@@ -56,8 +56,9 @@ partition image is built or flashed.
 Future builds use `make profile PROFILE=<name>` followed by
 `make port PROFILE=<name>`. The captured build manifest pins every source
 revision, while package-time rendering changes the installer/version/hash gate
-to that profile. A patch conflict or compile failure refuses to produce an
-installable ZIP.
+to that profile. Source synchronization fetches those object IDs directly and
+has no branch-history fallback. A missing revision, patch conflict, or compile
+failure refuses to produce an installable ZIP.
 
 ## Manual activation outline
 

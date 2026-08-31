@@ -6,55 +6,17 @@ BUILD=${2:?build}
 PROFILE=${3:?profile}
 CACHE=${4:?cache}
 TREE=$CACHE/lineage-22.2-display
-MANIFEST_REPO=$CACHE/manifest-display
-REPO=$CACHE/bin/repo
 OUT=$BUILD/soong-out
 COMPOSER_OUT=$BUILD/composer
 PROFILE_JSON=$SOURCE/profiles/$PROFILE.json
 EXACT_MANIFEST=$SOURCE/manifests/$PROFILE.xml
-
-# repo may create a local merge commit when the generated manifest repository
-# advances between builds.  Keep that identity confined to this build process
-# instead of mutating the build server's global Git configuration.
-export GIT_AUTHOR_NAME=hdmi-los-builder
-export GIT_AUTHOR_EMAIL=hdmi-los@localhost
-export GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
-export GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
+FILTERED_MANIFEST=$BUILD/exact-display-manifest.xml
 
 test -f "$EXACT_MANIFEST"
-mkdir -p "$CACHE/bin" "$TREE" "$MANIFEST_REPO" "$COMPOSER_OUT"
+mkdir -p "$TREE" "$COMPOSER_OUT"
 
-if [ ! -x "$REPO" ]; then
-    python - "$REPO" <<'PY'
-import pathlib, sys, urllib.request
-url = "https://storage.googleapis.com/git-repo-downloads/repo"
-target = pathlib.Path(sys.argv[1])
-target.write_bytes(urllib.request.urlopen(url, timeout=60).read())
-target.chmod(0o755)
-PY
-fi
-
-python "$SOURCE/build-support/filter-manifest.py" "$EXACT_MANIFEST" \
-    "$MANIFEST_REPO/default.xml"
-if [ ! -d "$MANIFEST_REPO/.git" ]; then
-    git -C "$MANIFEST_REPO" init -q
-    git -C "$MANIFEST_REPO" config user.name hdmi-los-builder
-    git -C "$MANIFEST_REPO" config user.email hdmi-los@localhost
-fi
-git -C "$MANIFEST_REPO" add default.xml
-if ! git -C "$MANIFEST_REPO" diff --cached --quiet; then
-    git -C "$MANIFEST_REPO" commit -q -m 'exact installed-build display manifest'
-fi
-
-# The generated manifest repository is tiny and authoritative.  Recreate its
-# repo checkout on every run so an interrupted shallow rebase cannot poison a
-# later retry; the large per-project object cache remains untouched.
-rm -rf -- "$TREE/.repo/manifests" "$TREE/.repo/manifests.git"
-
-(cd "$TREE" && "$REPO" init -q --depth=1 -u "file://$MANIFEST_REPO" -m default.xml)
-
-(cd "$TREE" && "$REPO" sync --no-tags --no-clone-bundle --optimized-fetch \
-    --prune --force-sync --fail-fast -j8)
+python "$SOURCE/build-support/filter-manifest.py" "$EXACT_MANIFEST" "$FILTERED_MANIFEST"
+python "$SOURCE/build-support/sync-exact-manifest.py" "$FILTERED_MANIFEST" "$TREE" 8
 
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
 patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")
