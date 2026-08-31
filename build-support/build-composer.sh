@@ -21,6 +21,8 @@ cp "$TREE/.hdmi-los-exact-manifest.json" "$BUILD/exact-source-sync.json"
 
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
 patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")
+release=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["device"]["ro.build.id"].split(".", 1)[0].lower())' "$PROFILE_JSON")
+[[ $release =~ ^[a-z0-9_]+$ ]]
 DISPLAY=$TREE/hardware/qcom-caf/sm8550/display
 git -C "$DISPLAY" am --abort >/dev/null 2>&1 || true
 git -C "$DISPLAY" reset --hard "$revision"
@@ -47,7 +49,7 @@ cp -a "$SOURCE/build-support/product/." "$TREE/device/hdmi/pdx234/"
     export BUILD_HOSTNAME=ResearchVM
     export ALLOW_MISSING_DEPENDENCIES=true
     source build/envsetup.sh
-    lunch hdmi_pdx234-userdebug
+    lunch "hdmi_pdx234-${release}-userdebug"
     m -j8 vendor.qti.hardware.display.composer-service libsdmcore libsdmdal
 ) 2>&1 | tee "$BUILD/composer-build.log"
 
