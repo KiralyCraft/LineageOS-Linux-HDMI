@@ -71,6 +71,7 @@ always_paths = {
     "system/tools/aidl",
     "system/tools/hidl",
     "system/tools/sysprop",
+    "toolchain/pgo-profiles",
     "vendor/qcom/opensource/commonsys/display",
     "vendor/qcom/opensource/commonsys-intf/display",
     "vendor/qcom/opensource/display",
