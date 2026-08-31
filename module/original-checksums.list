@@ -1,0 +1,4 @@
+# sha256|mode|uid|gid|selinux_context|absolute_target|module_relative_source
+974a96305bba4b6f215a77a769fabd2ab79b7a9036c8fd07bd04521c009fb371|0755|0|2000|u:object_r:hal_graphics_composer_default_exec:s0|/vendor/bin/hw/vendor.qti.hardware.display.composer-service|vendor/bin/hw/vendor.qti.hardware.display.composer-service
+f5620a5428f346be94614aea36d460ddf76c8f4ea935e458e3942261833926ff|0644|0|0|u:object_r:vendor_file:s0|/vendor/lib64/libsdmcore.so|vendor/lib64/libsdmcore.so
+5be213a18a22b225a0da84d7368190a6c1139671616ca252fe7ad44812bff30f|0644|0|0|u:object_r:vendor_file:s0|/vendor/lib64/libsdmdal.so|vendor/lib64/libsdmdal.so

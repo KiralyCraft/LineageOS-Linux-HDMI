@@ -1,0 +1,2 @@
+This module performs verified early-boot bind mounts in post-fs-data.sh.
+

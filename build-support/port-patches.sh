@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SOURCE=${1:?source}
+BUILD=${2:?build}
+PROFILE=${3:?profile}
+PROFILE_JSON=$SOURCE/profiles/$PROFILE.json
+DISPLAY=$BUILD/qcom-display
+CACHE=/bigdata/hdmi-los-build/cache/qcom-display.git
+
+revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
+patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")
+
+if [ ! -d "$CACHE" ]; then
+    git clone --mirror https://github.com/LineageOS/android_hardware_qcom_display.git "$CACHE"
+else
+    git -C "$CACHE" fetch --prune origin
+fi
+
+rm -rf -- "$DISPLAY"
+git clone --no-checkout --reference-if-able "$CACHE" "$CACHE" "$DISPLAY"
+git -C "$DISPLAY" checkout --detach "$revision"
+git -C "$DISPLAY" config user.name hdmi-los-builder
+git -C "$DISPLAY" config user.email hdmi-los@localhost
+
+while IFS= read -r patch; do
+    case "$patch" in ''|'#'*) continue ;; esac
+    git -C "$DISPLAY" am "$SOURCE/patches/$patchset/$patch"
+done < "$SOURCE/patches/$patchset/series"
+
+git -C "$DISPLAY" diff --check "$revision"..HEAD
+test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
+printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
+git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"
+

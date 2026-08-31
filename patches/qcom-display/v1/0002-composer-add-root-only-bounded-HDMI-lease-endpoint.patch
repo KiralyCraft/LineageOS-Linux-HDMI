@@ -1,0 +1,635 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: KiralyCraft <alexucu@gmail.com>
+Date: Mon, 31 Aug 2026 19:16:04 +0300
+Subject: [PATCH 2/2] composer: add root-only bounded HDMI lease endpoint
+
+---
+ composer/hdmi_lease_server.cpp | 241 +++++++++++++++++++++++++++++++++
+ composer/hdmi_lease_server.h   |  47 +++++++
+ composer/hdmi_los_protocol.h   |  58 ++++++++
+ composer/hwc_session.cpp       | 164 ++++++++++++++++++++++
+ composer/hwc_session.h         |  13 +-
+ 5 files changed, 522 insertions(+), 1 deletion(-)
+ create mode 100644 composer/hdmi_lease_server.cpp
+ create mode 100644 composer/hdmi_lease_server.h
+ create mode 100644 composer/hdmi_los_protocol.h
+
+diff --git a/composer/hdmi_lease_server.cpp b/composer/hdmi_lease_server.cpp
+new file mode 100644
+index 0000000..11aa622
+--- /dev/null
++++ b/composer/hdmi_lease_server.cpp
+@@ -0,0 +1,241 @@
++#include "hdmi_lease_server.h"
++
++#include <errno.h>
++#include <fcntl.h>
++#include <log/log.h>
++#include <poll.h>
++#include <stddef.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <time.h>
++#include <unistd.h>
++
++#include <algorithm>
++
++namespace sdm {
++namespace {
++
++constexpr int kComposerFailsafeSeconds = 65;
++
++socklen_t AbstractAddress(sockaddr_un *address, const char *name) {
++  memset(address, 0, sizeof(*address));
++  address->sun_family = AF_UNIX;
++  size_t length = std::min(strlen(name), sizeof(address->sun_path) - 2);
++  memcpy(address->sun_path + 1, name, length);
++  return static_cast<socklen_t>(offsetof(sockaddr_un, sun_path) + 1 + length);
++}
++
++void FillError(hdmi_los_message *response, int status, const char *detail) {
++  response->status = status;
++  response->state = HDMI_LOS_STATE_ERROR;
++  snprintf(response->detail, sizeof(response->detail), "%s", detail);
++}
++
++}  // namespace
++
++HdmiLeaseServer::HdmiLeaseServer(HdmiLeaseController *controller) : controller_(controller) {}
++
++HdmiLeaseServer::~HdmiLeaseServer() {
++  Stop();
++}
++
++int HdmiLeaseServer::Start() {
++  if (running_.exchange(true)) {
++    return 0;
++  }
++
++  listen_fd_ = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
++  if (listen_fd_ < 0) {
++    ALOGE("hdmi-los: cannot create composer socket: %s", strerror(errno));
++    running_ = false;
++    return -errno;
++  }
++
++  sockaddr_un address = {};
++  socklen_t address_length = AbstractAddress(&address, HDMI_LOS_COMPOSER_SOCKET);
++  if (bind(listen_fd_, reinterpret_cast<sockaddr *>(&address), address_length) < 0 ||
++      listen(listen_fd_, 1) < 0) {
++    int error = errno;
++    ALOGE("hdmi-los: cannot bind composer socket: %s", strerror(error));
++    close(listen_fd_);
++    listen_fd_ = -1;
++    running_ = false;
++    return -error;
++  }
++
++  int wake[2] = {-1, -1};
++  if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, wake) < 0) {
++    int error = errno;
++    close(listen_fd_);
++    listen_fd_ = -1;
++    running_ = false;
++    return -error;
++  }
++  wake_read_fd_ = wake[0];
++  wake_write_fd_ = wake[1];
++  thread_ = std::thread(&HdmiLeaseServer::ThreadMain, this);
++  ALOGI("hdmi-los: composer lease endpoint ready");
++  return 0;
++}
++
++void HdmiLeaseServer::Stop() {
++  if (!running_.exchange(false)) {
++    return;
++  }
++  if (wake_write_fd_ >= 0) {
++    char byte = 1;
++    (void)write(wake_write_fd_, &byte, sizeof(byte));
++  }
++  if (thread_.joinable()) {
++    thread_.join();
++  }
++  if (wake_read_fd_ >= 0) close(wake_read_fd_);
++  if (wake_write_fd_ >= 0) close(wake_write_fd_);
++  if (listen_fd_ >= 0) close(listen_fd_);
++  wake_read_fd_ = wake_write_fd_ = listen_fd_ = -1;
++}
++
++int64_t HdmiLeaseServer::MonotonicMs() {
++  timespec now = {};
++  clock_gettime(CLOCK_MONOTONIC, &now);
++  return static_cast<int64_t>(now.tv_sec) * 1000 + now.tv_nsec / 1000000;
++}
++
++bool HdmiLeaseServer::SendResponse(int client_fd, const hdmi_los_message &response, int fd) {
++  iovec iov = {const_cast<hdmi_los_message *>(&response), sizeof(response)};
++  msghdr message = {};
++  message.msg_iov = &iov;
++  message.msg_iovlen = 1;
++  char control[CMSG_SPACE(sizeof(int))] = {};
++  if (fd >= 0) {
++    message.msg_control = control;
++    message.msg_controllen = sizeof(control);
++    cmsghdr *cmsg = CMSG_FIRSTHDR(&message);
++    cmsg->cmsg_level = SOL_SOCKET;
++    cmsg->cmsg_type = SCM_RIGHTS;
++    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
++    memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
++  }
++  ssize_t sent;
++  do {
++    sent = sendmsg(client_fd, &message, MSG_NOSIGNAL);
++  } while (sent < 0 && errno == EINTR);
++  return sent == static_cast<ssize_t>(sizeof(response));
++}
++
++bool HdmiLeaseServer::HandleRequest(int client_fd, const hdmi_los_message &request) {
++  hdmi_los_message response = {};
++  response.magic = HDMI_LOS_MAGIC;
++  response.version = HDMI_LOS_VERSION;
++  response.opcode = request.opcode | HDMI_LOS_OP_RESPONSE;
++  response.request_id = request.request_id;
++
++  if (request.magic != HDMI_LOS_MAGIC || request.version != HDMI_LOS_VERSION) {
++    FillError(&response, HDMI_LOS_ERR_PROTOCOL, "protocol mismatch");
++    return SendResponse(client_fd, response, -1);
++  }
++
++  int lease_fd = -1;
++  switch (request.opcode) {
++    case HDMI_LOS_OP_STATUS:
++    case HDMI_LOS_OP_PING:
++      controller_->GetHdmiLeaseStatus(&response);
++      break;
++    case HDMI_LOS_OP_ACQUIRE:
++      response.status = controller_->AcquireHdmiLease(&response, &lease_fd);
++      if (response.status == HDMI_LOS_OK) {
++        deadline_ms_ = MonotonicMs() + kComposerFailsafeSeconds * 1000;
++      }
++      break;
++    case HDMI_LOS_OP_RELEASE:
++      response.status = controller_->ReleaseHdmiLease("broker request");
++      deadline_ms_ = 0;
++      controller_->GetHdmiLeaseStatus(&response);
++      break;
++    default:
++      FillError(&response, HDMI_LOS_ERR_PROTOCOL, "unknown opcode");
++      break;
++  }
++
++  bool delivered = SendResponse(client_fd, response, lease_fd);
++  if (lease_fd >= 0) close(lease_fd);
++  if (!delivered && request.opcode == HDMI_LOS_OP_ACQUIRE && response.status == HDMI_LOS_OK) {
++    controller_->ReleaseHdmiLease("lease fd delivery failed");
++    deadline_ms_ = 0;
++  }
++  return delivered;
++}
++
++void HdmiLeaseServer::ThreadMain() {
++  int client_fd = -1;
++  while (running_) {
++    pollfd fds[3] = {
++        {listen_fd_, POLLIN, 0},
++        {wake_read_fd_, POLLIN, 0},
++        {client_fd, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
++    };
++    int timeout = 1000;
++    if (deadline_ms_ > 0) {
++      timeout = static_cast<int>(std::max<int64_t>(0, std::min<int64_t>(1000,
++                                            deadline_ms_ - MonotonicMs())));
++    }
++    int result;
++    do {
++      result = poll(fds, client_fd >= 0 ? 3 : 2, timeout);
++    } while (result < 0 && errno == EINTR);
++    if (!running_ || (result > 0 && (fds[1].revents & POLLIN))) break;
++
++    if (deadline_ms_ > 0 && MonotonicMs() >= deadline_ms_) {
++      ALOGW("hdmi-los: composer failsafe expired");
++      controller_->ReleaseHdmiLease("composer 65 second failsafe");
++      deadline_ms_ = 0;
++    }
++
++    if (result > 0 && (fds[0].revents & POLLIN)) {
++      int accepted = accept4(listen_fd_, nullptr, nullptr, SOCK_CLOEXEC);
++      if (accepted >= 0) {
++        ucred credentials = {};
++        socklen_t length = sizeof(credentials);
++        if (getsockopt(accepted, SOL_SOCKET, SO_PEERCRED, &credentials, &length) < 0 ||
++            credentials.uid != 0 || client_fd >= 0) {
++          ALOGW("hdmi-los: rejected composer client uid=%u", credentials.uid);
++          close(accepted);
++        } else {
++          client_fd = accepted;
++          ALOGI("hdmi-los: root broker connected");
++        }
++      }
++    }
++
++    if (client_fd >= 0 && result > 0 && (fds[2].revents & POLLIN)) {
++      hdmi_los_message request = {};
++      ssize_t received;
++      do {
++        received = recv(client_fd, &request, sizeof(request), 0);
++      } while (received < 0 && errno == EINTR);
++      if (received != static_cast<ssize_t>(sizeof(request)) ||
++          !HandleRequest(client_fd, request)) {
++        shutdown(client_fd, SHUT_RDWR);
++        close(client_fd);
++        client_fd = -1;
++        controller_->ReleaseHdmiLease("broker disconnected");
++        deadline_ms_ = 0;
++      }
++    }
++    if (client_fd >= 0 && result > 0 &&
++        (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
++      shutdown(client_fd, SHUT_RDWR);
++      close(client_fd);
++      client_fd = -1;
++      controller_->ReleaseHdmiLease("broker disconnected");
++      deadline_ms_ = 0;
++    }
++  }
++
++  if (client_fd >= 0) close(client_fd);
++  controller_->ReleaseHdmiLease("composer lease server stopped");
++}
++
++}  // namespace sdm
+diff --git a/composer/hdmi_lease_server.h b/composer/hdmi_lease_server.h
+new file mode 100644
+index 0000000..bf8355a
+--- /dev/null
++++ b/composer/hdmi_lease_server.h
+@@ -0,0 +1,47 @@
++#ifndef HDMI_LEASE_SERVER_H
++#define HDMI_LEASE_SERVER_H
++
++#include <atomic>
++#include <memory>
++#include <thread>
++
++#include "hdmi_los_protocol.h"
++
++namespace sdm {
++
++class HdmiLeaseController {
++ public:
++  virtual int AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) = 0;
++  virtual int ReleaseHdmiLease(const char *reason) = 0;
++  virtual void GetHdmiLeaseStatus(hdmi_los_message *status) = 0;
++
++ protected:
++  virtual ~HdmiLeaseController() = default;
++};
++
++class HdmiLeaseServer {
++ public:
++  explicit HdmiLeaseServer(HdmiLeaseController *controller);
++  ~HdmiLeaseServer();
++
++  int Start();
++  void Stop();
++
++ private:
++  void ThreadMain();
++  bool HandleRequest(int client_fd, const hdmi_los_message &request);
++  bool SendResponse(int client_fd, const hdmi_los_message &response, int fd);
++  static int64_t MonotonicMs();
++
++  HdmiLeaseController *controller_ = nullptr;
++  std::atomic<bool> running_ = false;
++  std::thread thread_;
++  int listen_fd_ = -1;
++  int wake_read_fd_ = -1;
++  int wake_write_fd_ = -1;
++  int64_t deadline_ms_ = 0;
++};
++
++}  // namespace sdm
++
++#endif
+diff --git a/composer/hdmi_los_protocol.h b/composer/hdmi_los_protocol.h
+new file mode 100644
+index 0000000..0a6de4b
+--- /dev/null
++++ b/composer/hdmi_los_protocol.h
+@@ -0,0 +1,58 @@
++#ifndef HDMI_LOS_PROTOCOL_H
++#define HDMI_LOS_PROTOCOL_H
++
++#include <stdint.h>
++
++#define HDMI_LOS_MAGIC 0x48444d49u
++#define HDMI_LOS_VERSION 1u
++#define HDMI_LOS_MESSAGE_SIZE 160u
++#define HDMI_LOS_COMPOSER_SOCKET "hdmi-los-composer-v1"
++
++enum hdmi_los_opcode {
++  HDMI_LOS_OP_STATUS = 1,
++  HDMI_LOS_OP_ACQUIRE = 2,
++  HDMI_LOS_OP_RELEASE = 3,
++  HDMI_LOS_OP_PING = 4,
++  HDMI_LOS_OP_RESPONSE = 0x8000,
++};
++
++enum hdmi_los_state {
++  HDMI_LOS_STATE_ANDROID = 0,
++  HDMI_LOS_STATE_DRAINING = 1,
++  HDMI_LOS_STATE_LEASED = 2,
++  HDMI_LOS_STATE_RESTORING = 3,
++  HDMI_LOS_STATE_UNAVAILABLE = 4,
++  HDMI_LOS_STATE_ERROR = 5,
++};
++
++enum hdmi_los_status {
++  HDMI_LOS_OK = 0,
++  HDMI_LOS_ERR_PROTOCOL = -1,
++  HDMI_LOS_ERR_BUSY = -2,
++  HDMI_LOS_ERR_UNAVAILABLE = -3,
++  HDMI_LOS_ERR_PERMISSION = -4,
++  HDMI_LOS_ERR_STATE = -5,
++  HDMI_LOS_ERR_IO = -6,
++  HDMI_LOS_ERR_TIMEOUT = -7,
++};
++
++struct hdmi_los_message {
++  uint32_t magic;
++  uint16_t version;
++  uint16_t opcode;
++  uint32_t request_id;
++  int32_t status;
++  uint32_t state;
++  uint32_t remaining_seconds;
++  uint32_t connector_id;
++  uint32_t crtc_id;
++  uint32_t plane_id;
++  uint32_t lessee_id;
++  uint32_t flags;
++  char detail[116];
++};
++
++static_assert(sizeof(hdmi_los_message) == HDMI_LOS_MESSAGE_SIZE,
++              "hdmi_los_message ABI changed");
++
++#endif
+diff --git a/composer/hwc_session.cpp b/composer/hwc_session.cpp
+index 5d99958..db87b1b 100644
+--- a/composer/hwc_session.cpp
++++ b/composer/hwc_session.cpp
+@@ -339,6 +339,12 @@ int HWCSession::Init() {
+   is_composer_up_ = true;
+   StartServices();
+ 
++  hdmi_lease_server_ = std::make_unique<HdmiLeaseServer>(this);
++  if (hdmi_lease_server_->Start() != 0) {
++    DLOGW("hdmi-los: lease endpoint unavailable; normal composer operation continues");
++    hdmi_lease_server_.reset();
++  }
++
+   PostInit();
+ 
+   GetVirtualDisplayList();
+@@ -354,6 +360,12 @@ void HWCSession::PostInit() {
+ }
+ 
+ int HWCSession::Deinit() {
++  if (hdmi_lease_server_) {
++    hdmi_lease_server_->Stop();
++    hdmi_lease_server_.reset();
++  }
++  ReleaseHdmiLease("composer deinitializing");
++
+   // Destroy all connected displays
+   DestroyDisplay(&map_info_primary_);
+ 
+@@ -383,6 +395,141 @@ int HWCSession::Deinit() {
+   return 0;
+ }
+ 
++void HWCSession::GetHdmiLeaseStatus(hdmi_los_message *status) {
++  if (!status) return;
++  std::lock_guard<std::mutex> lock(hdmi_lease_mutex_);
++  status->status = HDMI_LOS_OK;
++  status->state = hdmi_lease_state_.load();
++  status->connector_id = hdmi_lease_info_.connector_id;
++  status->crtc_id = hdmi_lease_info_.crtc_id;
++  status->plane_id = hdmi_lease_info_.plane_id;
++  status->lessee_id = hdmi_lease_info_.lessee_id;
++  snprintf(status->detail, sizeof(status->detail), "%s", hdmi_lease_detail_.c_str());
++}
++
++int HWCSession::AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) {
++  if (!status || !lease_fd) return HDMI_LOS_ERR_PROTOCOL;
++  std::lock_guard<std::mutex> lease_lock(hdmi_lease_mutex_);
++  if (hdmi_lease_state_.load() != HDMI_LOS_STATE_ANDROID) {
++    snprintf(status->detail, sizeof(status->detail), "lease transition already active");
++    status->state = hdmi_lease_state_.load();
++    return HDMI_LOS_ERR_BUSY;
++  }
++  if (!callbacks_.IsClientConnected() || secure_session_active_ || IsVirtualDisplayConnected()) {
++    snprintf(status->detail, sizeof(status->detail),
++             "SurfaceFlinger, secure session, or virtual-display state forbids leasing");
++    status->state = HDMI_LOS_STATE_UNAVAILABLE;
++    return HDMI_LOS_ERR_UNAVAILABLE;
++  }
++
++  hdmi_lease_state_ = HDMI_LOS_STATE_DRAINING;
++  hdmi_lease_detail_ = "pausing Android external display";
++  DisplayLeaseInfo lease = {};
++  int selected = -1;
++  int connected_count = 0;
++  int result = HDMI_LOS_ERR_UNAVAILABLE;
++  {
++    SCOPE_LOCK(pluggable_handler_lock_);
++    for (auto &map_info : map_info_pluggable_) {
++      if (map_info.client_id < HWCCallbacks::kNumDisplays &&
++          hwc_display_[map_info.client_id] != nullptr) {
++        selected = static_cast<int>(map_info.client_id);
++        connected_count++;
++      }
++    }
++    if (connected_count != 1 || selected < 0) {
++      hdmi_lease_detail_ = "exactly one active Android pluggable display is required";
++    } else {
++      SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
++      HWCDisplay *display = hwc_display_[selected];
++      if (!display || !display->IsExternalDisplayLeaseReady()) {
++        hdmi_lease_detail_ = "external display is not on and lease-ready";
++      } else if (display->PrepareExternalDisplayLease(&lease) != 0) {
++        hdmi_lease_detail_ = "cannot pin the external display primary plane";
++      } else if (display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause) != 0) {
++        display->ResetExternalDisplayLease();
++        hdmi_lease_detail_ = "Android could not pause the external display";
++      } else if (display->CreateExternalDisplayLease(&lease) != 0 || lease.lease_fd < 0) {
++        display->RevokeExternalDisplayLease();
++        display->ResetExternalDisplayLease();
++        display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
++        hdmi_lease_detail_ = "DRM lease creation failed; Android was resumed";
++      } else {
++        hdmi_lease_display_idx_ = selected;
++        hdmi_lease_info_ = lease;
++        *lease_fd = lease.lease_fd;
++        hdmi_lease_state_ = HDMI_LOS_STATE_LEASED;
++        hdmi_lease_detail_ = "external display leased to root broker";
++        result = HDMI_LOS_OK;
++      }
++    }
++  }
++
++  if (result != HDMI_LOS_OK) {
++    hdmi_lease_state_ = HDMI_LOS_STATE_ANDROID;
++    hdmi_lease_display_idx_ = -1;
++    hdmi_lease_info_ = {};
++  }
++  status->state = hdmi_lease_state_.load();
++  status->connector_id = hdmi_lease_info_.connector_id;
++  status->crtc_id = hdmi_lease_info_.crtc_id;
++  status->plane_id = hdmi_lease_info_.plane_id;
++  status->lessee_id = hdmi_lease_info_.lessee_id;
++  snprintf(status->detail, sizeof(status->detail), "%s", hdmi_lease_detail_.c_str());
++  if (result == HDMI_LOS_OK) {
++    hwc2_display_t primary = GetActiveBuiltinDisplay();
++    if (primary < HWCCallbacks::kNumDisplays) callbacks_.Refresh(primary);
++  }
++  return result;
++}
++
++int HWCSession::ReleaseHdmiLease(const char *reason) {
++  std::lock_guard<std::mutex> lease_lock(hdmi_lease_mutex_);
++  uint32_t state = hdmi_lease_state_.load();
++  if (state == HDMI_LOS_STATE_ANDROID && hdmi_lease_display_idx_ < 0) {
++    return HDMI_LOS_OK;
++  }
++
++  hdmi_lease_state_ = HDMI_LOS_STATE_RESTORING;
++  hdmi_lease_detail_ = reason ? reason : "restoring Android external display";
++  int result = HDMI_LOS_OK;
++  bool connected = false;
++  int selected = hdmi_lease_display_idx_;
++  {
++    SCOPE_LOCK(pluggable_handler_lock_);
++    if (selected >= 0 && selected < static_cast<int>(HWCCallbacks::kNumDisplays) &&
++        hwc_display_[selected]) {
++      SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
++      HWCDisplay *display = hwc_display_[selected];
++      if (display->RevokeExternalDisplayLease() != 0) result = HDMI_LOS_ERR_IO;
++      connected = display->IsExternalDisplayLeaseConnected();
++      if (display->ResetExternalDisplayLease() != 0) result = HDMI_LOS_ERR_IO;
++      if (connected && display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) != 0) {
++        result = HDMI_LOS_ERR_IO;
++      }
++    }
++  }
++
++  hdmi_lease_info_ = {};
++  if (result == HDMI_LOS_OK || !connected) {
++    hdmi_lease_display_idx_ = -1;
++    hdmi_lease_state_ = HDMI_LOS_STATE_ANDROID;
++    hdmi_lease_detail_ = connected ? "Android external display restored" :
++                                      "lease ended after external disconnect";
++  } else {
++    hdmi_lease_state_ = HDMI_LOS_STATE_ERROR;
++    hdmi_lease_detail_ = "lease revoked, but synchronized Android resume reported an error";
++  }
++
++  if (connected) {
++    hwc2_display_t primary = GetActiveBuiltinDisplay();
++    if (primary < HWCCallbacks::kNumDisplays) callbacks_.Refresh(primary);
++  } else {
++    pending_hotplug_event_ = kHotPlugEvent;
++  }
++  return result;
++}
++
+ void HWCSession::InitSupportedDisplaySlots() {
+   // Default slots:
+   //    Primary = 0, External = 1
+@@ -842,6 +989,9 @@ int32_t HWCSession::PresentDisplay(hwc2_display_t display, shared_ptr<Fence> *ou
+   }
+ 
+   HandleSecureSession();
++  if (secure_session_active_ && hdmi_lease_state_.load() == HDMI_LOS_STATE_LEASED) {
++    ReleaseHdmiLease("secure display session requested");
++  }
+ 
+   {
+     SEQUENCE_EXIT_SCOPE_LOCK(locker_[display]);
+@@ -2785,6 +2935,16 @@ void HWCSession::UEventHandler(int connected) {
+ 
+   DLOGI("Handling event, counter: %d", uevent_counter_.load());
+ 
++  if (hdmi_lease_state_.load() != HDMI_LOS_STATE_ANDROID) {
++    pending_hotplug_event_ = kHotPlugEvent;
++    if (connected == 0) {
++      ReleaseHdmiLease("external display unplugged");
++    } else {
++      DLOGI("hdmi-los: deferring hotplug while external display is leased");
++      return;
++    }
++  }
++
+   // Handle hotplug.
+   int32_t err = HandlePluggableDisplays(true);
+   if (err) {
+@@ -3034,6 +3194,10 @@ bool HWCSession::IsHWDisplayConnected(hwc2_display_t client_id) {
+ }
+ 
+ int HWCSession::HandlePluggableDisplays(bool delay_hotplug) {
++  if (hdmi_lease_state_.load() != HDMI_LOS_STATE_ANDROID) {
++    pending_hotplug_event_ = kHotPlugEvent;
++    return -EAGAIN;
++  }
+   SCOPE_LOCK(pluggable_handler_lock_);
+   HWDisplaysInfo hw_displays_info = {};
+   hwc2_display_t virtual_display_index =
+diff --git a/composer/hwc_session.h b/composer/hwc_session.h
+index c4edded..eb10dfa 100644
+--- a/composer/hwc_session.h
++++ b/composer/hwc_session.h
+@@ -61,6 +61,7 @@
+ #include "hwc_display_event_handler.h"
+ #include "hwc_buffer_sync_handler.h"
+ #include "hwc_display_virtual_factory.h"
++#include "hdmi_lease_server.h"
+ 
+ using ::android::hardware::Return;
+ using ::android::hardware::hidl_string;
+@@ -131,7 +132,8 @@ constexpr int32_t kDataspaceSaturationPropertyElements = 9;
+ constexpr int32_t kPropertyMax = 256;
+ 
+ class HWCSession : hwc2_device_t, HWCUEventListener, public qClient::BnQClient,
+-                   public HWCDisplayEventHandler, public DisplayConfig::ClientContext {
++                   public HWCDisplayEventHandler, public DisplayConfig::ClientContext,
++                   public HdmiLeaseController {
+ 
+  friend class aidl::vendor::qti::hardware::display::config::DisplayConfigAIDL;
+ 
+@@ -152,6 +154,9 @@ class HWCSession : hwc2_device_t, HWCUEventListener, public qClient::BnQClient,
+   HWCSession();
+   int Init();
+   int Deinit();
++  int AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) override;
++  int ReleaseHdmiLease(const char *reason) override;
++  void GetHdmiLeaseStatus(hdmi_los_message *status) override;
+   HWC2::Error CreateVirtualDisplayObj(uint32_t width, uint32_t height, int32_t *format,
+                                       hwc2_display_t *out_display_id);
+ 
+@@ -674,6 +679,12 @@ class HWCSession : hwc2_device_t, HWCUEventListener, public qClient::BnQClient,
+   std::map <hwc2_display_t, sdm::DisplayType> map_active_displays_;
+   vector<HWDisplayInfo> virtual_display_list_ = {};
+   std::map <hwc2_display_t, std::future<int>> commit_done_future_;
++  std::unique_ptr<HdmiLeaseServer> hdmi_lease_server_;
++  std::mutex hdmi_lease_mutex_;
++  std::atomic<uint32_t> hdmi_lease_state_{HDMI_LOS_STATE_ANDROID};
++  int hdmi_lease_display_idx_ = -1;
++  DisplayLeaseInfo hdmi_lease_info_ = {};
++  std::string hdmi_lease_detail_ = "Android owns external display";
+ };
+ }  // namespace sdm
+ 

@@ -1,0 +1,5 @@
+# run-agent.sh defaults to auto-detecting the MacroSilicon 534d:2109 capture card.
+# Disable capture explicitly when using a normal monitor:
+#   sudo ./run-agent.sh --capture none
+# Or select a particular node:
+#   sudo ./run-agent.sh --capture /dev/video2

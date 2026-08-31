@@ -1,0 +1,431 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: KiralyCraft <alexucu@gmail.com>
+Date: Mon, 31 Aug 2026 19:16:04 +0300
+Subject: [PATCH 1/2] sdm: add coordinated external DRM lease lifecycle
+
+---
+ composer/hwc_display.cpp             |  33 +++++
+ composer/hwc_display.h               |   6 +
+ sdm/include/core/display_interface.h |  25 ++++
+ sdm/include/private/hw_interface.h   |  12 ++
+ sdm/libs/core/display_base.cpp       |  25 ++++
+ sdm/libs/core/display_base.h         |   5 +
+ sdm/libs/dal/hw_device_drm.cpp       | 184 +++++++++++++++++++++++++++
+ sdm/libs/dal/hw_device_drm.h         |   9 ++
+ 8 files changed, 299 insertions(+)
+
+diff --git a/composer/hwc_display.cpp b/composer/hwc_display.cpp
+index 6eb9468..ad32f46 100755
+--- a/composer/hwc_display.cpp
++++ b/composer/hwc_display.cpp
+@@ -2251,6 +2251,39 @@ int HWCDisplay::SetDisplayStatus(DisplayStatus display_status) {
+   return status;
+ }
+ 
++int HWCDisplay::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
++  if (!lease || !IsExternalDisplayLeaseReady()) {
++    return -EINVAL;
++  }
++  return display_intf_->PrepareExternalDisplayLease(lease) == kErrorNone ? 0 : -EIO;
++}
++
++int HWCDisplay::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
++  if (!lease || !display_paused_) {
++    return -EINVAL;
++  }
++  return display_intf_->CreateExternalDisplayLease(lease) == kErrorNone ? 0 : -EIO;
++}
++
++int HWCDisplay::RevokeExternalDisplayLease() {
++  DisplayError error = display_intf_->RevokeExternalDisplayLease();
++  return (error == kErrorNone || error == kErrorNotSupported) ? 0 : -EIO;
++}
++
++int HWCDisplay::ResetExternalDisplayLease() {
++  return display_intf_->ResetExternalDisplayLease() == kErrorNone ? 0 : -EIO;
++}
++
++bool HWCDisplay::IsExternalDisplayLeaseConnected() {
++  bool connected = false;
++  return display_intf_->IsExternalDisplayLeaseConnected(&connected) == kErrorNone && connected;
++}
++
++bool HWCDisplay::IsExternalDisplayLeaseReady() const {
++  return !shutdown_pending_ && !display_paused_ && secure_event_ == kSecureEventMax &&
++         current_power_mode_ == HWC2::PowerMode::On;
++}
++
+ HWC2::Error HWCDisplay::SetCursorPosition(hwc2_layer_t layer, int x, int y) {
+   if (shutdown_pending_) {
+     return HWC2::Error::None;
+diff --git a/composer/hwc_display.h b/composer/hwc_display.h
+index 624750b..3ad5b4e 100644
+--- a/composer/hwc_display.h
++++ b/composer/hwc_display.h
+@@ -484,6 +484,12 @@ class HWCDisplay : public DisplayEventHandler {
+                              int active_config_index, uint32_t num_configs) {};
+   virtual void Abort();
+   virtual void MarkClientActive(bool is_client_up);
++  int PrepareExternalDisplayLease(DisplayLeaseInfo *lease);
++  int CreateExternalDisplayLease(DisplayLeaseInfo *lease);
++  int RevokeExternalDisplayLease();
++  int ResetExternalDisplayLease();
++  bool IsExternalDisplayLeaseConnected();
++  bool IsExternalDisplayLeaseReady() const;
+ 
+  protected:
+   static uint32_t throttling_refresh_rate_;
+diff --git a/sdm/include/core/display_interface.h b/sdm/include/core/display_interface.h
+index 0560e36..3fc83bf 100644
+--- a/sdm/include/core/display_interface.h
++++ b/sdm/include/core/display_interface.h
+@@ -450,6 +450,17 @@ class DisplayEventHandler {
+ struct PPDisplayAPIPayload;
+ struct PPPendingParams;
+ 
++// Information for a deliberately short-lived DRM lease of a pluggable display.
++// The descriptor is owned by the caller and must be closed after SCM_RIGHTS
++// delivery. Only the DRM-owning display implementation may populate it.
++struct DisplayLeaseInfo {
++  int lease_fd = -1;
++  uint32_t connector_id = 0;
++  uint32_t crtc_id = 0;
++  uint32_t plane_id = 0;
++  uint32_t lessee_id = 0;
++};
++
+ /*! @brief Display device interface.
+ 
+   @details This class defines display device interface. It contains methods which client shall use
+@@ -1340,6 +1351,20 @@ class DisplayInterface {
+   */
+   virtual DisplayError SetDemuraState(int state) = 0;
+ 
++  // Experimental pdx234 external-display lease hooks. Implementations other
++  // than the DRM pluggable display deliberately reject these operations.
++  virtual DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
++    return kErrorNotSupported;
++  }
++  virtual DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
++    return kErrorNotSupported;
++  }
++  virtual DisplayError RevokeExternalDisplayLease() { return kErrorNotSupported; }
++  virtual DisplayError ResetExternalDisplayLease() { return kErrorNotSupported; }
++  virtual DisplayError IsExternalDisplayLeaseConnected(bool *connected) {
++    return kErrorNotSupported;
++  }
++
+  protected:
+   virtual ~DisplayInterface() { }
+ };
+diff --git a/sdm/include/private/hw_interface.h b/sdm/include/private/hw_interface.h
+index c4583c5..825e794 100644
+--- a/sdm/include/private/hw_interface.h
++++ b/sdm/include/private/hw_interface.h
+@@ -186,6 +186,18 @@ class HWInterface {
+   virtual DisplayError CancelDeferredPowerMode() = 0;
+   virtual void HandleCwbTeardown() = 0;
+ 
++  virtual DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
++    return kErrorNotSupported;
++  }
++  virtual DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
++    return kErrorNotSupported;
++  }
++  virtual DisplayError RevokeExternalDisplayLease() { return kErrorNotSupported; }
++  virtual DisplayError ResetExternalDisplayLease() { return kErrorNotSupported; }
++  virtual DisplayError IsExternalDisplayLeaseConnected(bool *connected) {
++    return kErrorNotSupported;
++  }
++
+  protected:
+   virtual ~HWInterface() { }
+ };
+diff --git a/sdm/libs/core/display_base.cpp b/sdm/libs/core/display_base.cpp
+index 331a0cc..a9a668a 100644
+--- a/sdm/libs/core/display_base.cpp
++++ b/sdm/libs/core/display_base.cpp
+@@ -1960,6 +1960,31 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state, bool teardown,
+   return error;
+ }
+ 
++DisplayError DisplayBase::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
++  ClientLock lock(disp_mutex_);
++  return hw_intf_->PrepareExternalDisplayLease(lease);
++}
++
++DisplayError DisplayBase::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
++  ClientLock lock(disp_mutex_);
++  return hw_intf_->CreateExternalDisplayLease(lease);
++}
++
++DisplayError DisplayBase::RevokeExternalDisplayLease() {
++  ClientLock lock(disp_mutex_);
++  return hw_intf_->RevokeExternalDisplayLease();
++}
++
++DisplayError DisplayBase::ResetExternalDisplayLease() {
++  ClientLock lock(disp_mutex_);
++  return hw_intf_->ResetExternalDisplayLease();
++}
++
++DisplayError DisplayBase::IsExternalDisplayLeaseConnected(bool *connected) {
++  ClientLock lock(disp_mutex_);
++  return hw_intf_->IsExternalDisplayLeaseConnected(connected);
++}
++
+ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
+   ClientLock lock(disp_mutex_);
+   DisplayError error = kErrorNone;
+diff --git a/sdm/libs/core/display_base.h b/sdm/libs/core/display_base.h
+index c5be953..45b31d2 100644
+--- a/sdm/libs/core/display_base.h
++++ b/sdm/libs/core/display_base.h
+@@ -253,6 +253,11 @@ class DisplayBase : public DisplayInterface, public CompManagerEventHandler {
+   virtual bool HandleCwbTeardown();
+   virtual uint32_t GetAvailableMixerCount();
+   virtual DisplayError SetDemuraState(int state) { return kErrorNotSupported; }
++  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) override;
++  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) override;
++  DisplayError RevokeExternalDisplayLease() override;
++  DisplayError ResetExternalDisplayLease() override;
++  DisplayError IsExternalDisplayLeaseConnected(bool *connected) override;
+ 
+  protected:
+   struct DisplayMutex {
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 8ce6a1d..f31a675 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -38,6 +38,7 @@
+ #include <ctype.h>
+ #include <time.h>
+ #include <drm/drm_fourcc.h>
++#include <drm/drm_mode.h>
+ #include <drm_lib_loader.h>
+ #include <drm_master.h>
+ #include <drm_res_mgr.h>
+@@ -121,6 +122,31 @@ using sde_drm::DRMCWbCaptureMode;
+ 
+ namespace sdm {
+ 
++namespace {
++
++bool GetDrmProperty(int fd, uint32_t object_id, uint32_t object_type, const char *name,
++                    uint32_t *property_id, uint64_t *value) {
++  drmModeObjectPropertiesPtr properties = drmModeObjectGetProperties(fd, object_id, object_type);
++  if (!properties) {
++    return false;
++  }
++  bool found = false;
++  for (uint32_t i = 0; i < properties->count_props; ++i) {
++    drmModePropertyPtr property = drmModeGetProperty(fd, properties->props[i]);
++    if (property && strcmp(property->name, name) == 0) {
++      if (property_id) *property_id = property->prop_id;
++      if (value) *value = properties->prop_values[i];
++      found = true;
++    }
++    if (property) drmModeFreeProperty(property);
++    if (found) break;
++  }
++  drmModeFreeObjectProperties(properties);
++  return found;
++}
++
++}  // namespace
++
+ std::atomic<uint32_t> HWDeviceDRM::hw_dest_scaler_blocks_used_(0);
+ HWCwbConfig HWDeviceDRM::cwb_config_ = {};
+ std::mutex HWDeviceDRM::cwb_state_lock_;
+@@ -2531,6 +2557,164 @@ void HWDeviceDRM::GetDRMDisplayToken(sde_drm::DRMDisplayToken *token) const {
+   *token = token_;
+ }
+ 
++DisplayError HWDeviceDRM::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
++  if (!lease || disp_type_ != DRMDisplayType::TV || lease_prepared_ || lease_active_ ||
++      dev_fd_ < 0 || !drmIsMaster(dev_fd_) || !active_) {
++    return kErrorNotSupported;
++  }
++
++  drmModePlaneResPtr resources = drmModeGetPlaneResources(dev_fd_);
++  if (!resources) {
++    DLOGE("hdmi-los: cannot enumerate DRM planes: %s", strerror(errno));
++    return kErrorHardware;
++  }
++
++  uint32_t selected = 0;
++  for (uint32_t i = 0; i < resources->count_planes; ++i) {
++    drmModePlanePtr plane = drmModeGetPlane(dev_fd_, resources->planes[i]);
++    uint64_t type = UINT64_MAX;
++    if (plane && plane->crtc_id == token_.crtc_id &&
++        GetDrmProperty(dev_fd_, plane->plane_id, DRM_MODE_OBJECT_PLANE, "type", nullptr, &type) &&
++        type == DRM_PLANE_TYPE_PRIMARY) {
++      selected = plane->plane_id;
++    }
++    if (plane) drmModeFreePlane(plane);
++    if (selected) break;
++  }
++  drmModeFreePlaneResources(resources);
++  if (!selected) {
++    DLOGE("hdmi-los: external CRTC %u has no active primary plane", token_.crtc_id);
++    return kErrorResources;
++  }
++
++  lease_plane_id_ = selected;
++  lease_prepared_ = true;
++  lease->connector_id = token_.conn_id;
++  lease->crtc_id = token_.crtc_id;
++  lease->plane_id = selected;
++  DLOGI("hdmi-los: prepared connector=%u crtc=%u primary-plane=%u",
++        token_.conn_id, token_.crtc_id, selected);
++  return kErrorNone;
++}
++
++DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
++  if (!lease || !lease_prepared_ || lease_active_ || lease_plane_id_ == 0 || active_) {
++    return kErrorParameters;
++  }
++
++  bool connected = false;
++  if (IsExternalDisplayLeaseConnected(&connected) != kErrorNone || !connected) {
++    return kErrorDeviceRemoved;
++  }
++
++  drmModePlanePtr plane = drmModeGetPlane(dev_fd_, lease_plane_id_);
++  if (!plane || (plane->crtc_id != 0 && plane->crtc_id != token_.crtc_id)) {
++    if (plane) drmModeFreePlane(plane);
++    DLOGE("hdmi-los: prepared plane was reassigned before lease creation");
++    return kErrorResources;
++  }
++  drmModeFreePlane(plane);
++
++  uint32_t objects[] = {token_.conn_id, token_.crtc_id, lease_plane_id_};
++  uint32_t lessee_id = 0;
++  int fd = drmModeCreateLease(dev_fd_, objects, 3, O_CLOEXEC, &lessee_id);
++  if (fd < 0) {
++    DLOGE("hdmi-los: drmModeCreateLease failed: %s", strerror(errno));
++    return kErrorHardware;
++  }
++
++  lease_active_ = true;
++  lease_lessee_id_ = lessee_id;
++  lease->lease_fd = fd;
++  lease->connector_id = token_.conn_id;
++  lease->crtc_id = token_.crtc_id;
++  lease->plane_id = lease_plane_id_;
++  lease->lessee_id = lessee_id;
++  DLOGI("hdmi-los: created DRM lease %u", lessee_id);
++  return kErrorNone;
++}
++
++DisplayError HWDeviceDRM::RevokeExternalDisplayLease() {
++  if (!lease_active_) {
++    return kErrorNone;
++  }
++  if (drmModeRevokeLease(dev_fd_, lease_lessee_id_) < 0 && errno != ENOENT) {
++    DLOGE("hdmi-los: drmModeRevokeLease(%u) failed: %s", lease_lessee_id_, strerror(errno));
++    return kErrorHardware;
++  }
++  lease_active_ = false;
++  DLOGI("hdmi-los: revoked DRM lease %u", lease_lessee_id_);
++  return kErrorNone;
++}
++
++DisplayError HWDeviceDRM::ResetExternalDisplayLease() {
++  DisplayError result = kErrorNone;
++  if (lease_active_ && RevokeExternalDisplayLease() != kErrorNone) {
++    result = kErrorHardware;
++  }
++
++  if (lease_plane_id_ != 0) {
++    uint32_t crtc_property = 0;
++    uint32_t fb_property = 0;
++    if (GetDrmProperty(dev_fd_, lease_plane_id_, DRM_MODE_OBJECT_PLANE, "CRTC_ID",
++                       &crtc_property, nullptr) &&
++        GetDrmProperty(dev_fd_, lease_plane_id_, DRM_MODE_OBJECT_PLANE, "FB_ID",
++                       &fb_property, nullptr)) {
++      drmModeAtomicReqPtr request = drmModeAtomicAlloc();
++      if (!request || drmModeAtomicAddProperty(request, lease_plane_id_, crtc_property, 0) < 0 ||
++          drmModeAtomicAddProperty(request, lease_plane_id_, fb_property, 0) < 0 ||
++          drmModeAtomicCommit(dev_fd_, request,
++                              DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_TEST_ONLY,
++                              nullptr) < 0 ||
++          drmModeAtomicCommit(dev_fd_, request, DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr) < 0) {
++        DLOGE("hdmi-los: failed to detach leased plane %u: %s", lease_plane_id_,
++              strerror(errno));
++        result = kErrorHardware;
++      }
++      if (request) drmModeAtomicFree(request);
++    } else {
++      result = kErrorHardware;
++    }
++  }
++
++  bool connected = false;
++  IsExternalDisplayLeaseConnected(&connected);
++  if (connected && drm_atomic_intf_) {
++    drm_atomic_intf_->Perform(DRMOps::PLANES_RESET_CACHE, token_.crtc_id);
++    drm_atomic_intf_->Perform(DRMOps::CRTC_RESET_CACHE, token_.crtc_id);
++    drmModeModeInfo current_mode = connector_info_.modes[current_mode_index_].mode;
++    drm_atomic_intf_->Perform(DRMOps::CONNECTOR_SET_CRTC, token_.conn_id, token_.crtc_id);
++    drm_atomic_intf_->Perform(DRMOps::CRTC_SET_MODE, token_.crtc_id, &current_mode);
++    drm_atomic_intf_->Perform(DRMOps::CRTC_SET_ACTIVE, token_.crtc_id, 0);
++    drm_atomic_intf_->Perform(DRMOps::CONNECTOR_SET_POWER_MODE, token_.conn_id,
++                              DRMPowerMode::OFF);
++    if (NullCommit(true /* synchronous */, false /* retain_planes */) != 0) {
++      DLOGE("hdmi-los: synchronized external-display reset failed");
++      result = kErrorHardware;
++    }
++  }
++
++  lease_prepared_ = false;
++  lease_active_ = false;
++  lease_plane_id_ = 0;
++  lease_lessee_id_ = 0;
++  return result;
++}
++
++DisplayError HWDeviceDRM::IsExternalDisplayLeaseConnected(bool *connected) {
++  if (!connected || dev_fd_ < 0 || token_.conn_id == 0) {
++    return kErrorParameters;
++  }
++  drmModeConnectorPtr connector = drmModeGetConnector(dev_fd_, token_.conn_id);
++  if (!connector) {
++    *connected = false;
++    return kErrorDeviceRemoved;
++  }
++  *connected = connector->connection == DRM_MODE_CONNECTED;
++  drmModeFreeConnector(connector);
++  return kErrorNone;
++}
++
+ void HWDeviceDRM::UpdateMixerAttributes() {
+   uint32_t index = current_mode_index_;
+ 
+diff --git a/sdm/libs/dal/hw_device_drm.h b/sdm/libs/dal/hw_device_drm.h
+index 1653b6b..da96f1d 100644
+--- a/sdm/libs/dal/hw_device_drm.h
++++ b/sdm/libs/dal/hw_device_drm.h
+@@ -179,6 +179,11 @@ class HWDeviceDRM : public HWInterface {
+   }
+   virtual DisplayError CancelDeferredPowerMode();
+   virtual void HandleCwbTeardown();
++  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) override;
++  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) override;
++  DisplayError RevokeExternalDisplayLease() override;
++  DisplayError ResetExternalDisplayLease() override;
++  DisplayError IsExternalDisplayLeaseConnected(bool *connected) override;
+ 
+   enum {
+     kHWEventVSync,
+@@ -335,6 +340,10 @@ class HWDeviceDRM : public HWInterface {
+   static std::mutex cwb_state_lock_;  // cwb state lock. Set before accesing or updating cwb_config_
+   uint32_t transfer_time_updated_ = 0;
+   bool force_tonemapping_ = false;
++  uint32_t lease_plane_id_ = 0;
++  uint32_t lease_lessee_id_ = 0;
++  bool lease_prepared_ = false;
++  bool lease_active_ = false;
+ 
+  private:
+   void GetCWBCapabilities();

@@ -1,0 +1,7 @@
+dist/
+.local/
+.gradle/
+__pycache__/
+*.pyc
+*.swp
+*.tmp

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "name": "current-install",
+  "captured_utc": "2026-08-31T15:52:00Z",
+  "device": {
+    "ro.product.device": "XQ-DQ72",
+    "lineage_device": "pdx234",
+    "ro.lineage.version": "22.2-20250608-NIGHTLY-pdx234",
+    "ro.build.id": "BP1A.250505.005",
+    "ro.build.version.sdk": "35",
+    "ro.build.version.security_patch": "2025-06-01"
+  },
+  "source": {
+    "branch": "lineage-22.2",
+    "qcom_display_path": "hardware/qcom-caf/sm8550/display",
+    "qcom_display_revision": "d1371ff5545be5bdd0f610879ab5e8c7b7394091",
+    "frameworks_base_revision": "3b9065901b817e95c95152082c746cbee46d2290",
+    "system_core_revision": "ee0570fcd4ca0fef1a20c33b856a7da29d3c78cf",
+    "device_pdx234_revision": "7fcfb273bba111e2d3b8e25f759c11c44a01cae9",
+    "device_sm8550_common_revision": "01930342abe91fa4f1884cf8d04fedfc90130d0e",
+    "kernel_revision": "d00ba216ccda5d4fcc0d864729ae69d5b63d860c",
+    "kernel_modules_revision": "ec2e039129f2b8f93fdfe62a8c6a595efb63d496",
+    "kernel_devicetrees_revision": "5e234bf0ce73ee62bd39e145e048655cf228014e"
+  },
+  "artifacts": [
+    {
+      "path": "/vendor/bin/hw/vendor.qti.hardware.display.composer-service",
+      "sha256": "974a96305bba4b6f215a77a769fabd2ab79b7a9036c8fd07bd04521c009fb371",
+      "build_id": "735472f2c20fa2706fb4ff5bb2cafe9e",
+      "mode": "0755",
+      "uid": 0,
+      "gid": 2000,
+      "selinux": "u:object_r:hal_graphics_composer_default_exec:s0"
+    },
+    {
+      "path": "/vendor/lib64/libsdmcore.so",
+      "sha256": "f5620a5428f346be94614aea36d460ddf76c8f4ea935e458e3942261833926ff",
+      "build_id": "d8b8b512535de2c05345f2536bfea64f",
+      "mode": "0644",
+      "uid": 0,
+      "gid": 0,
+      "selinux": "u:object_r:vendor_file:s0"
+    },
+    {
+      "path": "/vendor/lib64/libsdmdal.so",
+      "sha256": "5be213a18a22b225a0da84d7368190a6c1139671616ca252fe7ad44812bff30f",
+      "build_id": "a58299a78f366006c6f5a36b11d53d23",
+      "mode": "0644",
+      "uid": 0,
+      "gid": 0,
+      "selinux": "u:object_r:vendor_file:s0"
+    }
+  ],
+  "patchset": "qcom-display/v1",
+  "timeout_seconds": 60,
+  "composer_failsafe_seconds": 65
+}
+
