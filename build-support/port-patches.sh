@@ -12,10 +12,14 @@ revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourc
 patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")
 
 if [ ! -d "$CACHE" ]; then
-    git clone --mirror https://github.com/LineageOS/android_hardware_qcom_display.git "$CACHE"
-else
-    git -C "$CACHE" fetch --prune origin
+    git init --bare "$CACHE"
+    git -C "$CACHE" remote add origin \
+        https://github.com/LineageOS/android_hardware_qcom_display.git
 fi
+if ! git -C "$CACHE" cat-file -e "$revision^{commit}" 2>/dev/null; then
+    git -C "$CACHE" fetch --no-tags --depth=1 origin "$revision"
+fi
+git -C "$CACHE" update-ref "refs/hdmi-los/$revision" "$revision"
 
 rm -rf -- "$DISPLAY"
 git clone --no-checkout --reference-if-able "$CACHE" "$CACHE" "$DISPLAY"
@@ -32,4 +36,3 @@ git -C "$DISPLAY" diff --check "$revision"..HEAD
 test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
 printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
 git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"
-
