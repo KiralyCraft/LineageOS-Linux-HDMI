@@ -17,6 +17,7 @@ mkdir -p "$TREE" "$COMPOSER_OUT"
 
 python "$SOURCE/build-support/filter-manifest.py" "$EXACT_MANIFEST" "$FILTERED_MANIFEST"
 python "$SOURCE/build-support/sync-exact-manifest.py" "$FILTERED_MANIFEST" "$TREE" 8
+cp "$TREE/.hdmi-los-exact-manifest.json" "$BUILD/exact-source-sync.json"
 
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
 patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")

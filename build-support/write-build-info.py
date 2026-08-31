@@ -10,6 +10,7 @@ profile_name = sys.argv[3]
 commit = sys.argv[4]
 output = pathlib.Path(sys.argv[5])
 profile = json.loads((source / "profiles" / f"{profile_name}.json").read_text())
+exact_source_sync = json.loads((build / "exact-source-sync.json").read_text())
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -32,6 +33,7 @@ data = {
     "repository_commit": commit,
     "profile": profile_name,
     "source_revisions": profile["source"],
+    "exact_source_sync": exact_source_sync,
     "qcom_patched_revision": (build / "qcom-display.patched").read_text().strip(),
     "build_host": "root@192.168.104.201",
     "artifacts": artifacts,
