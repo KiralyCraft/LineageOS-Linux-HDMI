@@ -97,7 +97,7 @@ static bool connect_physical(struct physical_device *device) {
     if (physical_matches(fd, device) && ioctl(fd, EVIOCGRAB, (void *)1) == 0) {
       device->fd = fd;
       snprintf(device->path, sizeof(device->path), "%s", paths.gl_pathv[i]);
-      char message[512];
+      char message[PATH_MAX + 512];
       snprintf(message, sizeof(message), "grabbed %s at %s", device->name, device->path);
       log_message("info", message);
       globfree(&paths);
