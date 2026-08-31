@@ -41,10 +41,6 @@ git -C "$DISPLAY" reset --hard "$revision"
 git -C "$DISPLAY" clean -fdx
 git -C "$DISPLAY" config user.name hdmi-los-builder
 git -C "$DISPLAY" config user.email hdmi-los@localhost
-while IFS= read -r patch; do
-    case "$patch" in ''|'#'*) continue ;; esac
-    git -C "$DISPLAY" am "$SOURCE/patches/$patchset/$patch"
-done < "$SOURCE/patches/$patchset/series"
 
 rm -rf -- "$OUT" "$COMPOSER_OUT"/*
 # A failed product probe must never make Lineage roomservice mutate this exact
@@ -52,25 +48,43 @@ rm -rf -- "$OUT" "$COMPOSER_OUT"/*
 # force subsequent probes into read-only dry-run mode.
 rm -f -- "$TREE/.repo/local_manifests/roomservice.xml"
 
-(
-    # Android's envsetup/lunch functions intentionally probe unset shell
-    # variables and are not compatible with nounset.  Keep every other strict
-    # setting, and confine this relaxation to the Android build subshell.
-    set +u
-    cd "$TREE"
-    export OUT_DIR="$OUT"
-    export BUILD_USERNAME=hdmi-los
-    export BUILD_HOSTNAME=ResearchVM
-    export ROOMSERVICE_DRYRUN=true
-    source build/envsetup.sh
-    lunch "lineage_pdx234-${release}-userdebug"
-    m -j8 vendor.qti.hardware.display.composer-service libsdmcore libsdmdal
-) 2>&1 | tee "$BUILD/composer-build.log"
+build_modules() {
+    local log=${1:?log}
+    (
+        # Android's envsetup/lunch functions intentionally probe unset shell
+        # variables and are not compatible with nounset.  Keep every other strict
+        # setting, and confine this relaxation to the Android build subshell.
+        set +u
+        cd "$TREE"
+        export OUT_DIR="$OUT"
+        export BUILD_USERNAME=hdmi-los
+        export BUILD_HOSTNAME=ResearchVM
+        export ROOMSERVICE_DRYRUN=true
+        source build/envsetup.sh
+        lunch "lineage_pdx234-${release}-userdebug"
+        m -j8 vendor.qti.hardware.display.composer-service libsdmcore libsdmdal
+    ) 2>&1 | tee "$log"
+}
 
 PRODUCT=$OUT/target/product/pdx234
+BASELINE_OUT=$BUILD/composer-baseline
+rm -rf -- "$BASELINE_OUT"
+mkdir -p "$BASELINE_OUT"
+build_modules "$BUILD/composer-baseline-build.log"
+cp "$PRODUCT/vendor/bin/hw/vendor.qti.hardware.display.composer-service" "$BASELINE_OUT/"
+cp "$PRODUCT/vendor/lib64/libsdmcore.so" "$PRODUCT/vendor/lib64/libsdmdal.so" "$BASELINE_OUT/"
+
+while IFS= read -r patch; do
+    case "$patch" in ''|'#'*) continue ;; esac
+    git -C "$DISPLAY" am "$SOURCE/patches/$patchset/$patch"
+done < "$SOURCE/patches/$patchset/series"
+
+build_modules "$BUILD/composer-build.log"
 cp "$PRODUCT/vendor/bin/hw/vendor.qti.hardware.display.composer-service" "$COMPOSER_OUT/"
 cp "$PRODUCT/vendor/lib64/libsdmcore.so" "$PRODUCT/vendor/lib64/libsdmdal.so" "$COMPOSER_OUT/"
 for artifact in "$COMPOSER_OUT/"*; do
     readelf -h "$artifact" | grep -q 'AArch64'
     readelf -n "$artifact" > "$artifact.notes.txt"
 done
+"$SOURCE/build-support/verify-composer-abi.sh" "$BASELINE_OUT" "$COMPOSER_OUT" |
+    tee "$BUILD/composer-abi-report.txt"

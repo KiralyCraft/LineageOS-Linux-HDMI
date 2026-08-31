@@ -19,6 +19,12 @@ disconnects.  Unplug and secure-display entry also force release.  SurfaceFlinge
 hotplug notifications are suppressed only while this already-created external
 display is leased.
 
+Lease bookkeeping lives in a private sidecar map in the DAL translation unit,
+not in `HWDeviceDRM`.  Its state is erased on reset and DAL teardown.  This keeps
+the object layout and all pre-existing adjustment thunks compatible with the
+installed proprietary display extension.  Every build proves that property
+against an unpatched exact-tree baseline before packaging.
+
 The Magisk module has `skip_mount`; it never unconditionally overlays `/vendor`.
 At `post-fs-data` it compares five build properties and SHA-256 hashes of all
 three untouched files.  Only a complete match permits early bind mounts.  The
@@ -32,4 +38,3 @@ reaching 60 seconds stops Xorg before asking composer to resume Android.
 
 No code in this repository writes a boot, init_boot, vendor, system, or vbmeta
 partition.
-

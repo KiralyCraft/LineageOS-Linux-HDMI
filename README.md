@@ -74,6 +74,12 @@ missing dependencies. The current proprietary pins correspond to Sony base
 `67.2.A.3.16`; the critical `libsdmextension.so` input is also hash-checked
 against the running phone before compilation.
 
+Before applying the patch series, the same exact tree builds an unmodified
+composer/SDM baseline. Packaging fails if a patched ELF changes its ELF class,
+machine, SONAME, dependency set, or drops/changes any baseline dynamic export.
+This includes ABI-sensitive C++ adjustment-thunk names, so adding fields to a
+Qualcomm class used by proprietary display extensions cannot silently ship.
+
 ## Manual activation outline
 
 The exact manual test checklist is in `docs/MANUAL_TEST.md`. In short: install

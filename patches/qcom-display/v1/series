@@ -1,3 +1,4 @@
 0001-sdm-add-coordinated-external-DRM-lease-lifecycle.patch
 0002-composer-add-root-only-bounded-HDMI-lease-endpoint.patch
 0003-hdmi-los-preserve-extension-ABI-and-harden-failed-pause.patch
+0004-sdm-keep-lease-state-outside-HWDeviceDRM.patch

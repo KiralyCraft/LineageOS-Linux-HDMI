@@ -35,6 +35,11 @@ data = {
     "source_revisions": profile["source"],
     "exact_source_sync": exact_source_sync,
     "qcom_patched_revision": (build / "qcom-display.patched").read_text().strip(),
+    "composer_abi": {
+        "method": "unpatched exact-tree baseline export and dynamic-contract comparison",
+        "report_sha256": sha(build / "composer-abi-report.txt"),
+        "status": "PASS",
+    },
     "build_host": "root@192.168.104.201",
     "artifacts": artifacts,
 }
