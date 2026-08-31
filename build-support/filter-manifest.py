@@ -24,6 +24,7 @@ always_paths = {
     "external/expat",
     "external/fmtlib",
     "external/go-cmp",
+    "external/golang-protobuf",
     "external/googletest",
     "external/jsoncpp",
     "external/kernel-headers",

@@ -37,6 +37,10 @@ done < "$SOURCE/patches/$patchset/series"
 rm -rf -- "$TREE/device/hdmi/pdx234" "$OUT" "$COMPOSER_OUT"/*
 mkdir -p "$TREE/device/hdmi/pdx234"
 cp -a "$SOURCE/build-support/product/." "$TREE/device/hdmi/pdx234/"
+# A failed product probe must never make Lineage roomservice mutate this exact
+# source set or fetch a moving branch.  Remove any prior fallback record and
+# force subsequent probes into read-only dry-run mode.
+rm -f -- "$TREE/.repo/local_manifests/roomservice.xml"
 
 (
     # Android's envsetup/lunch functions intentionally probe unset shell
@@ -48,6 +52,7 @@ cp -a "$SOURCE/build-support/product/." "$TREE/device/hdmi/pdx234/"
     export BUILD_USERNAME=hdmi-los
     export BUILD_HOSTNAME=ResearchVM
     export ALLOW_MISSING_DEPENDENCIES=true
+    export ROOMSERVICE_DRYRUN=true
     source build/envsetup.sh
     lunch "hdmi_pdx234-${release}-userdebug"
     m -j8 vendor.qti.hardware.display.composer-service libsdmcore libsdmdal
