@@ -167,6 +167,11 @@ def main() -> None:
         fetch = remotes.get(remote_name)
         if not fetch:
             fail(f"project {path} has unknown remote {remote_name!r}")
+        # A repo manifest resolves a fetch URL of ".." relative to the
+        # manifest repository.  The captured Lineage manifest uses that form
+        # for GitHub projects; make the resolved transport explicit here.
+        if fetch == "..":
+            fetch = "https://github.com"
         url = f"{fetch.rstrip('/')}/{name.lstrip('/')}"
         projects.append(
             {

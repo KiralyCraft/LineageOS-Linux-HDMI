@@ -60,6 +60,20 @@ to that profile. Source synchronization fetches those object IDs directly and
 has no branch-history fallback. A missing revision, patch conflict, or compile
 failure refuses to produce an installable ZIP.
 
+`make profile` also records the installed `libsdmextension.so` checksum, but a
+build manifest cannot reveal the proprietary repository commits. Before
+`make zip PROFILE=<name>`, add the two reviewed, exact TheMuppets revisions to
+that profile's `source.proprietary_projects`; the build checks the extracted
+library hash and fails closed if those commits do not match the installed ROM.
+
+The composer build follows the supported Lineage/AOSP shape: it materializes
+the complete captured manifest, adds exact proprietary Sony projects, selects
+the real `lineage_pdx234` product, and asks `m` for only the composer service and
+two SDM libraries. It does not use a reduced synthetic product or suppress
+missing dependencies. The current proprietary pins correspond to Sony base
+`67.2.A.3.16`; the critical `libsdmextension.so` input is also hash-checked
+against the running phone before compilation.
+
 ## Manual activation outline
 
 The exact manual test checklist is in `docs/MANUAL_TEST.md`. In short: install

@@ -44,10 +44,12 @@ assert info["repository_commit"] == expected_commit, "artifact is not from curre
 assert info["profile"] == profile["name"]
 assert info["source_revisions"] == profile["source"]
 exact = info["exact_source_sync"]
-assert len(exact["projects"]) >= 71, "unexpected exact source project count"
+assert len(exact["projects"]) >= 1138, "unexpected exact source project count"
 assert all(len(revision) == 40 for revision in exact["projects"].values())
 assert "prebuilts/module_sdk/art" in exact["projects"]
 assert "vendor/lineage" in exact["projects"]
+for project in profile["source"]["proprietary_projects"]:
+    assert exact["projects"][project["path"]] == project["revision"]
 qcom_path = profile["source"]["qcom_display_path"]
 assert exact["projects"][qcom_path] == profile["source"]["qcom_display_revision"]
 print("package structure and provenance: PASS")

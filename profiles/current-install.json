@@ -20,7 +20,25 @@
     "device_sm8550_common_revision": "01930342abe91fa4f1884cf8d04fedfc90130d0e",
     "kernel_revision": "d00ba216ccda5d4fcc0d864729ae69d5b63d860c",
     "kernel_modules_revision": "ec2e039129f2b8f93fdfe62a8c6a595efb63d496",
-    "kernel_devicetrees_revision": "5e234bf0ce73ee62bd39e145e048655cf228014e"
+    "kernel_devicetrees_revision": "5e234bf0ce73ee62bd39e145e048655cf228014e",
+    "proprietary_projects": [
+      {
+        "name": "TheMuppets/proprietary_vendor_sony_pdx234",
+        "path": "vendor/sony/pdx234",
+        "revision": "8c98a849c1eff47e2b2917a225e5c61da631a86a"
+      },
+      {
+        "name": "TheMuppets/proprietary_vendor_sony_sm8550-common",
+        "path": "vendor/sony/sm8550-common",
+        "revision": "2defe77391d8ae8b8b48709ed893596d960c5564"
+      }
+    ],
+    "proprietary_files": [
+      {
+        "path": "vendor/sony/sm8550-common/proprietary/vendor/lib64/libsdmextension.so",
+        "sha256": "b6f1c3df6a535639426a52307e978be1468e8a84b9c783140d222dce0b0ee55a"
+      }
+    ]
   },
   "artifacts": [
     {
@@ -55,4 +73,3 @@
   "timeout_seconds": 60,
   "composer_failsafe_seconds": 65
 }
-

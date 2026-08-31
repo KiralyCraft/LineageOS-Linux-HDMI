@@ -10,6 +10,7 @@ props = dict(line.rstrip("\n").split("=", 1) for line in pathlib.Path(sys.argv[2
 artifact_lines = pathlib.Path(sys.argv[3]).read_text().splitlines()
 manifest = ET.parse(sys.argv[4]).getroot()
 output = pathlib.Path(sys.argv[5])
+proprietary_lines = pathlib.Path(sys.argv[6]).read_text().splitlines()
 
 by_path = {p.get("path", p.get("name", "")): p for p in manifest.findall("project")}
 source_paths = {
@@ -25,6 +26,11 @@ source_paths = {
 source = {"branch": "lineage-22.2", "qcom_display_path": source_paths["qcom_display_revision"]}
 for key, path in source_paths.items():
     source[key] = by_path[path].get("revision")
+source["proprietary_projects"] = []
+source["proprietary_files"] = [
+    {"path": path, "sha256": sha}
+    for path, sha in (line.split("|", 1) for line in proprietary_lines)
+]
 
 artifacts = []
 for line in artifact_lines:
@@ -52,4 +58,3 @@ data = {
     "composer_failsafe_seconds": 65,
 }
 output.write_text(json.dumps(data, indent=2) + "\n")
-

@@ -33,9 +33,16 @@ for path in /vendor/bin/hw/vendor.qti.hardware.display.composer-service \
         >> "$tmp/artifacts"
 done
 
+proprietary_path=/vendor/lib64/libsdmextension.so
+proprietary_hash=$(sudo -n sha256sum "/proc/1/root$proprietary_path" | awk '{print $1}')
+printf '%s|%s\n' \
+    "vendor/sony/sm8550-common/proprietary$proprietary_path" \
+    "$proprietary_hash" > "$tmp/proprietary-files"
+
 python "$ROOT/scripts/profile-from-capture.py" "$NAME" "$tmp/properties" \
-    "$tmp/artifacts" "$tmp/manifest.xml" "$tmp/profile.json"
+    "$tmp/artifacts" "$tmp/manifest.xml" "$tmp/profile.json" \
+    "$tmp/proprietary-files"
 mv "$tmp/profile.json" "$ROOT/profiles/$NAME.json"
 mv "$tmp/manifest.xml" "$ROOT/manifests/$NAME.xml"
-printf 'Captured %s. Review and commit both files before port/build.\n' "$NAME"
-
+printf '%s\n' \
+    "Captured $NAME. Add exact proprietary project revisions, then review and commit both files before building."

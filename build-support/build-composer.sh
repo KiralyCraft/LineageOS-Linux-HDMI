@@ -10,13 +10,15 @@ OUT=$BUILD/soong-out
 COMPOSER_OUT=$BUILD/composer
 PROFILE_JSON=$SOURCE/profiles/$PROFILE.json
 EXACT_MANIFEST=$SOURCE/manifests/$PROFILE.xml
-FILTERED_MANIFEST=$BUILD/exact-display-manifest.xml
+BUILD_MANIFEST=$BUILD/exact-build-manifest.xml
 
 test -f "$EXACT_MANIFEST"
 mkdir -p "$TREE" "$COMPOSER_OUT"
 
-python "$SOURCE/build-support/filter-manifest.py" "$EXACT_MANIFEST" "$FILTERED_MANIFEST"
-python "$SOURCE/build-support/sync-exact-manifest.py" "$FILTERED_MANIFEST" "$TREE" 8
+python "$SOURCE/build-support/prepare-build-manifest.py" \
+    "$EXACT_MANIFEST" "$PROFILE_JSON" "$BUILD_MANIFEST"
+python "$SOURCE/build-support/sync-exact-manifest.py" "$BUILD_MANIFEST" "$TREE" 8
+python "$SOURCE/build-support/verify-proprietary-inputs.py" "$TREE" "$PROFILE_JSON"
 cp "$TREE/.hdmi-los-exact-manifest.json" "$BUILD/exact-source-sync.json"
 
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
@@ -34,9 +36,7 @@ while IFS= read -r patch; do
     git -C "$DISPLAY" am "$SOURCE/patches/$patchset/$patch"
 done < "$SOURCE/patches/$patchset/series"
 
-rm -rf -- "$TREE/device/hdmi/pdx234" "$OUT" "$COMPOSER_OUT"/*
-mkdir -p "$TREE/device/hdmi/pdx234"
-cp -a "$SOURCE/build-support/product/." "$TREE/device/hdmi/pdx234/"
+rm -rf -- "$OUT" "$COMPOSER_OUT"/*
 # A failed product probe must never make Lineage roomservice mutate this exact
 # source set or fetch a moving branch.  Remove any prior fallback record and
 # force subsequent probes into read-only dry-run mode.
@@ -51,14 +51,13 @@ rm -f -- "$TREE/.repo/local_manifests/roomservice.xml"
     export OUT_DIR="$OUT"
     export BUILD_USERNAME=hdmi-los
     export BUILD_HOSTNAME=ResearchVM
-    export ALLOW_MISSING_DEPENDENCIES=true
     export ROOMSERVICE_DRYRUN=true
     source build/envsetup.sh
-    lunch "hdmi_pdx234-${release}-userdebug"
+    lunch "lineage_pdx234-${release}-userdebug"
     m -j8 vendor.qti.hardware.display.composer-service libsdmcore libsdmdal
 ) 2>&1 | tee "$BUILD/composer-build.log"
 
-PRODUCT=$OUT/target/product/hdmi_pdx234
+PRODUCT=$OUT/target/product/pdx234
 cp "$PRODUCT/vendor/bin/hw/vendor.qti.hardware.display.composer-service" "$COMPOSER_OUT/"
 cp "$PRODUCT/vendor/lib64/libsdmcore.so" "$PRODUCT/vendor/lib64/libsdmdal.so" "$COMPOSER_OUT/"
 for artifact in "$COMPOSER_OUT/"*; do
