@@ -44,7 +44,7 @@ assert info["repository_commit"] == expected_commit, "artifact is not from curre
 assert info["profile"] == profile["name"]
 assert info["source_revisions"] == profile["source"]
 exact = info["exact_source_sync"]
-assert len(exact["projects"]) >= 64, "unexpected exact source project count"
+assert len(exact["projects"]) >= 65, "unexpected exact source project count"
 assert all(len(revision) == 40 for revision in exact["projects"].values())
 assert "vendor/lineage" in exact["projects"]
 qcom_path = profile["source"]["qcom_display_path"]

@@ -36,6 +36,7 @@ always_paths = {
     "external/pcre",
     "external/protobuf",
     "external/selinux",
+    "external/starlark-go",
     "external/zlib",
     "frameworks/av",
     "frameworks/native",
