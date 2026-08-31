@@ -72,6 +72,7 @@ always_paths = {
     "vendor/qcom/opensource/commonsys/display",
     "vendor/qcom/opensource/commonsys-intf/display",
     "vendor/qcom/opensource/display",
+    "vendor/lineage",
 }
 
 for remote in root.findall("remote"):
