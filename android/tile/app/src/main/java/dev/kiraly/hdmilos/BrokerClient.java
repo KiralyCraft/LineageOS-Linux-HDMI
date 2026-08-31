@@ -46,7 +46,9 @@ final class BrokerClient {
 
     private static Status request(short opcode) {
         try (LocalSocket socket = new LocalSocket(LocalSocket.SOCKET_STREAM)) {
-            socket.setSoTimeout(20000);
+            // Preparation, composer hand-off, and Xorg validation are all
+            // bounded but can legitimately take up to roughly 30 seconds.
+            socket.setSoTimeout(40000);
             socket.connect(new LocalSocketAddress(SOCKET, LocalSocketAddress.Namespace.ABSTRACT));
             ByteBuffer outgoing = ByteBuffer.allocate(MESSAGE_SIZE).order(ByteOrder.LITTLE_ENDIAN);
             outgoing.putInt(MAGIC);
@@ -92,4 +94,3 @@ final class BrokerClient {
 
     private BrokerClient() {}
 }
-

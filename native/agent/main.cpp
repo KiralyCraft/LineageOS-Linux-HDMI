@@ -38,7 +38,7 @@ std::string g_bundle;
 
 int64_t monotonic_ms() {
   timespec now = {};
-  clock_gettime(CLOCK_MONOTONIC, &now);
+  clock_gettime(CLOCK_BOOTTIME, &now);
   return static_cast<int64_t>(now.tv_sec) * 1000 + now.tv_nsec / 1000000;
 }
 
@@ -164,9 +164,10 @@ int run_wait(const std::vector<std::string> &arguments, uid_t uid = 0, gid_t gid
     }
     if (uid != 0) {
       passwd *user = getpwuid(uid);
-      if (user) initgroups(user->pw_name, gid);
-      setgid(gid);
-      setuid(uid);
+      if (!user || initgroups(user->pw_name, gid) != 0 || setgid(gid) != 0 ||
+          setuid(uid) != 0) {
+        _exit(126);
+      }
     }
     std::vector<char *> argv;
     for (const auto &argument : arguments) argv.push_back(const_cast<char *>(argument.c_str()));
@@ -263,8 +264,10 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard) {
       "  InputDevice \"HDMI Mouse\" \"CorePointer\"\n"
       "  InputDevice \"HDMI Keyboard\" \"CoreKeyboard\"\n"
       "EndSection\n", mouse.c_str(), keyboard.c_str());
-  bool ok = result > 0 && fflush(file) == 0 && fsync(fileno(file)) == 0 && fclose(file) == 0;
-  chmod(path.c_str(), 0600);
+  bool ok = result > 0;
+  if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
+  if (fclose(file) != 0) ok = false;
+  if (chmod(path.c_str(), 0600) != 0) ok = false;
   return ok;
 }
 
@@ -272,7 +275,9 @@ bool prepare_session() {
   terminate_group(&g_session);
   terminate_group(&g_xorg);
   terminate_group(&g_bridge);
-  mkdir(kRuntime, 0700);
+  if ((mkdir(kRuntime, 0700) < 0 && errno != EEXIST) || chmod(kRuntime, 0700) != 0) {
+    return false;
+  }
   unlink((std::string(kRuntime) + "/input.env").c_str());
 
   std::string bridge = g_bundle + "/bin/hdmi-input-bridge";
@@ -319,11 +324,13 @@ bool prepare_session() {
 
   passwd *user = getpwnam("kiraly");
   if (!user) return false;
-  chown(auth.c_str(), user->pw_uid, user->pw_gid);
+  if (chown(auth.c_str(), user->pw_uid, user->pw_gid) != 0) return false;
   std::string user_runtime = std::string(kRuntime) + "/user-runtime";
-  mkdir(user_runtime.c_str(), 0700);
-  chmod(user_runtime.c_str(), 0700);
-  chown(user_runtime.c_str(), user->pw_uid, user->pw_gid);
+  if ((mkdir(user_runtime.c_str(), 0700) < 0 && errno != EEXIST) ||
+      chmod(user_runtime.c_str(), 0700) != 0 ||
+      chown(user_runtime.c_str(), user->pw_uid, user->pw_gid) != 0) {
+    return false;
+  }
   return true;
 }
 
@@ -335,7 +342,7 @@ pid_t spawn_xorg(int lease_fd) {
   }
   setpgid(0, 0);
   int flags = fcntl(lease_fd, F_GETFD);
-  if (flags >= 0) fcntl(lease_fd, F_SETFD, flags & ~FD_CLOEXEC);
+  if (flags < 0 || fcntl(lease_fd, F_SETFD, flags & ~FD_CLOEXEC) < 0) _exit(126);
   char fd_text[32];
   snprintf(fd_text, sizeof(fd_text), "%d", lease_fd);
   std::string config = std::string(kRuntime) + "/xorg.conf";
@@ -359,9 +366,10 @@ pid_t spawn_lxde() {
     return child;
   }
   setpgid(0, 0);
-  initgroups(user->pw_name, user->pw_gid);
-  setgid(user->pw_gid);
-  setuid(user->pw_uid);
+  if (initgroups(user->pw_name, user->pw_gid) != 0 || setgid(user->pw_gid) != 0 ||
+      setuid(user->pw_uid) != 0) {
+    _exit(126);
+  }
   setenv("HOME", user->pw_dir, 1);
   setenv("USER", user->pw_name, 1);
   setenv("LOGNAME", user->pw_name, 1);

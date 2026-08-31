@@ -39,7 +39,7 @@ uint32_t g_request_id = 1;
 
 int64_t monotonic_ms() {
   timespec now = {};
-  clock_gettime(CLOCK_MONOTONIC, &now);
+  clock_gettime(CLOCK_BOOTTIME, &now);
   return static_cast<int64_t>(now.tv_sec) * 1000 + now.tv_nsec / 1000000;
 }
 
@@ -427,7 +427,11 @@ class Broker {
       *detail = "both physical volume inputs are required";
       return HDMI_LOS_ERR_UNAVAILABLE;
     }
-    set_wake_lock(true);
+    if (!set_wake_lock(true)) {
+      *detail = "could not acquire the mandatory suspend blocker";
+      CleanupGuards();
+      return HDMI_LOS_ERR_UNAVAILABLE;
+    }
     // Count preparation and Xorg verification inside the mandatory window.
     deadline_ms_ = monotonic_ms() + kSessionSeconds * 1000;
 

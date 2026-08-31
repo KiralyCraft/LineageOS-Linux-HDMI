@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BUNDLE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+BUNDLE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 CAPTURE=auto
 RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
@@ -28,6 +28,17 @@ done
 if ((EUID != 0)); then
     exec sudo -n -- "$0" --capture "$CAPTURE"
 fi
+
+for required in \
+    "$BUNDLE/bin/hdmi-los-agent" \
+    "$BUNDLE/bin/hdmi-input-bridge" \
+    /usr/lib/Xorg /usr/bin/xauth /usr/bin/xdpyinfo /usr/bin/xrandr \
+    /usr/bin/xinput /usr/bin/dbus-run-session /usr/bin/startlxde; do
+    [[ -x $required ]] || {
+        printf 'Required executable is missing: %s\n' "$required" >&2
+        exit 1
+    }
+done
 
 mkdir -p -- "$RUNTIME"
 chmod 700 "$RUNTIME"
