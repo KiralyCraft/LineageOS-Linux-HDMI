@@ -38,7 +38,7 @@ git -C "$MANIFEST_REPO" commit -q --allow-empty -m 'exact installed-build displa
 
 (cd "$TREE" && "$REPO" init -q --depth=1 -u "file://$MANIFEST_REPO" -m default.xml)
 
-(cd "$TREE" && "$REPO" sync -c --no-tags --no-clone-bundle --optimized-fetch \
+(cd "$TREE" && "$REPO" sync --no-tags --no-clone-bundle --optimized-fetch \
     --prune --force-sync --fail-fast -j8)
 
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")

@@ -84,6 +84,13 @@ for project in list(root.findall("project")):
     if path not in always_paths:
         root.remove(project)
     else:
+        # The captured manifest already pins every project to an immutable SHA.
+        # Keeping branch hints makes `repo sync -c` fetch the advertised branch
+        # as well, which is particularly expensive for the Sony kernel history.
+        # Remove those hints so the build cache downloads only the recorded
+        # installed-build revision.
+        project.attrib.pop("upstream", None)
+        project.attrib.pop("dest-branch", None)
         kept += 1
 
 ET.indent(root, space="  ")
