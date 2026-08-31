@@ -37,6 +37,10 @@ mkdir -p "$TREE/device/hdmi/pdx234"
 cp -a "$SOURCE/build-support/product/." "$TREE/device/hdmi/pdx234/"
 
 (
+    # Android's envsetup/lunch functions intentionally probe unset shell
+    # variables and are not compatible with nounset.  Keep every other strict
+    # setting, and confine this relaxation to the Android build subshell.
+    set +u
     cd "$TREE"
     export OUT_DIR="$OUT"
     export BUILD_USERNAME=hdmi-los
