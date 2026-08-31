@@ -40,7 +40,11 @@ class ExactManifestSyncTest(unittest.TestCase):
             run("git", "config", "user.name", "HDMI LOS test", cwd=source)
             run("git", "config", "user.email", "hdmi-los-test@localhost", cwd=source)
             (source / "payload.txt").write_text("pinned payload\n")
-            run("git", "add", "payload.txt", cwd=source)
+            (source / "linux-x86").mkdir()
+            (source / "linux-x86" / "tool").write_text("linux tool\n")
+            (source / "windows-x86").mkdir()
+            (source / "windows-x86" / "tool.exe").write_text("unused tool\n")
+            run("git", "add", ".", cwd=source)
             run("git", "commit", "-q", "-m", "pinned", cwd=source)
             revision = run("git", "rev-parse", "HEAD", cwd=source).stdout.strip()
             run("git", "clone", "-q", "--bare", source, remote)
@@ -52,7 +56,7 @@ class ExactManifestSyncTest(unittest.TestCase):
                 root,
                 "project",
                 name="example",
-                path="platform/example",
+                path="prebuilts/rust",
                 revision=revision,
             )
             ET.SubElement(project, "linkfile", src="payload.txt", dest="root-link.txt")
@@ -60,7 +64,7 @@ class ExactManifestSyncTest(unittest.TestCase):
             ET.ElementTree(root).write(manifest, encoding="utf-8", xml_declaration=True)
 
             run(sys.executable, SYNC, manifest, tree, "2")
-            checkout = tree / "platform" / "example"
+            checkout = tree / "prebuilts" / "rust"
             self.assertEqual(
                 run("git", "rev-parse", "HEAD", cwd=checkout).stdout.strip(), revision
             )
@@ -70,6 +74,8 @@ class ExactManifestSyncTest(unittest.TestCase):
             self.assertTrue((tree / "root-link.txt").is_symlink())
             self.assertEqual((tree / "root-link.txt").read_text(), "pinned payload\n")
             self.assertEqual((tree / "root-copy.txt").read_text(), "pinned payload\n")
+            self.assertEqual((checkout / "linux-x86" / "tool").read_text(), "linux tool\n")
+            self.assertFalse((checkout / "windows-x86").exists())
 
             # A retry must stay on the captured revision even if the remote has
             # moved forward.
@@ -79,7 +85,7 @@ class ExactManifestSyncTest(unittest.TestCase):
             run(sys.executable, SYNC, manifest, tree, "2")
             self.assertEqual((tree / "root-link.txt").read_text(), "pinned payload\n")
             record = json.loads((tree / ".hdmi-los-exact-manifest.json").read_text())
-            self.assertEqual(record["projects"], {"platform/example": revision})
+            self.assertEqual(record["projects"], {"prebuilts/rust": revision})
 
 
 if __name__ == "__main__":

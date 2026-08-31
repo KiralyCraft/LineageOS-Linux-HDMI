@@ -26,6 +26,13 @@ import xml.etree.ElementTree as ET
 SHA1 = re.compile(r"[0-9a-f]{40}")
 print_lock = threading.Lock()
 
+# These repositories carry complete toolchains for several build hosts.  This
+# project builds only on Linux/glibc x86-64; keeping the other host trees in the
+# working copy wastes many gigabytes without changing the pinned Git object.
+SPARSE_PATHS = {
+    "prebuilts/rust": ("bootstrap", "linux-x86", "soong", "tests"),
+}
+
 
 def fail(message: str) -> NoReturn:
     raise SystemExit(message)
@@ -99,6 +106,11 @@ def sync_project(item: dict[str, str]) -> tuple[str, str]:
         )
     if not has_commit(target, revision):
         raise RuntimeError(f"fetch did not materialize {item['path']} at {revision}")
+
+    sparse_paths = SPARSE_PATHS.get(item["path"])
+    if sparse_paths:
+        git(target, "sparse-checkout", "init", "--cone")
+        git(target, "sparse-checkout", "set", "--cone", *sparse_paths)
 
     git(target, "checkout", "-q", "--detach", "--force", revision)
     git(target, "reset", "-q", "--hard", revision)
