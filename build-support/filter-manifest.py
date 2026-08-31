@@ -55,6 +55,7 @@ always_paths = {
     "prebuilts/go/linux-x86",
     "prebuilts/jdk/jdk21",
     "prebuilts/misc",
+    "prebuilts/module_sdk/art",
     "prebuilts/ndk",
     "prebuilts/rust",
     "prebuilts/sdk",
