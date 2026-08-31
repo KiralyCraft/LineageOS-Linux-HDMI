@@ -13,6 +13,14 @@ COMPOSER_OUT=$BUILD/composer
 PROFILE_JSON=$SOURCE/profiles/$PROFILE.json
 EXACT_MANIFEST=$SOURCE/manifests/$PROFILE.xml
 
+# repo may create a local merge commit when the generated manifest repository
+# advances between builds.  Keep that identity confined to this build process
+# instead of mutating the build server's global Git configuration.
+export GIT_AUTHOR_NAME=hdmi-los-builder
+export GIT_AUTHOR_EMAIL=hdmi-los@localhost
+export GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
+export GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
+
 test -f "$EXACT_MANIFEST"
 mkdir -p "$CACHE/bin" "$TREE" "$MANIFEST_REPO" "$COMPOSER_OUT"
 
