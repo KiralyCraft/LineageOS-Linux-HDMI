@@ -56,6 +56,8 @@ fi
 
 COMMIT=$(git -C "$ROOT" rev-parse HEAD)
 WORK=$REMOTE_ROOT/work/$COMMIT
+ARCHIVE=$(mktemp --tmpdir hdmi-los-source.XXXXXXXX.tar)
+trap 'rm -f -- "$ARCHIVE"' EXIT
 
 ssh -o BatchMode=yes -- "$SERVER" bash -s -- "$WORK" <<'REMOTE'
 set -Eeuo pipefail
@@ -65,8 +67,16 @@ rm -rf -- "$work/source" "$work/incoming.tar"
 mkdir -p "$work/source"
 REMOTE
 
-git -C "$ROOT" archive --format=tar HEAD | \
-    ssh -o BatchMode=yes -- "$SERVER" "tar -xf - -C '$WORK/source'"
+git -C "$ROOT" archive --format=tar --output="$ARCHIVE" HEAD
+rsync -a -- "$ARCHIVE" "$SERVER:$WORK/incoming.tar"
+ssh -o BatchMode=yes -- "$SERVER" bash -s -- "$WORK" <<'REMOTE'
+set -Eeuo pipefail
+work=$1
+case "$work" in /bigdata/hdmi-los-build/work/*) ;; *) exit 2 ;; esac
+test -s "$work/incoming.tar"
+tar -xf "$work/incoming.tar" -C "$work/source"
+rm -f -- "$work/incoming.tar"
+REMOTE
 
 ssh -o BatchMode=yes -- "$SERVER" \
     "$WORK/source/build-support/remote-entry.sh" "$MODE" "$PROFILE" "$COMMIT" "$WORK"
@@ -82,4 +92,3 @@ if [[ $MODE == zip ]]; then
     printf 'Returned artifacts:\n'
     (cd "$ROOT/dist" && sha256sum -- * | sort)
 fi
-
