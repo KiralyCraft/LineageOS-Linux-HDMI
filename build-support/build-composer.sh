@@ -21,6 +21,16 @@ python "$SOURCE/build-support/sync-exact-manifest.py" "$BUILD_MANIFEST" "$TREE" 
 python "$SOURCE/build-support/verify-proprietary-inputs.py" "$TREE" "$PROFILE_JSON"
 cp "$TREE/.hdmi-los-exact-manifest.json" "$BUILD/exact-source-sync.json"
 
+# Builds made before the full-manifest transition installed a synthetic pdx234
+# product in this dedicated cache.  It is not a project in the pinned manifest,
+# so Git checkout cannot clean it, and Android otherwise sees two BoardConfig
+# files for the same TARGET_DEVICE.  Remove only that known legacy cache path.
+LEGACY_PRODUCT=$TREE/device/hdmi/pdx234
+case "$LEGACY_PRODUCT" in
+    "$TREE"/device/hdmi/pdx234) rm -rf -- "$LEGACY_PRODUCT" ;;
+    *) printf 'refusing unsafe legacy product path: %s\n' "$LEGACY_PRODUCT" >&2; exit 2 ;;
+esac
+
 revision=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["source"]["qcom_display_revision"])' "$PROFILE_JSON")
 patchset=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["patchset"])' "$PROFILE_JSON")
 release=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["device"]["ro.build.id"].split(".", 1)[0].lower())' "$PROFILE_JSON")
