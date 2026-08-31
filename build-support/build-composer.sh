@@ -42,7 +42,14 @@ if [ ! -d "$MANIFEST_REPO/.git" ]; then
     git -C "$MANIFEST_REPO" config user.email hdmi-los@localhost
 fi
 git -C "$MANIFEST_REPO" add default.xml
-git -C "$MANIFEST_REPO" commit -q --allow-empty -m 'exact installed-build display manifest'
+if ! git -C "$MANIFEST_REPO" diff --cached --quiet; then
+    git -C "$MANIFEST_REPO" commit -q -m 'exact installed-build display manifest'
+fi
+
+# The generated manifest repository is tiny and authoritative.  Recreate its
+# repo checkout on every run so an interrupted shallow rebase cannot poison a
+# later retry; the large per-project object cache remains untouched.
+rm -rf -- "$TREE/.repo/manifests" "$TREE/.repo/manifests.git"
 
 (cd "$TREE" && "$REPO" init -q --depth=1 -u "file://$MANIFEST_REPO" -m default.xml)
 
