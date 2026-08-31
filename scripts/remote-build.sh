@@ -56,26 +56,36 @@ fi
 
 COMMIT=$(git -C "$ROOT" rev-parse HEAD)
 WORK=$REMOTE_ROOT/work/$COMMIT
-ARCHIVE=$(mktemp --tmpdir hdmi-los-source.XXXXXXXX.tar)
+ARCHIVE=$(mktemp --tmpdir hdmi-los-source.XXXXXXXX.tar.gz)
 trap 'rm -f -- "$ARCHIVE"' EXIT
 
 ssh -o BatchMode=yes -- "$SERVER" bash -s -- "$WORK" <<'REMOTE'
 set -Eeuo pipefail
 work=$1
 case "$work" in /bigdata/hdmi-los-build/work/*) ;; *) exit 2 ;; esac
-rm -rf -- "$work/source" "$work/incoming.tar"
+rm -rf -- "$work/source" "$work/incoming.tar" "$work/incoming.tar.gz"
 mkdir -p "$work/source"
 REMOTE
 
-git -C "$ROOT" archive --format=tar --output="$ARCHIVE" HEAD
-rsync -a -- "$ARCHIVE" "$SERVER:$WORK/incoming.tar"
+git -C "$ROOT" archive --format=tar.gz --output="$ARCHIVE" HEAD
+uploaded=false
+for attempt in 1 2 3 4 5; do
+    if rsync -a --partial --timeout=45 \
+        -e 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3' \
+        -- "$ARCHIVE" "$SERVER:$WORK/incoming.tar.gz"; then
+        uploaded=true
+        break
+    fi
+    printf 'source upload attempt %d failed; retrying with a new SSH connection\n' "$attempt" >&2
+done
+[[ $uploaded == true ]] || { printf 'source upload failed after 5 attempts\n' >&2; exit 1; }
 ssh -o BatchMode=yes -- "$SERVER" bash -s -- "$WORK" <<'REMOTE'
 set -Eeuo pipefail
 work=$1
 case "$work" in /bigdata/hdmi-los-build/work/*) ;; *) exit 2 ;; esac
-test -s "$work/incoming.tar"
-tar -xf "$work/incoming.tar" -C "$work/source"
-rm -f -- "$work/incoming.tar"
+test -s "$work/incoming.tar.gz"
+tar -xzf "$work/incoming.tar.gz" -C "$work/source"
+rm -f -- "$work/incoming.tar.gz"
 REMOTE
 
 ssh -o BatchMode=yes -- "$SERVER" \
