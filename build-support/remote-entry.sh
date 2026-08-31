@@ -24,8 +24,8 @@ if [[ $MODE == port ]]; then
 fi
 
 [[ $MODE == zip ]]
+"$SOURCE/build-support/build-composer.sh" "$SOURCE" "$BUILD" "$PROFILE" "$REMOTE_ROOT/cache"
 "$SOURCE/build-support/build-native.sh" "$SOURCE" "$BUILD"
 "$SOURCE/build-support/build-tile.sh" "$SOURCE" "$BUILD" \
     "$REMOTE_ROOT/signing" "$PROFILE"
-"$SOURCE/build-support/build-composer.sh" "$SOURCE" "$BUILD" "$PROFILE" "$REMOTE_ROOT/cache"
 "$SOURCE/build-support/package.sh" "$SOURCE" "$BUILD" "$OUTPUT" "$PROFILE" "$COMMIT"
