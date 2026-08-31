@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <limits.h>
 #include <poll.h>
 #include <pwd.h>
 #include <signal.h>
