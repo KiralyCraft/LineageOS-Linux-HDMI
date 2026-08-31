@@ -11,9 +11,9 @@ Subject: [PATCH] hdmi-los: preserve extension ABI and harden failed pause
  sdm/include/private/hw_interface.h   |  9 ++++++---
  sdm/libs/core/display_base.cpp       |  5 +++++
  sdm/libs/core/display_base.h         |  1 +
- sdm/libs/dal/hw_device_drm.cpp       | 14 +++++++++++++-
- sdm/libs/dal/hw_device_drm.h         |  2 ++
- 9 files changed, 42 insertions(+), 10 deletions(-)
+ sdm/libs/dal/hw_device_drm.cpp       | 11 ++++++++++-
+ sdm/libs/dal/hw_device_drm.h         |  1 +
+ 9 files changed, 39 insertions(+), 10 deletions(-)
 
 diff --git a/composer/hwc_display.cpp b/composer/hwc_display.cpp
 index ad32f46..7e8706a 100755
@@ -154,20 +154,12 @@ diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
 index f31a675..95806dd 100644
 --- a/sdm/libs/dal/hw_device_drm.cpp
 +++ b/sdm/libs/dal/hw_device_drm.cpp
-@@ -2624,6 +2624,7 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
-   }
- 
-   lease_active_ = true;
-+  lease_created_ = true;
-   lease_lessee_id_ = lessee_id;
-   lease->lease_fd = fd;
-   lease->connector_id = token_.conn_id;
-@@ -2647,13 +2648,23 @@ DisplayError HWDeviceDRM::RevokeExternalDisplayLease() {
+@@ -2647,13 +2647,23 @@ DisplayError HWDeviceDRM::RevokeExternalDisplayLease() {
    return kErrorNone;
  }
  
 +DisplayError HWDeviceDRM::AbortExternalDisplayLeasePreparation() {
-+  if (lease_active_ || lease_created_) {
++  if (lease_active_ || lease_lessee_id_ != 0) {
 +    return kErrorPermission;
 +  }
 +  lease_prepared_ = false;
@@ -183,35 +175,18 @@ index f31a675..95806dd 100644
    }
  
 -  if (lease_plane_id_ != 0) {
-+  if (lease_created_ && lease_plane_id_ != 0) {
++  if (lease_lessee_id_ != 0 && lease_plane_id_ != 0) {
      uint32_t crtc_property = 0;
      uint32_t fb_property = 0;
      if (GetDrmProperty(dev_fd_, lease_plane_id_, DRM_MODE_OBJECT_PLANE, "CRTC_ID",
-@@ -2696,6 +2707,7 @@ DisplayError HWDeviceDRM::ResetExternalDisplayLease() {
- 
-   lease_prepared_ = false;
-   lease_active_ = false;
-+  lease_created_ = false;
-   lease_plane_id_ = 0;
-   lease_lessee_id_ = 0;
-   return result;
 diff --git a/sdm/libs/dal/hw_device_drm.h b/sdm/libs/dal/hw_device_drm.h
 index da96f1d..653b0e4 100644
 --- a/sdm/libs/dal/hw_device_drm.h
 +++ b/sdm/libs/dal/hw_device_drm.h
-@@ -182,6 +182,7 @@ class HWDeviceDRM : public HWInterface {
+@@ -182,5 +182,6 @@ class HWDeviceDRM : public HWInterface {
    DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) override;
    DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) override;
    DisplayError RevokeExternalDisplayLease() override;
 +  DisplayError AbortExternalDisplayLeasePreparation() override;
    DisplayError ResetExternalDisplayLease() override;
    DisplayError IsExternalDisplayLeaseConnected(bool *connected) override;
- 
-@@ -344,6 +345,7 @@ class HWDeviceDRM : public HWInterface {
-   uint32_t lease_lessee_id_ = 0;
-   bool lease_prepared_ = false;
-   bool lease_active_ = false;
-+  bool lease_created_ = false;
- 
-  private:
-   void GetCWBCapabilities();
