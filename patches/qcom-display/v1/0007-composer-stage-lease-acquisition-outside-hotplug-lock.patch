@@ -1,0 +1,339 @@
+From 8cd45f30f5e5004817f8b93d4adb69d587012f44 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Tue, 1 Sep 2026 14:24:25 +0300
+Subject: [PATCH] composer: stage lease acquisition outside hotplug lock
+
+---
+ composer/hdmi_lease_server.cpp |   2 +-
+ composer/hdmi_lease_server.h   |   2 +-
+ composer/hdmi_los_protocol.h   |   7 ++
+ composer/hwc_session.cpp       | 191 ++++++++++++++++++++++++---------
+ composer/hwc_session.h         |   3 +-
+ 5 files changed, 149 insertions(+), 56 deletions(-)
+
+diff --git a/composer/hdmi_lease_server.cpp b/composer/hdmi_lease_server.cpp
+index 157d9f5..051a267 100644
+--- a/composer/hdmi_lease_server.cpp
++++ b/composer/hdmi_lease_server.cpp
+@@ -144,7 +144,7 @@ bool HdmiLeaseServer::HandleRequest(int client_fd, const hdmi_los_message &reque
+       controller_->GetHdmiLeaseStatus(&response);
+       break;
+     case HDMI_LOS_OP_ACQUIRE:
+-      response.status = controller_->AcquireHdmiLease(&response, &lease_fd);
++      response.status = controller_->AcquireHdmiLease(request.flags, &response, &lease_fd);
+       if (response.status == HDMI_LOS_OK) {
+         deadline_ms_ = BootTimeMs() + kComposerFailsafeSeconds * 1000;
+       }
+diff --git a/composer/hdmi_lease_server.h b/composer/hdmi_lease_server.h
+index c3a468c..9e2d49f 100644
+--- a/composer/hdmi_lease_server.h
++++ b/composer/hdmi_lease_server.h
+@@ -11,7 +11,7 @@ namespace sdm {
+ 
+ class HdmiLeaseController {
+  public:
+-  virtual int AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) = 0;
++  virtual int AcquireHdmiLease(uint32_t phase, hdmi_los_message *status, int *lease_fd) = 0;
+   virtual int ReleaseHdmiLease(const char *reason) = 0;
+   virtual void GetHdmiLeaseStatus(hdmi_los_message *status) = 0;
+ 
+diff --git a/composer/hdmi_los_protocol.h b/composer/hdmi_los_protocol.h
+index 0a6de4b..8bb4705 100644
+--- a/composer/hdmi_los_protocol.h
++++ b/composer/hdmi_los_protocol.h
+@@ -16,6 +16,13 @@ enum hdmi_los_opcode {
+   HDMI_LOS_OP_RESPONSE = 0x8000,
+ };
+ 
++enum hdmi_los_acquire_phase {
++  HDMI_LOS_ACQUIRE_NONE = 0,
++  HDMI_LOS_ACQUIRE_PREPARE = 1,
++  HDMI_LOS_ACQUIRE_PAUSE = 2,
++  HDMI_LOS_ACQUIRE_CREATE = 3,
++};
++
+ enum hdmi_los_state {
+   HDMI_LOS_STATE_ANDROID = 0,
+   HDMI_LOS_STATE_DRAINING = 1,
+diff --git a/composer/hwc_session.cpp b/composer/hwc_session.cpp
+index 5e2aa96..4efbdc9 100644
+--- a/composer/hwc_session.cpp
++++ b/composer/hwc_session.cpp
+@@ -404,90 +404,166 @@ void HWCSession::GetHdmiLeaseStatus(hdmi_los_message *status) {
+   status->crtc_id = hdmi_lease_info_.crtc_id;
+   status->plane_id = hdmi_lease_info_.plane_id;
+   status->lessee_id = hdmi_lease_info_.lessee_id;
++  status->flags = hdmi_lease_phase_;
+   snprintf(status->detail, sizeof(status->detail), "%s", hdmi_lease_detail_.c_str());
+ }
+ 
+-int HWCSession::AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) {
++int HWCSession::AcquireHdmiLease(uint32_t phase, hdmi_los_message *status, int *lease_fd) {
+   if (!status || !lease_fd) return HDMI_LOS_ERR_PROTOCOL;
+   std::lock_guard<std::mutex> lease_lock(hdmi_lease_mutex_);
+-  if (hdmi_lease_state_.load() != HDMI_LOS_STATE_ANDROID) {
+-    snprintf(status->detail, sizeof(status->detail), "lease transition already active");
++  *lease_fd = -1;
++  auto fill_status = [&](int result) {
+     status->state = hdmi_lease_state_.load();
+-    return HDMI_LOS_ERR_BUSY;
+-  }
+-  if (!callbacks_.IsClientConnected() || secure_session_active_ || IsVirtualDisplayConnected()) {
+-    snprintf(status->detail, sizeof(status->detail),
+-             "SurfaceFlinger, secure session, or virtual-display state forbids leasing");
+-    status->state = HDMI_LOS_STATE_UNAVAILABLE;
+-    return HDMI_LOS_ERR_UNAVAILABLE;
+-  }
++    status->connector_id = hdmi_lease_info_.connector_id;
++    status->crtc_id = hdmi_lease_info_.crtc_id;
++    status->plane_id = hdmi_lease_info_.plane_id;
++    status->lessee_id = hdmi_lease_info_.lessee_id;
++    status->flags = hdmi_lease_phase_;
++    snprintf(status->detail, sizeof(status->detail), "%s", hdmi_lease_detail_.c_str());
++    return result;
++  };
++  auto reset_transition = [&]() {
++    hdmi_lease_state_ = HDMI_LOS_STATE_ANDROID;
++    hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_NONE;
++    hdmi_lease_display_idx_ = -1;
++    hdmi_lease_info_ = {};
++  };
++
++  if (phase == HDMI_LOS_ACQUIRE_PREPARE) {
++    DLOGI("hdmi-los: acquire phase=prepare begin");
++    if (hdmi_lease_state_.load() != HDMI_LOS_STATE_ANDROID ||
++        hdmi_lease_phase_ != HDMI_LOS_ACQUIRE_NONE) {
++      hdmi_lease_detail_ = "lease transition already active";
++      return fill_status(HDMI_LOS_ERR_BUSY);
++    }
++    if (!callbacks_.IsClientConnected() || secure_session_active_ || IsVirtualDisplayConnected()) {
++      hdmi_lease_detail_ =
++          "SurfaceFlinger, secure session, or virtual-display state forbids leasing";
++      return fill_status(HDMI_LOS_ERR_UNAVAILABLE);
++    }
+ 
+-  hdmi_lease_state_ = HDMI_LOS_STATE_DRAINING;
+-  hdmi_lease_detail_ = "pausing Android external display";
+-  DisplayLeaseInfo lease = {};
+-  int selected = -1;
+-  int connected_count = 0;
+-  int result = HDMI_LOS_ERR_UNAVAILABLE;
+-  {
+-    SCOPE_LOCK(pluggable_handler_lock_);
+-    for (auto &map_info : map_info_pluggable_) {
+-      if (map_info.client_id < HWCCallbacks::kNumDisplays &&
+-          hwc_display_[map_info.client_id] != nullptr) {
+-        selected = static_cast<int>(map_info.client_id);
+-        connected_count++;
++    hdmi_lease_state_ = HDMI_LOS_STATE_DRAINING;
++    hdmi_lease_detail_ = "selecting Android external display";
++    int selected = -1;
++    int connected_count = 0;
++    {
++      // Pin only the display index under the hotplug lock.  Hotplug handling is
++      // gated by the DRAINING state after this scope, so power and DRM calls
++      // must not retain this global lock and deadlock a driver callback.
++      SCOPE_LOCK(pluggable_handler_lock_);
++      for (auto &map_info : map_info_pluggable_) {
++        if (map_info.client_id < HWCCallbacks::kNumDisplays &&
++            hwc_display_[map_info.client_id] != nullptr) {
++          selected = static_cast<int>(map_info.client_id);
++          connected_count++;
++        }
+       }
+     }
+     if (connected_count != 1 || selected < 0) {
+       hdmi_lease_detail_ = "exactly one active Android pluggable display is required";
+-    } else {
++      reset_transition();
++      return fill_status(HDMI_LOS_ERR_UNAVAILABLE);
++    }
++
++    DisplayLeaseInfo lease = {};
++    int result = HDMI_LOS_ERR_UNAVAILABLE;
++    {
+       SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
+       HWCDisplay *display = hwc_display_[selected];
+       if (!display || !display->IsExternalDisplayLeaseReady()) {
+         hdmi_lease_detail_ = "external display is not on and lease-ready";
+       } else if (display->PrepareExternalDisplayLease(&lease) != 0) {
+         hdmi_lease_detail_ = "cannot pin the external display primary plane";
+-      } else if (display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause) != 0) {
++      } else {
++        hdmi_lease_display_idx_ = selected;
++        hdmi_lease_info_ = lease;
++        hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_PREPARE;
++        hdmi_lease_detail_ = "external display resources prepared; Android remains active";
++        DLOGI("hdmi-los: acquire phase=prepare complete display=%d", selected);
++        result = HDMI_LOS_OK;
++      }
++    }
++    if (result != HDMI_LOS_OK) reset_transition();
++    return fill_status(result);
++  }
++
++  if (phase != HDMI_LOS_ACQUIRE_PAUSE && phase != HDMI_LOS_ACQUIRE_CREATE) {
++    hdmi_lease_detail_ = "staged acquire phase is required";
++    return fill_status(HDMI_LOS_ERR_PROTOCOL);
++  }
++  uint32_t required_phase = phase == HDMI_LOS_ACQUIRE_PAUSE ?
++                                HDMI_LOS_ACQUIRE_PREPARE : HDMI_LOS_ACQUIRE_PAUSE;
++  if (hdmi_lease_state_.load() != HDMI_LOS_STATE_DRAINING ||
++      hdmi_lease_phase_ != required_phase || hdmi_lease_display_idx_ < 0) {
++    hdmi_lease_detail_ = "staged acquire request is out of sequence";
++    return fill_status(HDMI_LOS_ERR_STATE);
++  }
++
++  int selected = hdmi_lease_display_idx_;
++  int result = HDMI_LOS_ERR_IO;
++  bool refresh_primary = false;
++  {
++    SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
++    HWCDisplay *display = hwc_display_[selected];
++    if (!display || secure_session_active_ || IsVirtualDisplayConnected()) {
++      if (display) {
++        display->AbortExternalDisplayLeasePreparation();
++        if (hdmi_lease_phase_ == HDMI_LOS_ACQUIRE_PAUSE) {
++          display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
++          refresh_primary = true;
++        }
++      }
++      hdmi_lease_detail_ = "display or secure-session state changed during takeover";
++      reset_transition();
++      result = HDMI_LOS_ERR_UNAVAILABLE;
++    } else if (phase == HDMI_LOS_ACQUIRE_PAUSE) {
++      DLOGI("hdmi-los: acquire phase=pause begin display=%d", selected);
++      if (display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause) != 0) {
+         display->AbortExternalDisplayLeasePreparation();
+         display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
+         hdmi_lease_detail_ = "Android could not pause the external display";
+-      } else if (display->CreateExternalDisplayLease(&lease) != 0 || lease.lease_fd < 0) {
+-        display->RevokeExternalDisplayLease();
+-        display->ResetExternalDisplayLease();
++        reset_transition();
++      } else {
++        hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_PAUSE;
++        hdmi_lease_detail_ = "Android external display paused";
++        DLOGI("hdmi-los: acquire phase=pause complete display=%d", selected);
++        result = HDMI_LOS_OK;
++      }
++      refresh_primary = true;
++    } else {
++      DLOGI("hdmi-los: acquire phase=create begin display=%d", selected);
++      DisplayLeaseInfo lease = hdmi_lease_info_;
++      if (display->CreateExternalDisplayLease(&lease) != 0 || lease.lease_fd < 0) {
++        display->AbortExternalDisplayLeasePreparation();
+         display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
+         hdmi_lease_detail_ = "DRM lease creation failed; Android was resumed";
++        reset_transition();
++        refresh_primary = true;
+       } else {
+-        hdmi_lease_display_idx_ = selected;
+         hdmi_lease_info_ = lease;
+         *lease_fd = lease.lease_fd;
++        hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_CREATE;
+         hdmi_lease_state_ = HDMI_LOS_STATE_LEASED;
+         hdmi_lease_detail_ = "external display leased to root broker";
++        DLOGI("hdmi-los: acquire phase=create complete display=%d lease=%u",
++              selected, lease.lessee_id);
+         result = HDMI_LOS_OK;
+       }
+     }
+   }
+ 
+-  if (result != HDMI_LOS_OK) {
+-    hdmi_lease_state_ = HDMI_LOS_STATE_ANDROID;
+-    hdmi_lease_display_idx_ = -1;
+-    hdmi_lease_info_ = {};
+-  }
+-  status->state = hdmi_lease_state_.load();
+-  status->connector_id = hdmi_lease_info_.connector_id;
+-  status->crtc_id = hdmi_lease_info_.crtc_id;
+-  status->plane_id = hdmi_lease_info_.plane_id;
+-  status->lessee_id = hdmi_lease_info_.lessee_id;
+-  snprintf(status->detail, sizeof(status->detail), "%s", hdmi_lease_detail_.c_str());
+-  if (result == HDMI_LOS_OK) {
++  if (refresh_primary) {
+     hwc2_display_t primary = GetActiveBuiltinDisplay();
+     if (primary < HWCCallbacks::kNumDisplays) callbacks_.Refresh(primary);
+   }
+-  return result;
++  return fill_status(result);
+ }
+ 
+ int HWCSession::ReleaseHdmiLease(const char *reason) {
+   std::lock_guard<std::mutex> lease_lock(hdmi_lease_mutex_);
+   uint32_t state = hdmi_lease_state_.load();
+-  if (state == HDMI_LOS_STATE_ANDROID && hdmi_lease_display_idx_ < 0) {
++  if (state == HDMI_LOS_STATE_ANDROID && hdmi_lease_phase_ == HDMI_LOS_ACQUIRE_NONE &&
++      hdmi_lease_display_idx_ < 0) {
+     return HDMI_LOS_OK;
+   }
+ 
+@@ -496,24 +572,33 @@ int HWCSession::ReleaseHdmiLease(const char *reason) {
+   int result = HDMI_LOS_OK;
+   bool connected = false;
+   int selected = hdmi_lease_display_idx_;
+-  {
+-    SCOPE_LOCK(pluggable_handler_lock_);
+-    if (selected >= 0 && selected < static_cast<int>(HWCCallbacks::kNumDisplays) &&
+-        hwc_display_[selected]) {
+-      SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
+-      HWCDisplay *display = hwc_display_[selected];
++  uint32_t phase = hdmi_lease_phase_;
++  DLOGI("hdmi-los: release phase=%u display=%d reason=%s", phase, selected,
++        reason ? reason : "unspecified");
++  if (selected >= 0 && selected < static_cast<int>(HWCCallbacks::kNumDisplays) &&
++      hwc_display_[selected]) {
++    // The non-ANDROID state defers hotplug teardown, so the per-display lock is
++    // sufficient and avoids the global-lock inversion that reset the device.
++    SEQUENCE_WAIT_SCOPE_LOCK(locker_[selected]);
++    HWCDisplay *display = hwc_display_[selected];
++    if (phase == HDMI_LOS_ACQUIRE_CREATE) {
+       if (display->RevokeExternalDisplayLease() != 0) result = HDMI_LOS_ERR_IO;
+       connected = display->IsExternalDisplayLeaseConnected();
+       if (display->ResetExternalDisplayLease() != 0) result = HDMI_LOS_ERR_IO;
+-      if (connected && display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) != 0) {
+-        result = HDMI_LOS_ERR_IO;
+-      }
++    } else {
++      connected = display->IsExternalDisplayLeaseConnected();
++      if (display->AbortExternalDisplayLeasePreparation() != 0) result = HDMI_LOS_ERR_IO;
++    }
++    if (phase >= HDMI_LOS_ACQUIRE_PAUSE && connected &&
++        display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) != 0) {
++      result = HDMI_LOS_ERR_IO;
+     }
+   }
+ 
+   hdmi_lease_info_ = {};
+   if (result == HDMI_LOS_OK || !connected) {
+     hdmi_lease_display_idx_ = -1;
++    hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_NONE;
+     hdmi_lease_state_ = HDMI_LOS_STATE_ANDROID;
+     hdmi_lease_detail_ = connected ? "Android external display restored" :
+                                       "lease ended after external disconnect";
+diff --git a/composer/hwc_session.h b/composer/hwc_session.h
+index eb10dfa..4bffed6 100644
+--- a/composer/hwc_session.h
++++ b/composer/hwc_session.h
+@@ -154,7 +154,7 @@ class HWCSession : hwc2_device_t, HWCUEventListener, public qClient::BnQClient,
+   HWCSession();
+   int Init();
+   int Deinit();
+-  int AcquireHdmiLease(hdmi_los_message *status, int *lease_fd) override;
++  int AcquireHdmiLease(uint32_t phase, hdmi_los_message *status, int *lease_fd) override;
+   int ReleaseHdmiLease(const char *reason) override;
+   void GetHdmiLeaseStatus(hdmi_los_message *status) override;
+   HWC2::Error CreateVirtualDisplayObj(uint32_t width, uint32_t height, int32_t *format,
+@@ -682,6 +682,7 @@ class HWCSession : hwc2_device_t, HWCUEventListener, public qClient::BnQClient,
+   std::unique_ptr<HdmiLeaseServer> hdmi_lease_server_;
+   std::mutex hdmi_lease_mutex_;
+   std::atomic<uint32_t> hdmi_lease_state_{HDMI_LOS_STATE_ANDROID};
++  uint32_t hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_NONE;
+   int hdmi_lease_display_idx_ = -1;
+   DisplayLeaseInfo hdmi_lease_info_ = {};
+   std::string hdmi_lease_detail_ = "Android owns external display";
+-- 
+2.53.0
+

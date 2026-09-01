@@ -51,6 +51,16 @@ void log_line(const char *level, const char *message) {
   fflush(stderr);
 }
 
+void log_transition(const char *message) {
+  log_line("transition", message);
+  // stderr is redirected to the persistent module log by service.sh.  Make
+  // every transition boundary durable before entering composer or Xorg code,
+  // so even a watchdog reset identifies the last operation begun.
+  int saved_errno = errno;
+  (void)fdatasync(STDERR_FILENO);
+  errno = saved_errno;
+}
+
 void log_errno(const char *message) {
   std::string text(message);
   text += ": ";
@@ -370,9 +380,11 @@ class Broker {
     return composer_fd_ >= 0;
   }
 
-  bool ComposerRequest(uint16_t opcode, hdmi_los_message *response, int *lease_fd = nullptr) {
+  bool ComposerRequest(uint16_t opcode, hdmi_los_message *response, int *lease_fd = nullptr,
+                       uint32_t flags = 0) {
     if (!EnsureComposer()) return false;
     hdmi_los_message request = make_message(opcode);
+    request.flags = flags;
     if (!send_with_fd(composer_fd_, request, -1) ||
         !recv_with_fd(composer_fd_, response, lease_fd) || !valid_message(*response) ||
         response->request_id != request.request_id) {
@@ -435,6 +447,7 @@ class Broker {
     // Count preparation and Xorg verification inside the mandatory window.
     deadline_ms_ = monotonic_ms() + kSessionSeconds * 1000;
 
+    log_transition("takeover agent-prepare begin");
     hdmi_los_message request = make_message(HDMI_LOS_OP_AGENT_PREPARE);
     hdmi_los_message response = {};
     if (!write_full(agent_fd_, &request, sizeof(request)) ||
@@ -445,18 +458,57 @@ class Broker {
       CleanupGuards();
       return HDMI_LOS_ERR_AGENT;
     }
+    log_transition("takeover agent-prepare complete");
 
     int lease_fd = -1;
-    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, &lease_fd) ||
-        response.status != HDMI_LOS_OK || lease_fd < 0) {
+    log_transition("takeover composer-prepare begin");
+    response = {};
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
+                         HDMI_LOS_ACQUIRE_PREPARE) || response.status != HDMI_LOS_OK) {
       *detail = response.detail[0] ? response.detail : "composer lease request failed";
+      int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      log_transition("takeover composer-prepare failed");
+      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
+      write_full(agent_fd_, &stop, sizeof(stop));
+      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
+      CleanupGuards();
+      return failure_status;
+    }
+    log_transition("takeover composer-prepare complete");
+
+    log_transition("takeover composer-pause begin");
+    response = {};
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
+                         HDMI_LOS_ACQUIRE_PAUSE) || response.status != HDMI_LOS_OK) {
+      *detail = response.detail[0] ? response.detail : "composer display pause failed";
+      int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      log_transition("takeover composer-pause failed");
+      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
+      write_full(agent_fd_, &stop, sizeof(stop));
+      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
+      CleanupGuards();
+      return failure_status;
+    }
+    log_transition("takeover composer-pause complete");
+
+    log_transition("takeover composer-create begin");
+    response = {};
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, &lease_fd,
+                         HDMI_LOS_ACQUIRE_CREATE) || response.status != HDMI_LOS_OK ||
+        lease_fd < 0) {
+      *detail = response.detail[0] ? response.detail : "composer lease creation failed";
+      int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      log_transition("takeover composer-create failed");
       hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
       write_full(agent_fd_, &stop, sizeof(stop));
       if (lease_fd >= 0) close(lease_fd);
+      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
       CleanupGuards();
-      return response.status ? response.status : HDMI_LOS_ERR_IO;
+      return failure_status;
     }
+    log_transition("takeover composer-create complete");
 
+    log_transition("takeover agent-start begin");
     request = make_message(HDMI_LOS_OP_AGENT_START);
     request.connector_id = response.connector_id;
     request.crtc_id = response.crtc_id;
@@ -477,6 +529,7 @@ class Broker {
       *detail = "Xorg did not become ready within 15 seconds";
       return HDMI_LOS_ERR_TIMEOUT;
     }
+    log_transition("takeover agent-start complete");
 
     active_ = true;
     state_detail_ = "Xorg owns external display";
@@ -494,6 +547,7 @@ class Broker {
   void Release(const char *reason, bool tell_composer) {
     if (!active_ && volumes_.down < 0 && volumes_.up < 0) return;
     log_line("warning", reason);
+    log_transition("restore begin");
     if (agent_fd_ >= 0) {
       hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
       hdmi_los_message response = {};
@@ -508,6 +562,7 @@ class Broker {
     active_ = false;
     CleanupGuards();
     state_detail_ = reason;
+    log_transition("restore complete");
   }
 
   hdmi_los_message Status(uint32_t request_id) {

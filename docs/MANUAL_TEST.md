@@ -9,7 +9,9 @@ Do not use release 0.1 or the ZIP whose SHA-256 is
 That package shifted proprietary Qualcomm/Sony C++ vtables and failed before
 the Lineage boot animation. Release 0.2 corrected the ABI but inherited
 `nosuid` by binding its executable directly from `/data`; do not install it
-either. These instructions apply to release 0.2.1 or later.
+either. The first 0.2.3 live takeover hard-reset the device; that path also held
+the global pluggable-display lock across synchronous power and lease operations.
+These instructions apply to release 0.2.4 or later.
 
 ## Before installation
 

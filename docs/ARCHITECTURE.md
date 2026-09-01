@@ -2,17 +2,26 @@
 
 The Android composer remains the DRM master.  The patch adds a private,
 root-only control endpoint inside the existing Qualcomm composer process.  For
-one connected pluggable display it performs this sequence under the session
-lock:
+one connected pluggable display it performs this staged sequence:
 
 1. Identify the connector, its current CRTC, and the primary plane already
    selected by the DAL.
-2. Pause the existing external `HWCDisplay`; the internal DSI display is never
-   part of the lease.
-3. Create a DRM lease containing exactly those three objects and pass its file
+2. Release the global pluggable-display handler lock. The non-Android takeover
+   state defers hotplug teardown, while the per-display sequence lock pins each
+   short operation without blocking a driver callback on the global lock.
+3. Pause the existing external `HWCDisplay`, acknowledge that phase, and issue
+   the same primary-display refresh used by Qualcomm's stock display-status
+   path. The internal DSI display is never part of the lease.
+4. Create a DRM lease containing exactly those three objects and pass its file
    descriptor to the root broker.
-4. On release, revoke the lease, detach any lessee plane state, reset the DAL's
+5. On release, revoke the lease, detach any lessee plane state, reset the DAL's
    cached CRTC/plane state, and resume the same `HWCDisplay` object.
+
+The broker fsyncs a persistent transition breadcrumb before and after agent
+preparation, composer preparation, pause, lease creation, and Xorg startup.
+Composer rolls back a prepared or paused partial transition when the broker
+disconnects or a phase fails; its independent 65-second deadline begins with
+the first preparation phase.
 
 Lease readiness is gated by the composer-owned `HWCDisplay` power and pause
 state.  It deliberately does not use `HWDeviceDRM::active_`: that legacy DAL
@@ -20,9 +29,8 @@ member is never maintained in this source tree and remains false even while an
 external CRTC and primary plane are actively scanning out.
 
 The composer independently revokes after 65 seconds or when its broker
-disconnects.  Unplug and secure-display entry also force release.  SurfaceFlinger
-hotplug notifications are suppressed only while this already-created external
-display is leased.
+disconnects. Unplug and secure-display entry also force release. SurfaceFlinger
+hotplug handling is deferred only from resource preparation through restoration.
 
 Lease bookkeeping lives in a private sidecar map in the DAL translation unit,
 not in `HWDeviceDRM`.  Its state is erased on reset and DAL teardown.  This keeps

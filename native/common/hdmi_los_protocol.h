@@ -24,6 +24,13 @@ enum hdmi_los_opcode {
   HDMI_LOS_OP_RESPONSE = 0x8000
 };
 
+enum hdmi_los_acquire_phase {
+  HDMI_LOS_ACQUIRE_NONE = 0,
+  HDMI_LOS_ACQUIRE_PREPARE = 1,
+  HDMI_LOS_ACQUIRE_PAUSE = 2,
+  HDMI_LOS_ACQUIRE_CREATE = 3
+};
+
 enum hdmi_los_state {
   HDMI_LOS_STATE_ANDROID = 0,
   HDMI_LOS_STATE_DRAINING = 1,

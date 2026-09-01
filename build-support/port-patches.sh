@@ -44,6 +44,18 @@ if sed -n '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::IsExternalDi
     printf 'patch-port check failed: HDMI lease lifecycle must not use the unmaintained active_ flag\n' >&2
     exit 1
 fi
+composer_source=$DISPLAY/composer/hwc_session.cpp
+composer_header=$DISPLAY/composer/hdmi_los_protocol.h
+for phase in PREPARE PAUSE CREATE; do
+    grep -q "HDMI_LOS_ACQUIRE_$phase" "$composer_header" || {
+        printf 'patch-port check failed: staged composer acquisition is incomplete\n' >&2
+        exit 1
+    }
+done
+grep -q 'must not retain this global lock and deadlock a driver callback' "$composer_source" || {
+    printf 'patch-port check failed: composer hotplug-lock boundary is missing\n' >&2
+    exit 1
+}
 test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
 printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
 git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"

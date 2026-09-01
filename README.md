@@ -37,6 +37,16 @@ the 0.1 nor the 0.2 ZIP should be installed. Release 0.2.2 also fixes deferred
 tile installation by preventing Package Manager from inheriting a log file
 descriptor that `system_server` cannot write under SELinux.
 
+Release 0.2.3 reached the first real lease transition, but its composer path
+held Qualcomm's global pluggable-display handler lock while synchronously
+powering off the external display and creating the DRM lease. The first live
+activation ended in a full-device reset and cut OTG dock power; no retained
+crash dump identified the exact internal phase. Do not install 0.2.3. Release
+0.2.4 limits that global lock to display selection,
+performs prepare, pause, and lease creation as separately acknowledged phases,
+refreshes SurfaceFlinger after pause as the stock display-status path does, and
+durably records every boundary before entering composer or Xorg code.
+
 Runtime escape paths are:
 
 - Hold Volume Up and Volume Down together for three seconds.
