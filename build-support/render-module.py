@@ -3,7 +3,9 @@ import json
 import pathlib
 import sys
 
-profile = json.loads(pathlib.Path(sys.argv[1]).read_text())
+profile_path = pathlib.Path(sys.argv[1])
+profile = json.loads(profile_path.read_text())
+release = json.loads((profile_path.parent.parent / "release.json").read_text())
 module = pathlib.Path(sys.argv[2])
 device = profile["device"]
 
@@ -31,8 +33,7 @@ for artifact in profile["artifacts"]:
 (module / "original-checksums.list").write_text("".join(lines))
 
 prop = (module / "module.prop").read_text().splitlines()
-version_code = int("".join(filter(str.isdigit, profile["captured_utc"][:10])))
-prop = [f"version=0.1-{profile['name']}" if line.startswith("version=")
-        else f"versionCode={version_code}" if line.startswith("versionCode=")
+prop = [f"version={release['version']}-{profile['name']}" if line.startswith("version=")
+        else f"versionCode={release['version_code']}" if line.startswith("versionCode=")
         else line for line in prop]
 (module / "module.prop").write_text("\n".join(prop) + "\n")

@@ -25,6 +25,12 @@ the object layout and all pre-existing adjustment thunks compatible with the
 installed proprietary display extension.  Every build proves that property
 against an unpatched exact-tree baseline before packaging.
 
+Lease calls also stay outside the existing `DisplayInterface` and `HWInterface`
+virtual tables. Namespace-level bridge functions enter non-virtual methods on
+`DisplayBase` and `HWDeviceDRM`; no existing base or derived virtual slot is
+added, removed, or moved. The ABI gate decodes Android packed relocations and
+compares every existing exported vtable's size and slot identity.
+
 The Magisk module has `skip_mount`; it never unconditionally overlays `/vendor`.
 At `post-fs-data` it compares five build properties and SHA-256 hashes of all
 three untouched files.  Only a complete match permits early bind mounts.  The

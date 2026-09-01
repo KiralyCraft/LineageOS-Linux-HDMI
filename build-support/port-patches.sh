@@ -33,6 +33,11 @@ while IFS= read -r patch; do
 done < "$SOURCE/patches/$patchset/series"
 
 git -C "$DISPLAY" diff --check "$revision"..HEAD
+if git -C "$DISPLAY" grep -n -E \
+    'virtual .*ExternalDisplayLease|ExternalDisplayLease.*override'; then
+    printf 'patch-port check failed: HDMI lease hooks must not enter vendor-facing vtables\n' >&2
+    exit 1
+fi
 test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
 printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
 git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"

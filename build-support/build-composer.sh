@@ -86,5 +86,9 @@ for artifact in "$COMPOSER_OUT/"*; do
     readelf -h "$artifact" | grep -q 'AArch64'
     readelf -n "$artifact" > "$artifact.notes.txt"
 done
-"$SOURCE/build-support/verify-composer-abi.sh" "$BASELINE_OUT" "$COMPOSER_OUT" |
+LLVM_READOBJ=$(find "$TREE/prebuilts/clang/host/linux-x86" -type f \
+    -path '*/bin/llvm-readobj' -print | LC_ALL=C sort -V | tail -n 1)
+[[ -n $LLVM_READOBJ && -x $LLVM_READOBJ ]]
+"$SOURCE/build-support/verify-composer-abi.sh" \
+    "$BASELINE_OUT" "$COMPOSER_OUT" "$LLVM_READOBJ" |
     tee "$BUILD/composer-abi-report.txt"

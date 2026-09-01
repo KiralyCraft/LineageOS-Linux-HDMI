@@ -25,6 +25,13 @@ composer/DAL that owns the state.
 It is still experimental. `make zip` performs build-time checks only. It never
 installs the module, reboots Android, starts Xorg, or performs a live takeover.
 
+The initial 0.1 package caused a pre-animation boot failure because new virtual
+methods shifted Qualcomm derived-class vtable slots used by proprietary Sony
+display code. Magisk safe mode recovered the phone. Release 0.2 replaces those
+hooks with a non-virtual bridge and adds an exact vtable-slot build gate. The
+[incident record](docs/BOOT_FAILURE_2026-09-01.md) contains the evidence. The
+0.2 correction is not yet runtime-validated, and the 0.1 ZIP must not be used.
+
 Runtime escape paths are:
 
 - Hold Volume Up and Volume Down together for three seconds.
@@ -76,9 +83,10 @@ against the running phone before compilation.
 
 Before applying the patch series, the same exact tree builds an unmodified
 composer/SDM baseline. Packaging fails if a patched ELF changes its ELF class,
-machine, SONAME, dependency set, or drops/changes any baseline dynamic export.
-This includes ABI-sensitive C++ adjustment-thunk names, so adding fields to a
-Qualcomm class used by proprietary display extensions cannot silently ship.
+machine, SONAME, dependency set, drops a baseline dynamic export, changes an
+existing exported object's size, or changes the size or relocation identity of
+any existing exported C++ vtable slot. This covers both class-layout adjustment
+thunks and the derived-vtable shifting that caused the 0.1 boot failure.
 
 ## Manual activation outline
 

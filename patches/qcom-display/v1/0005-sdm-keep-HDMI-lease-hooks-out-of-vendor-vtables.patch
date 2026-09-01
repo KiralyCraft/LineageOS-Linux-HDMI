@@ -1,0 +1,346 @@
+From 664c2c43c485dffce711e45fb9f93dda388ba38a Mon Sep 17 00:00:00 2001
+From: KiralyCraft <alexucu@gmail.com>
+Date: Tue, 1 Sep 2026 07:53:57 +0300
+Subject: [PATCH] sdm: keep HDMI lease hooks out of vendor vtables
+
+---
+ composer/hwc_display.cpp             | 13 +++---
+ sdm/include/core/display_interface.h | 28 +++++-------
+ sdm/include/private/hw_interface.h   | 24 ++++------
+ sdm/libs/core/display_base.cpp       | 68 +++++++++++++++++++++++++---
+ sdm/libs/core/display_base.h         | 12 ++---
+ sdm/libs/dal/hw_device_drm.cpp       | 42 +++++++++++++++++
+ sdm/libs/dal/hw_device_drm.h         | 20 +++++---
+ 7 files changed, 151 insertions(+), 56 deletions(-)
+
+diff --git a/composer/hwc_display.cpp b/composer/hwc_display.cpp
+index 7e8706a..8d2c421 100755
+--- a/composer/hwc_display.cpp
++++ b/composer/hwc_display.cpp
+@@ -2255,32 +2255,33 @@ int HWCDisplay::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+   if (!lease || !IsExternalDisplayLeaseReady()) {
+     return -EINVAL;
+   }
+-  return display_intf_->PrepareExternalDisplayLease(lease) == kErrorNone ? 0 : -EIO;
++  return sdm::PrepareExternalDisplayLease(display_intf_, lease) == kErrorNone ? 0 : -EIO;
+ }
+ 
+ int HWCDisplay::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+   if (!lease || !display_paused_) {
+     return -EINVAL;
+   }
+-  return display_intf_->CreateExternalDisplayLease(lease) == kErrorNone ? 0 : -EIO;
++  return sdm::CreateExternalDisplayLease(display_intf_, lease) == kErrorNone ? 0 : -EIO;
+ }
+ 
+ int HWCDisplay::RevokeExternalDisplayLease() {
+-  DisplayError error = display_intf_->RevokeExternalDisplayLease();
++  DisplayError error = sdm::RevokeExternalDisplayLease(display_intf_);
+   return (error == kErrorNone || error == kErrorNotSupported) ? 0 : -EIO;
+ }
+ 
+ int HWCDisplay::AbortExternalDisplayLeasePreparation() {
+-  return display_intf_->AbortExternalDisplayLeasePreparation() == kErrorNone ? 0 : -EIO;
++  return sdm::AbortExternalDisplayLeasePreparation(display_intf_) == kErrorNone ? 0 : -EIO;
+ }
+ 
+ int HWCDisplay::ResetExternalDisplayLease() {
+-  return display_intf_->ResetExternalDisplayLease() == kErrorNone ? 0 : -EIO;
++  return sdm::ResetExternalDisplayLease(display_intf_) == kErrorNone ? 0 : -EIO;
+ }
+ 
+ bool HWCDisplay::IsExternalDisplayLeaseConnected() {
+   bool connected = false;
+-  return display_intf_->IsExternalDisplayLeaseConnected(&connected) == kErrorNone && connected;
++  return sdm::IsExternalDisplayLeaseConnected(display_intf_, &connected) == kErrorNone &&
++         connected;
+ }
+ 
+ bool HWCDisplay::IsExternalDisplayLeaseReady() const {
+diff --git a/sdm/include/core/display_interface.h b/sdm/include/core/display_interface.h
+index 6f7ba39..f9280d8 100644
+--- a/sdm/include/core/display_interface.h
++++ b/sdm/include/core/display_interface.h
+@@ -1353,25 +1353,19 @@ class DisplayInterface {
+ 
+  protected:
+   virtual ~DisplayInterface() { }
+-
+- public:
+-  // Keep these hooks after the pre-existing virtual destructor.  Qualcomm's
+-  // proprietary extensions were compiled against the old vtable; appending
+-  // slots preserves every existing slot number.
+-  virtual DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+-    return kErrorNotSupported;
+-  }
+-  virtual DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+-    return kErrorNotSupported;
+-  }
+-  virtual DisplayError RevokeExternalDisplayLease() { return kErrorNotSupported; }
+-  virtual DisplayError AbortExternalDisplayLeasePreparation() { return kErrorNotSupported; }
+-  virtual DisplayError ResetExternalDisplayLease() { return kErrorNotSupported; }
+-  virtual DisplayError IsExternalDisplayLeaseConnected(bool *connected) {
+-    return kErrorNotSupported;
+-  }
+ };
+ 
++// Keep the experimental lease bridge outside DisplayInterface's virtual table.
++// Proprietary display extensions are compiled against the exact original slot
++// layout, including virtuals that derived display classes append after this
++// base.  Even appending a base-class virtual would shift those derived slots.
++DisplayError PrepareExternalDisplayLease(DisplayInterface *display, DisplayLeaseInfo *lease);
++DisplayError CreateExternalDisplayLease(DisplayInterface *display, DisplayLeaseInfo *lease);
++DisplayError RevokeExternalDisplayLease(DisplayInterface *display);
++DisplayError AbortExternalDisplayLeasePreparation(DisplayInterface *display);
++DisplayError ResetExternalDisplayLease(DisplayInterface *display);
++DisplayError IsExternalDisplayLeaseConnected(DisplayInterface *display, bool *connected);
++
+ }  // namespace sdm
+ 
+ #endif  // __DISPLAY_INTERFACE_H__
+diff --git a/sdm/include/private/hw_interface.h b/sdm/include/private/hw_interface.h
+index c1886bc..1f95ba5 100644
+--- a/sdm/include/private/hw_interface.h
++++ b/sdm/include/private/hw_interface.h
+@@ -188,23 +188,17 @@ class HWInterface {
+ 
+  protected:
+   virtual ~HWInterface() { }
+-
+- public:
+-  // ABI rule: new virtuals are appended after the old destructor slots.
+-  virtual DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+-    return kErrorNotSupported;
+-  }
+-  virtual DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+-    return kErrorNotSupported;
+-  }
+-  virtual DisplayError RevokeExternalDisplayLease() { return kErrorNotSupported; }
+-  virtual DisplayError AbortExternalDisplayLeasePreparation() { return kErrorNotSupported; }
+-  virtual DisplayError ResetExternalDisplayLease() { return kErrorNotSupported; }
+-  virtual DisplayError IsExternalDisplayLeaseConnected(bool *connected) {
+-    return kErrorNotSupported;
+-  }
+ };
+ 
++// Non-virtual bridge into the DRM implementation.  This must remain outside
++// HWInterface so existing derived-class virtual slots never move.
++DisplayError PrepareExternalDisplayLease(HWInterface *hw_intf, DisplayLeaseInfo *lease);
++DisplayError CreateExternalDisplayLease(HWInterface *hw_intf, DisplayLeaseInfo *lease);
++DisplayError RevokeExternalDisplayLease(HWInterface *hw_intf);
++DisplayError AbortExternalDisplayLeasePreparation(HWInterface *hw_intf);
++DisplayError ResetExternalDisplayLease(HWInterface *hw_intf);
++DisplayError IsExternalDisplayLeaseConnected(HWInterface *hw_intf, bool *connected);
++
+ }  // namespace sdm
+ 
+ #endif  // __HW_INTERFACE_H__
+diff --git a/sdm/libs/core/display_base.cpp b/sdm/libs/core/display_base.cpp
+index 7191f0a..94c7c7f 100644
+--- a/sdm/libs/core/display_base.cpp
++++ b/sdm/libs/core/display_base.cpp
+@@ -1962,32 +1962,88 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state, bool teardown,
+ 
+ DisplayError DisplayBase::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->PrepareExternalDisplayLease(lease);
++  return sdm::PrepareExternalDisplayLease(hw_intf_, lease);
+ }
+ 
+ DisplayError DisplayBase::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->CreateExternalDisplayLease(lease);
++  return sdm::CreateExternalDisplayLease(hw_intf_, lease);
+ }
+ 
+ DisplayError DisplayBase::RevokeExternalDisplayLease() {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->RevokeExternalDisplayLease();
++  return sdm::RevokeExternalDisplayLease(hw_intf_);
+ }
+ 
+ DisplayError DisplayBase::AbortExternalDisplayLeasePreparation() {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->AbortExternalDisplayLeasePreparation();
++  return sdm::AbortExternalDisplayLeasePreparation(hw_intf_);
+ }
+ 
+ DisplayError DisplayBase::ResetExternalDisplayLease() {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->ResetExternalDisplayLease();
++  return sdm::ResetExternalDisplayLease(hw_intf_);
+ }
+ 
+ DisplayError DisplayBase::IsExternalDisplayLeaseConnected(bool *connected) {
+   ClientLock lock(disp_mutex_);
+-  return hw_intf_->IsExternalDisplayLeaseConnected(connected);
++  return sdm::IsExternalDisplayLeaseConnected(hw_intf_, connected);
++}
++
++static DisplayBase *GetExternalLeaseDisplay(DisplayInterface *display) {
++  DisplayType type = kDisplayTypeMax;
++  if (!display || display->GetDisplayType(&type) != kErrorNone || type != kPluggable) {
++    return nullptr;
++  }
++  return static_cast<DisplayBase *>(display);
++}
++
++DisplayError PrepareExternalDisplayLease(DisplayInterface *display, DisplayLeaseInfo *lease) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->PrepareExternalDisplayLease(lease);
++}
++
++DisplayError CreateExternalDisplayLease(DisplayInterface *display, DisplayLeaseInfo *lease) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->CreateExternalDisplayLease(lease);
++}
++
++DisplayError RevokeExternalDisplayLease(DisplayInterface *display) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->RevokeExternalDisplayLease();
++}
++
++DisplayError AbortExternalDisplayLeasePreparation(DisplayInterface *display) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->AbortExternalDisplayLeasePreparation();
++}
++
++DisplayError ResetExternalDisplayLease(DisplayInterface *display) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->ResetExternalDisplayLease();
++}
++
++DisplayError IsExternalDisplayLeaseConnected(DisplayInterface *display, bool *connected) {
++  DisplayBase *display_base = GetExternalLeaseDisplay(display);
++  if (!display_base) {
++    return kErrorNotSupported;
++  }
++  return display_base->IsExternalDisplayLeaseConnected(connected);
+ }
+ 
+ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
+diff --git a/sdm/libs/core/display_base.h b/sdm/libs/core/display_base.h
+index 8c4f0c0..6911ba6 100644
+--- a/sdm/libs/core/display_base.h
++++ b/sdm/libs/core/display_base.h
+@@ -253,12 +253,12 @@ class DisplayBase : public DisplayInterface, public CompManagerEventHandler {
+   virtual bool HandleCwbTeardown();
+   virtual uint32_t GetAvailableMixerCount();
+   virtual DisplayError SetDemuraState(int state) { return kErrorNotSupported; }
+-  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) override;
+-  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) override;
+-  DisplayError RevokeExternalDisplayLease() override;
+-  DisplayError AbortExternalDisplayLeasePreparation() override;
+-  DisplayError ResetExternalDisplayLease() override;
+-  DisplayError IsExternalDisplayLeaseConnected(bool *connected) override;
++  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease);
++  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease);
++  DisplayError RevokeExternalDisplayLease();
++  DisplayError AbortExternalDisplayLeasePreparation();
++  DisplayError ResetExternalDisplayLease();
++  DisplayError IsExternalDisplayLeaseConnected(bool *connected);
+ 
+  protected:
+   struct DisplayMutex {
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 46a3e50..eb60093 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -2578,6 +2578,48 @@ void HWDeviceDRM::GetDRMDisplayToken(sde_drm::DRMDisplayToken *token) const {
+   *token = token_;
+ }
+ 
++DisplayError PrepareExternalDisplayLease(HWInterface *hw_intf, DisplayLeaseInfo *lease) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->PrepareExternalDisplayLease(lease);
++}
++
++DisplayError CreateExternalDisplayLease(HWInterface *hw_intf, DisplayLeaseInfo *lease) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->CreateExternalDisplayLease(lease);
++}
++
++DisplayError RevokeExternalDisplayLease(HWInterface *hw_intf) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->RevokeExternalDisplayLease();
++}
++
++DisplayError AbortExternalDisplayLeasePreparation(HWInterface *hw_intf) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->AbortExternalDisplayLeasePreparation();
++}
++
++DisplayError ResetExternalDisplayLease(HWInterface *hw_intf) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->ResetExternalDisplayLease();
++}
++
++DisplayError IsExternalDisplayLeaseConnected(HWInterface *hw_intf, bool *connected) {
++  if (!hw_intf) {
++    return kErrorParameters;
++  }
++  return static_cast<HWDeviceDRM *>(hw_intf)->IsExternalDisplayLeaseConnected(connected);
++}
++
+ DisplayError HWDeviceDRM::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+   if (!lease || disp_type_ != DRMDisplayType::TV || dev_fd_ < 0 || !drmIsMaster(dev_fd_) ||
+       !active_) {
+diff --git a/sdm/libs/dal/hw_device_drm.h b/sdm/libs/dal/hw_device_drm.h
+index a099f13..f253b5f 100644
+--- a/sdm/libs/dal/hw_device_drm.h
++++ b/sdm/libs/dal/hw_device_drm.h
+@@ -179,12 +179,20 @@ class HWDeviceDRM : public HWInterface {
+   }
+   virtual DisplayError CancelDeferredPowerMode();
+   virtual void HandleCwbTeardown();
+-  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease) override;
+-  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease) override;
+-  DisplayError RevokeExternalDisplayLease() override;
+-  DisplayError AbortExternalDisplayLeasePreparation() override;
+-  DisplayError ResetExternalDisplayLease() override;
+-  DisplayError IsExternalDisplayLeaseConnected(bool *connected) override;
++  friend DisplayError PrepareExternalDisplayLease(HWInterface *hw_intf,
++                                                   DisplayLeaseInfo *lease);
++  friend DisplayError CreateExternalDisplayLease(HWInterface *hw_intf,
++                                                  DisplayLeaseInfo *lease);
++  friend DisplayError RevokeExternalDisplayLease(HWInterface *hw_intf);
++  friend DisplayError AbortExternalDisplayLeasePreparation(HWInterface *hw_intf);
++  friend DisplayError ResetExternalDisplayLease(HWInterface *hw_intf);
++  friend DisplayError IsExternalDisplayLeaseConnected(HWInterface *hw_intf, bool *connected);
++  DisplayError PrepareExternalDisplayLease(DisplayLeaseInfo *lease);
++  DisplayError CreateExternalDisplayLease(DisplayLeaseInfo *lease);
++  DisplayError RevokeExternalDisplayLease();
++  DisplayError AbortExternalDisplayLeasePreparation();
++  DisplayError ResetExternalDisplayLease();
++  DisplayError IsExternalDisplayLeaseConnected(bool *connected);
+ 
+   enum {
+     kHWEventVSync,
+-- 
+2.55.0
+

@@ -39,9 +39,11 @@ with tarfile.open(tar_path, "r:gz") as archive:
 
 info = json.loads(info_path.read_text())
 profile = json.loads(profile_path.read_text())
+release = json.loads((profile_path.parent.parent / "release.json").read_text())
 assert info == embedded, "returned and embedded build-info differ"
 assert info["repository_commit"] == expected_commit, "artifact is not from current commit"
 assert info["profile"] == profile["name"]
+assert info["release"] == release
 assert info["source_revisions"] == profile["source"]
 exact = info["exact_source_sync"]
 assert len(exact["projects"]) >= 1138, "unexpected exact source project count"

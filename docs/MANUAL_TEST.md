@@ -4,6 +4,11 @@ This is an experimental graphics-stack replacement.  `make zip` and
 `make verify` are offline checks only; they do not install, reboot, connect a
 display, or start Xorg.
 
+Do not use release 0.1 or the ZIP whose SHA-256 is
+`e0a0dfec34a8cbd3395c0c4b8aa3583230e09835ab752cafdbdc8aad036c5ff9`.
+That package shifted proprietary Qualcomm/Sony C++ vtables and failed before
+the Lineage boot animation.  These instructions apply to release 0.2 or later.
+
 ## Before installation
 
 1. Keep the HDMI capture card connected so you can observe the external output.
@@ -23,6 +28,11 @@ display, or start Xorg.
    ```
 
 ## Install, but do not take over yet
+
+If the failed 0.1 module is still present and disabled, remove it in Magisk and
+complete one stock boot before installing the corrected package. This avoids
+carrying its safe-mode `disable` marker or zero-filled interrupted-boot logs
+into the corrected installation.
 
 Copy `dist/hdmi-los-current-install-magisk.zip` to Android-visible storage and
 select it manually in the Magisk app.  The installer must show that the exact
@@ -72,4 +82,3 @@ booting.  It grants no Android permissions.  Add its tile to Quick Settings.
 Logs are in `/data/adb/hdmi-los/logs/` on Android and `/run/hdmi-los/` in the
 chroot.  Do not retry after a freeze or unexpected reboot; preserve those logs
 and the previous boot's pstore/ramoops first.
-

@@ -10,6 +10,7 @@ profile_name = sys.argv[3]
 commit = sys.argv[4]
 output = pathlib.Path(sys.argv[5])
 profile = json.loads((source / "profiles" / f"{profile_name}.json").read_text())
+release = json.loads((source / "release.json").read_text())
 exact_source_sync = json.loads((build / "exact-source-sync.json").read_text())
 
 def sha(path):
@@ -31,12 +32,13 @@ for name, path in {
 data = {
     "schema": 1,
     "repository_commit": commit,
+    "release": release,
     "profile": profile_name,
     "source_revisions": profile["source"],
     "exact_source_sync": exact_source_sync,
     "qcom_patched_revision": (build / "qcom-display.patched").read_text().strip(),
     "composer_abi": {
-        "method": "unpatched exact-tree baseline export and dynamic-contract comparison",
+        "method": "unpatched exact-tree ELF, export, object-size, and vtable-slot comparison",
         "report_sha256": sha(build / "composer-abi-report.txt"),
         "status": "PASS",
     },

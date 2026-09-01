@@ -4,6 +4,7 @@ plugins {
 
 val hdmiProfile = providers.gradleProperty("hdmiProfile").orElse("development")
 val hdmiLineage = providers.gradleProperty("hdmiLineage").orElse("unknown")
+val hdmiVersionName = providers.gradleProperty("hdmiVersionName").orElse("development")
 val hdmiVersionCode = providers.gradleProperty("hdmiVersionCode").orElse("1")
 
 android {
@@ -15,7 +16,7 @@ android {
         minSdk = 35
         targetSdk = 35
         versionCode = hdmiVersionCode.get().toInt()
-        versionName = "0.1-${hdmiProfile.get()}"
+        versionName = "${hdmiVersionName.get()}-${hdmiProfile.get()}"
         buildConfigField("String", "HDMI_PROFILE", "\"${hdmiProfile.get()}\"")
         buildConfigField("String", "HDMI_LINEAGE", "\"${hdmiLineage.get()}\"")
     }

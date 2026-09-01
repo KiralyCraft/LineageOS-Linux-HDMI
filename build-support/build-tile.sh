@@ -10,8 +10,10 @@ OUT=$BUILD/tile
 SDK=/bigdata/android-sdk
 GRADLE=/bigdata/gradle-home/wrapper/dists/gradle-9.7.0-all/5hez1j29szzu41ldlyeeyuiv4/gradle-9.7.0/bin/gradle
 PROFILE_JSON=$SOURCE/profiles/$PROFILE_NAME.json
+RELEASE_JSON=$SOURCE/release.json
 LINEAGE_VERSION=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["device"]["ro.lineage.version"])' "$PROFILE_JSON")
-VERSION_CODE=$(python -c 'import json,re,sys; d=json.load(open(sys.argv[1])); print(int(re.sub(r"[^0-9]", "", d["captured_utc"][:10])))' "$PROFILE_JSON")
+VERSION_NAME=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$RELEASE_JSON")
+VERSION_CODE=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["version_code"])' "$RELEASE_JSON")
 
 mkdir -p "$OUT" "$SIGNING"
 if [ ! -s "$SIGNING/password" ]; then
@@ -30,7 +32,8 @@ fi
 rm -rf -- "$PROJECT/app/build" "$OUT"/*
 ANDROID_HOME=$SDK ANDROID_SDK_ROOT=$SDK GRADLE_USER_HOME=/bigdata/gradle-home \
     "$GRADLE" --no-daemon -p "$PROJECT" -PhdmiProfile="$PROFILE_NAME" \
-        -PhdmiLineage="$LINEAGE_VERSION" -PhdmiVersionCode="$VERSION_CODE" \
+        -PhdmiLineage="$LINEAGE_VERSION" -PhdmiVersionName="$VERSION_NAME" \
+        -PhdmiVersionCode="$VERSION_CODE" \
         :app:assembleRelease
 
 unsigned=$PROJECT/app/build/outputs/apk/release/app-release-unsigned.apk
