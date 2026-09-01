@@ -554,7 +554,7 @@ pid_t spawn_xorg(int lease_fd) {
   std::string tracer = g_bundle + "/lib/libhdmi-los-drmtrace.so";
   mkdir(config_dir.c_str(), 0700);
   setenv("HDMI_LOS_TRACE_FD", trace_fd_text, 1);
-  setenv("HDMI_LOS_SUPPRESS_AUTOREFRESH_SETPROPERTY", "1", 1);
+  setenv("HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS", "1", 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
   execl("/usr/lib/Xorg", "/usr/lib/Xorg", kDisplay, "-masterfd", fd_text,
         "-config", config.c_str(), "-configdir", config_dir.c_str(),

@@ -40,7 +40,7 @@ does not select either as the production fix without a durable ioctl boundary:
 
 - https://gitlab.freedesktop.org/xorg/xserver/-/tree/xorg-server-21.1.24/hw/xfree86/drivers/modesetting
 
-## Connector `autorefresh` write shutdown
+## Connector property replay shutdowns
 
 Two identical traced legacy Xorg starts reached the same connector-property
 initialization sequence. In both cases, the phone shut down after the before
@@ -48,15 +48,19 @@ record for `DRM_IOCTL_MODE_SETPROPERTY` and before its after record. Correlating
 the connector property list with Xorg's modesetting property loop identifies
 that request as a write of the current value (`0`) to Qualcomm's vendor
 `autorefresh` property. The preceding `ext_hdr_properties` blob read completed;
-it was not the fatal operation.
+it was not the fatal operation. A first narrow guard successfully suppressed
+that call, after which the phone shut down on the next vendor-property replay:
+connector `79`, `bl_scale` property `55`, value `1024`. That value also exactly
+matched the earlier connector object snapshot.
 
-The diagnostic tracer now learns the `autorefresh` property id from the
-successful `GETPROPERTY` result and, only for Xorg launched by the agent,
-emulates success for that one legacy connector `SETPROPERTY`. This avoids a
-boot-specific numeric property id and leaves all other DRM requests traced and
-unchanged. The suppression emits `SUPPRESSED_AUTOREFRESH_SETPROPERTY` before
-returning success so a live test can prove that the guard, rather than the
-kernel driver, handled the request.
+The diagnostic tracer now caches successful connector object-property
+snapshots and, only for Xorg launched by the agent, emulates success when a
+legacy connector `SETPROPERTY` exactly replays the cached value. A real value
+change, unknown property, or different connector still reaches the kernel.
+This avoids boot-specific ids and property-name lists while suppressing the
+unsafe RandR initialization no-ops. Each suppression emits
+`SUPPRESSED_CONNECTOR_NOOP` before returning success so a live test can prove
+that the guard, rather than the kernel driver, handled the request.
 
 ## Sony downstream SDE
 

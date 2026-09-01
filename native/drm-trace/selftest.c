@@ -13,6 +13,22 @@
 #include <unistd.h>
 
 #include "hdmi_los_trace.h"
+#include "property_cache.h"
+
+static int property_cache_case(void) {
+  struct hdmi_los_property_cache cache = {0};
+  if (hdmi_los_property_cache_is_noop(&cache, 79, 53, 0)) return 40;
+  if (!hdmi_los_property_cache_store(&cache, 79, 53, 0) ||
+      !hdmi_los_property_cache_store(&cache, 79, 55, 1024)) return 41;
+  if (!hdmi_los_property_cache_is_noop(&cache, 79, 53, 0) ||
+      !hdmi_los_property_cache_is_noop(&cache, 79, 55, 1024)) return 42;
+  if (hdmi_los_property_cache_is_noop(&cache, 80, 55, 1024) ||
+      hdmi_los_property_cache_is_noop(&cache, 79, 55, 2048)) return 43;
+  if (!hdmi_los_property_cache_store(&cache, 79, 55, 2048) ||
+      !hdmi_los_property_cache_is_noop(&cache, 79, 55, 2048) ||
+      hdmi_los_property_cache_is_noop(&cache, 79, 55, 1024)) return 44;
+  return 0;
+}
 
 static int send_ack(int fd, uint32_t sequence) {
   struct hdmi_los_trace_record ack = {0};
@@ -109,7 +125,9 @@ int main(int argc, char **argv) {
     fprintf(stderr, "usage: %s LIBRARY\n", argv[0]);
     return 2;
   }
-  int result = success_case(argv[0], argv[1]);
+  int result = property_cache_case();
+  if (result != 0) return result;
+  result = success_case(argv[0], argv[1]);
   if (result != 0) return result;
   result = fail_closed_case(argv[0], argv[1]);
   if (result != 0) return result;

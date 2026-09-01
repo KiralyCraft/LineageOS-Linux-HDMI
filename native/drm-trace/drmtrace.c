@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "hdmi_los_trace.h"
+#include "property_cache.h"
 
 enum {
   kTraceTimeoutMs = 2000,
@@ -28,8 +29,9 @@ enum {
 
 static int g_trace_fd = -1;
 static _Atomic uint32_t g_sequence = 1;
-static _Atomic uint32_t g_autorefresh_property_id;
-static int g_suppress_autorefresh_setproperty;
+static struct hdmi_los_property_cache g_connector_properties;
+static atomic_flag g_connector_properties_lock = ATOMIC_FLAG_INIT;
+static int g_suppress_connector_property_noops;
 static __thread int g_in_trace;
 
 static int wait_readable(int fd) {
@@ -329,20 +331,24 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
   }
 }
 
-static void remember_property_name(const void *argument) {
-  struct drm_mode_get_property value;
-  if (!safe_copy(&value, (uint64_t)(uintptr_t)argument, sizeof(value))) return;
-  if (strncmp(value.name, "autorefresh", sizeof(value.name)) == 0) {
-    atomic_store(&g_autorefresh_property_id, value.prop_id);
-  }
+static void lock_connector_properties(void) {
+  while (atomic_flag_test_and_set_explicit(&g_connector_properties_lock,
+                                           memory_order_acquire)) {}
 }
 
-static int should_suppress_autorefresh_setproperty(
+static void unlock_connector_properties(void) {
+  atomic_flag_clear_explicit(&g_connector_properties_lock, memory_order_release);
+}
+
+static int should_suppress_connector_property_noop(
     const void *argument, struct drm_mode_connector_set_property *value) {
-  if (!g_suppress_autorefresh_setproperty ||
+  if (!g_suppress_connector_property_noops ||
       !safe_copy(value, (uint64_t)(uintptr_t)argument, sizeof(*value))) return 0;
-  uint32_t property_id = atomic_load(&g_autorefresh_property_id);
-  return property_id != 0 && value->prop_id == property_id;
+  lock_connector_properties();
+  int is_noop = hdmi_los_property_cache_is_noop(
+      &g_connector_properties, value->connector_id, value->prop_id, value->value);
+  unlock_connector_properties();
+  return is_noop;
 }
 
 static void emit_detail(uint32_t sequence, int fd, unsigned long request, const char *name,
@@ -443,6 +449,12 @@ static void emit_object_property_details(uint32_t sequence, int fd,
                  (size_t)value.count_props * sizeof(property_values[0]))) return;
 
   for (uint32_t index = 0; index < value.count_props; ++index) {
+    if (value.obj_type == DRM_MODE_OBJECT_CONNECTOR) {
+      lock_connector_properties();
+      hdmi_los_property_cache_store(&g_connector_properties, value.obj_id,
+                                    properties[index], property_values[index]);
+      unlock_connector_properties();
+    }
     char detail[64];
     snprintf(detail, sizeof(detail), "obj=%u prop=%u value=%llu index=%u",
              value.obj_id, properties[index],
@@ -460,8 +472,8 @@ __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   long parsed = strtol(descriptor, &end, 10);
   if (errno != 0 || !end || *end != '\0' || parsed < 0 || parsed > INT32_MAX) _exit(125);
   g_trace_fd = (int)parsed;
-  const char *suppress = getenv("HDMI_LOS_SUPPRESS_AUTOREFRESH_SETPROPERTY");
-  g_suppress_autorefresh_setproperty = suppress && strcmp(suppress, "1") == 0;
+  const char *suppress = getenv("HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS");
+  g_suppress_connector_property_noops = suppress && strcmp(suppress, "1") == 0;
 
   struct hdmi_los_trace_record loaded;
   initialize_record(&loaded, HDMI_LOS_TRACE_LOADED, 0, g_trace_fd, 0, "DRMTRACE_LOADED");
@@ -494,12 +506,12 @@ int ioctl(int fd, unsigned long request, ...) {
 
   struct drm_mode_connector_set_property suppressed = {0};
   if (request == DRM_IOCTL_MODE_SETPROPERTY &&
-      should_suppress_autorefresh_setproperty(argument, &suppressed)) {
+      should_suppress_connector_property_noop(argument, &suppressed)) {
     char detail[64];
     snprintf(detail, sizeof(detail), "connector=%u prop=%u value=%llu",
              suppressed.connector_id, suppressed.prop_id,
              (unsigned long long)suppressed.value);
-    emit_detail(sequence, fd, request, "SUPPRESSED_AUTOREFRESH_SETPROPERTY",
+    emit_detail(sequence, fd, request, "SUPPRESSED_CONNECTOR_NOOP",
                 suppressed.connector_id, suppressed.prop_id, suppressed.value, 0,
                 detail);
 
@@ -517,9 +529,6 @@ int ioctl(int fd, unsigned long request, ...) {
   errno = 0;
   long result = syscall(SYS_ioctl, fd, request, argument);
   int saved_errno = errno;
-  if (result >= 0 && request == DRM_IOCTL_MODE_GETPROPERTY) {
-    remember_property_name(argument);
-  }
 
   struct hdmi_los_trace_record after;
   initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,

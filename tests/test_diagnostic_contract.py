@@ -46,14 +46,15 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('"OBJECT_PROPERTY"', tracer)
         self.assertIn('"request=0x%lx arg=0x%llx"', tracer)
 
-    def test_xorg_only_suppresses_dynamically_identified_autorefresh_write(self):
+    def test_xorg_only_suppresses_connector_property_snapshot_noops(self):
         tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
         agent = (ROOT / "native/agent/main.cpp").read_text()
-        variable = "HDMI_LOS_SUPPRESS_AUTOREFRESH_SETPROPERTY"
-        self.assertIn('strncmp(value.name, "autorefresh", sizeof(value.name)) == 0', tracer)
-        self.assertIn("value->prop_id == property_id", tracer)
-        self.assertIn('"SUPPRESSED_AUTOREFRESH_SETPROPERTY"', tracer)
+        variable = "HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS"
+        self.assertIn("value.obj_type == DRM_MODE_OBJECT_CONNECTOR", tracer)
+        self.assertIn("hdmi_los_property_cache_is_noop", tracer)
+        self.assertIn('"SUPPRESSED_CONNECTOR_NOOP"', tracer)
         self.assertNotIn("prop_id == 53", tracer)
+        self.assertNotIn('"autorefresh"', tracer)
         self.assertIn(f'setenv("{variable}", "1", 1);', agent)
         preflight, spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)
         self.assertNotIn(variable, preflight)
