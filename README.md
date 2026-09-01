@@ -60,7 +60,9 @@ That exact path produced a visible LXDE desktop on the workstation capture and
 the 60-second failsafe restored Android mirroring. The Quick Settings tile is
 enabled again; forensic root probes remain available. The capture card must be
 powered by the workstation, not the phone. The investigation is recorded in
-[`docs/QUALCOMM_DRM_RESEARCH.md`](docs/QUALCOMM_DRM_RESEARCH.md).
+[`docs/QUALCOMM_DRM_RESEARCH.md`](docs/QUALCOMM_DRM_RESEARCH.md). Live GPU
+results for native Freedreno, llvmpipe, and Zink over Turnip are recorded in
+[`docs/GPU.md`](docs/GPU.md).
 
 Runtime escape paths are:
 
