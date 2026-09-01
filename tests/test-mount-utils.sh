@@ -30,4 +30,9 @@ script=$(<"$ROOT/module/post-fs-data.sh")
 [[ $script != *'mount -o bind "$source" "$target"'* ]]
 [[ $script == *'.magisk/modules'* ]]
 
+service=$(<"$ROOT/module/service.sh")
+[[ $service == *'pm install -r "$MODDIR/apk/HdmiLosTile.apk" >/dev/null 2>&1'* ]]
+[[ $service != *'pm install -r "$MODDIR/apk/HdmiLosTile.apk" >>'* ]]
+[[ $service == *'pm path dev.kiraly.hdmilos >/dev/null 2>&1'* ]]
+
 printf 'mount option and bind-source tests: PASS\n'

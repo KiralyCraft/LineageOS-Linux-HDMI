@@ -30,10 +30,23 @@ done
 apk_hash="$(sha256sum "$MODDIR/apk/HdmiLosTile.apk" | awk '{print $1}')"
 installed_hash="$(cat "$STATE/tile.sha256" 2>/dev/null)"
 if [ "$apk_hash" != "$installed_hash" ] || ! pm path dev.kiraly.hdmilos >/dev/null 2>&1; then
-  if pm install -r "$MODDIR/apk/HdmiLosTile.apk" >>"$LOGDIR/tile-install.log" 2>&1; then
-    printf '%s\n' "$apk_hash" > "$STATE/tile.sha256"
+  # Package Manager writes its command result through the caller's output FD.
+  # Do not pass it a log file below /data/adb: system_server cannot append to
+  # that label.  Record the verified result from this Magisk process instead.
+  if pm install -r "$MODDIR/apk/HdmiLosTile.apk" >/dev/null 2>&1; then
+    if pm path dev.kiraly.hdmilos >/dev/null 2>&1; then
+      printf '%s\n' "$apk_hash" > "$STATE/tile.sha256"
+      printf '[%s] PASS: tile APK installed and verified\n' \
+          "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$LOGDIR/tile-install.log"
+    else
+      printf '[%s] FAIL: pm returned success but package is absent\n' \
+          "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$LOGDIR/tile-install.log"
+    fi
+  else
+    rc=$?
+    printf '[%s] FAIL: pm install exited %s; inspect logcat\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >>"$LOGDIR/tile-install.log"
   fi
 fi
 
 wait "$BROKER_PID"
-

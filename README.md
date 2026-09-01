@@ -33,7 +33,9 @@ hooks with a non-virtual bridge and adds an exact vtable-slot build gate. The
 first 0.2 package also failed before animation: its custom bind mounts bypassed
 Magisk's executable module mirror and inherited `nosuid` from `/data`. Release
 0.2.1 binds from Magisk's read-only, cleared-`nosuid` mirror instead. Neither
-the 0.1 nor the 0.2 ZIP should be installed.
+the 0.1 nor the 0.2 ZIP should be installed. Release 0.2.2 also fixes deferred
+tile installation by preventing Package Manager from inheriting a log file
+descriptor that `system_server` cannot write under SELinux.
 
 Runtime escape paths are:
 
