@@ -605,10 +605,12 @@ bool verify_xorg() {
   if (!user) return false;
   std::string xrandr = std::string(kRuntime) + "/xrandr.txt";
   std::string xinput = std::string(kRuntime) + "/xinput.txt";
+  setenv("DISPLAY", kDisplay, 1);
+  setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   if (run_wait({"/usr/bin/xrandr", "--display", kDisplay, "--query"}, user->pw_uid,
                user->pw_gid, xrandr.c_str()) != 0 ||
-      run_wait({"/usr/bin/xinput", "--display", kDisplay, "--list"}, user->pw_uid,
-               user->pw_gid, xinput.c_str()) != 0) return false;
+      run_wait({"/usr/bin/xinput", "list"}, user->pw_uid, user->pw_gid,
+               xinput.c_str()) != 0) return false;
 
   auto contains = [](const std::string &path, const char *wanted, const char *forbidden) {
     FILE *file = fopen(path.c_str(), "re");
@@ -624,8 +626,8 @@ bool verify_xorg() {
     return found && !rejected;
   };
   return contains(xrandr, "DP-1 connected", "DSI-") &&
-         contains(xinput, "hdmi-los-mouse", nullptr) &&
-         contains(xinput, "hdmi-los-keyboard", nullptr);
+         contains(xinput, "HDMI Mouse", nullptr) &&
+         contains(xinput, "HDMI Keyboard", nullptr);
 }
 
 bool start_xorg(int lease_fd) {
