@@ -45,16 +45,33 @@ class DiagnosticContractTests(unittest.TestCase):
         agent = (ROOT / "native/agent/main.cpp").read_text()
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
         self.assertIn("bool g_kgsl_glamor = false;", agent)
+        self.assertIn("bool g_kgsl_kms_bridge = false;", agent)
         self.assertIn('strcmp(value, "kgsl-glamor") == 0', agent)
+        self.assertIn('strcmp(value, "kgsl-kms-bridge") == 0', agent)
         self.assertIn('setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);', agent)
         self.assertIn('setenv("FD_FORCE_KGSL", "1", 1);', agent)
         self.assertIn('setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);', agent)
+        self.assertIn('setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);', agent)
+        self.assertIn('setenv("FD_KGSL_KMS_DEVICE", "/dev/dri/card0", 1);', agent)
+        self.assertIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
+        self.assertIn('setenv("FD_MESA_DEBUG", "notile,noubwc", 1);', agent)
+        self.assertIn('setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);', agent)
+        self.assertIn('/lib/mesa', agent)
         self.assertIn('g_kgsl_glamor ? "glamor" : "none"', agent)
         self.assertIn('g_kgsl_glamor ? "false"', agent)
+        self.assertIn('Option \\"PreferredMode\\" \\"1920x1080\\"', agent)
+        self.assertIn('Modes \\"1920x1080\\"', agent)
         self.assertIn("XORG_ACCEL=safe", runner)
         self.assertIn("SESSION=lxde", runner)
-        self.assertIn("--xorg-accel safe|kgsl-glamor", runner)
+        self.assertIn("--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge", runner)
         self.assertIn("--session lxde|none", runner)
+
+        xorg_spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)[1]
+        xorg_spawn = xorg_spawn.split("pid_t spawn_lxde()", 1)[0]
+        lxde_spawn = agent.split("pid_t spawn_lxde()", 1)[1]
+        lxde_spawn = lxde_spawn.split("bool xorg_ready()", 1)[0]
+        self.assertIn("configure_gpu_environment(true);", xorg_spawn)
+        self.assertIn("configure_gpu_environment(false);", lxde_spawn)
 
     def test_tracer_is_packaged_from_chroot_lib(self):
         package = (ROOT / "build-support/package.sh").read_text()

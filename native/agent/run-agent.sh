@@ -10,7 +10,7 @@ XORG_ACCEL=safe
 SESSION=lxde
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor] [--session lxde|none]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -37,7 +37,8 @@ while (($#)); do
     esac
 done
 
-[[ $XORG_ACCEL == safe || $XORG_ACCEL == kgsl-glamor ]] || { usage; exit 2; }
+[[ $XORG_ACCEL == safe || $XORG_ACCEL == kgsl-glamor || \
+   $XORG_ACCEL == kgsl-kms-bridge ]] || { usage; exit 2; }
 [[ $SESSION == lxde || $SESSION == none ]] || { usage; exit 2; }
 
 if ((EUID != 0)); then
@@ -129,6 +130,13 @@ fi
 
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
     printf 'WARNING: KGSL glamor is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
+elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
+    compgen -G "$BUNDLE/lib/mesa/libgallium-*.so" >/dev/null || {
+        printf 'Required private Mesa library is missing below: %s\n' \
+            "$BUNDLE/lib/mesa" >&2
+        exit 1
+    }
+    printf 'WARNING: KGSL/KMS scanout plus MIT-SHM presentation bridge is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
 fi
 
 "$BUNDLE/bin/hdmi-los-agent" --bundle "$BUNDLE" \

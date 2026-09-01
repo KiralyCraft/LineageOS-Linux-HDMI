@@ -40,6 +40,7 @@ int g_trace = -1;
 uint32_t g_probe_mode = HDMI_LOS_PROBE_NONE;
 std::string g_bundle;
 bool g_kgsl_glamor = false;
+bool g_kgsl_kms_bridge = false;
 bool g_start_lxde = true;
 
 bool relay_trace_record(int timeout_ms);
@@ -425,6 +426,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "Section \"Monitor\"\n"
       "  Identifier \"HDMI Monitor\"\n"
       "  Option \"DPMS\" \"false\"\n"
+      "  Option \"PreferredMode\" \"1920x1080\"\n"
       "EndSection\n"
       "Section \"Device\"\n"
       "  Identifier \"HDMI Modesetting\"\n"
@@ -442,6 +444,10 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Device \"HDMI Modesetting\"\n"
       "  Monitor \"HDMI Monitor\"\n"
       "  DefaultDepth 24\n"
+      "  SubSection \"Display\"\n"
+      "    Depth 24\n"
+      "    Modes \"1920x1080\"\n"
+      "  EndSubSection\n"
       "EndSection\n"
       "Section \"ServerLayout\"\n"
       "  Identifier \"HDMI Layout\"\n"
@@ -460,13 +466,33 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
   return ok;
 }
 
-void configure_gpu_environment() {
+void configure_gpu_environment(bool kms_scanout_server) {
   if (!g_kgsl_glamor) return;
   unsetenv("GALLIUM_DRIVER");
   unsetenv("VK_DRIVER_FILES");
+  unsetenv("FD_KGSL_USE_KMS_DUMB");
+  unsetenv("FD_KGSL_KMS_DEVICE");
+  unsetenv("MESA_KGSL_X11_SHM_BRIDGE");
+  unsetenv("FD_MESA_DEBUG");
   setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);
   setenv("FD_FORCE_KGSL", "1", 1);
   setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);
+  if (g_kgsl_kms_bridge) {
+    std::string mesa = g_bundle + "/lib/mesa";
+    setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);
+    if (kms_scanout_server) {
+      // Only Xorg's scanout allocation must be accepted by SDE KMS.  Client
+      // render buffers stay on KGSL's normal dma-heap allocation path.
+      setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);
+      setenv("FD_KGSL_KMS_DEVICE", "/dev/dri/card0", 1);
+    } else {
+      // Cross-context imports of KGSL render dma-bufs are black on this
+      // downstream stack.  Keep native KGSL rendering, then copy each
+      // completed drawable through Mesa's persistent MIT-SHM bridge.
+      setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);
+      setenv("FD_MESA_DEBUG", "notile,noubwc", 1);
+    }
+  }
 }
 
 bool prepare_session(uint32_t probe_mode) {
@@ -572,7 +598,7 @@ pid_t spawn_xorg(int lease_fd) {
   setenv("HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES", "1", 1);
   setenv("HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES", "1", 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
-  configure_gpu_environment();
+  configure_gpu_environment(true);
   execl("/usr/lib/Xorg", "/usr/lib/Xorg", kDisplay, "-masterfd", fd_text,
         "-config", config.c_str(), "-configdir", config_dir.c_str(),
         "-auth", auth.c_str(), "-logfile", log.c_str(), "-nolisten", "tcp",
@@ -603,7 +629,7 @@ pid_t spawn_lxde() {
   setenv("TMPDIR", "/tmp", 1);
   setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   setenv("XDG_RUNTIME_DIR", (std::string(kRuntime) + "/user-runtime").c_str(), 1);
-  configure_gpu_environment();
+  configure_gpu_environment(false);
   execl("/usr/bin/dbus-run-session", "/usr/bin/dbus-run-session", "--",
         "/usr/bin/startlxde", static_cast<char *>(nullptr));
   _exit(127);
@@ -808,8 +834,16 @@ int main(int argc, char **argv) {
       g_bundle = argv[++i];
     } else if (strcmp(argv[i], "--xorg-accel") == 0 && i + 1 < argc) {
       const char *value = argv[++i];
-      if (strcmp(value, "safe") == 0) g_kgsl_glamor = false;
-      else if (strcmp(value, "kgsl-glamor") == 0) g_kgsl_glamor = true;
+      if (strcmp(value, "safe") == 0) {
+        g_kgsl_glamor = false;
+        g_kgsl_kms_bridge = false;
+      } else if (strcmp(value, "kgsl-glamor") == 0) {
+        g_kgsl_glamor = true;
+        g_kgsl_kms_bridge = false;
+      } else if (strcmp(value, "kgsl-kms-bridge") == 0) {
+        g_kgsl_glamor = true;
+        g_kgsl_kms_bridge = true;
+      }
       else {
         fprintf(stderr, "invalid Xorg acceleration mode: %s\n", value);
         return 2;
@@ -824,8 +858,18 @@ int main(int argc, char **argv) {
       }
     } else {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
-                      "[--xorg-accel safe|kgsl-glamor] [--session lxde|none]\n");
+                      "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
+                      "[--session lxde|none]\n");
       return 2;
+    }
+  }
+  if (g_kgsl_kms_bridge) {
+    struct stat mesa = {};
+    std::string mesa_path = g_bundle + "/lib/mesa";
+    if (stat(mesa_path.c_str(), &mesa) != 0 || !S_ISDIR(mesa.st_mode)) {
+      fprintf(stderr, "kgsl-kms-bridge requires a private libgallium in %s\n",
+              mesa_path.c_str());
+      return 1;
     }
   }
   struct sigaction action = {};

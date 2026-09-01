@@ -42,7 +42,8 @@ does.
 | Leased Xorg `:1`, default LXDE environment | Mesa llvmpipe | no | Works, but CPU-rendered |
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
-| Leased Xorg `:1`, modesetting glamor plus native KGSL | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
+| Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works at 1920x1080; accelerated `glxgears` is visible at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -102,6 +103,7 @@ branch. Its relevant custom commits are:
 ```text
 91f7e8c6 freedreno/kgsl: retain merged submits through GPU command ioctl
 a3eb373e dri3: bridge native render fences to Present
+89da2771 freedreno/kgsl: bridge KMS scanout and X11 presentation
 ```
 
 The latter patch exports a native Freedreno render fence and attaches it as an
@@ -111,9 +113,9 @@ but the stable takeover currently initializes GLX with `DRISWRAST` and does
 not enter those DRI3 drawable and Present paths. The custom patch therefore
 cannot repair presentation in the present ShadowFB configuration.
 
-The X server's 2D rendering remains software-based. llvmpipe is currently the
-only GLX path verified to produce visible application pixels on the leased
-display.
+In the safe ShadowFB configuration the X server's 2D rendering remains
+software-based. The opt-in `kgsl-kms-bridge` configuration described below is
+the verified native-Freedreno exception.
 
 ## Native KGSL glamor diagnostic
 
@@ -162,13 +164,61 @@ register as its scanout framebuffer. Disabling page flips does not avoid that
 initial framebuffer registration. The phone remained stable and the normal
 timeout restored Android.
 
-The next useful target is a hybrid path, not another direct-glamor attempt:
-retain the known-good dumb framebuffer and ShadowFB modeset, add screen-level
-DRI3 import for the native KGSL client's linear dma-bufs, wait on the Mesa
-Present fence, and copy the completed pixels into ShadowFB. A CPU copy is the
-safest first implementation; a GPU-assisted copy can be evaluated only after
-the buffer and fence contract is proven. This preserves the already-tested KMS
-scanout object instead of asking SDE to scan out a KGSL sharing buffer.
+## KGSL/KMS allocation and presentation bridge
+
+The opt-in bridge was implemented and tested live on 2026-09-02. The custom
+Mesa work is commit `89da2771` on the same
+[`fix/kgsl-present-wait-fence`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-present-wait-fence)
+branch.
+
+The KMS capability probe in `native/probes/kms-kgsl-zero-copy.c` established
+this supported allocation chain:
+
+```text
+SDE KMS dumb allocation
+  -> PRIME dma-buf export
+  -> KGSL import
+  -> SDE KMS framebuffer
+```
+
+Mesa now has an explicit `FD_KGSL_USE_KMS_DUMB=1` allocation mode. It creates
+the shared storage with KMS, imports the dma-buf into KGSL for rendering, and
+translates the KGSL BO back to a GEM handle on Mesa's KMS control fd when GBM
+asks for the scanout handle. The agent sets this mode only in Xorg. This made
+the glamor-rendered root desktop visible with no `failed to add fb` errors, so
+Xorg's final scanout remains zero-copy.
+
+An ordinary client DRI3 pixmap was still black. This was tested with normal
+dma-heap and KMS-dumb client allocations, DRI2 fallback, `glFinish`, and forced
+linear/no-UBWC layouts. The diagnostic client read back the expected
+`255,0,26,255` pixel locally in every case, while Xorg saw black. The same
+window was visible with llvmpipe. The remaining fault is therefore the
+cross-context KGSL dma-buf consumption on this downstream stack, not rendering,
+mode setting, or the Present completion fence.
+
+For that boundary, Mesa provides the opt-in
+`MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application. On
+swap, Mesa waits for the completed image, maps that one drawable, copies it to
+a persistent memfd, and submits it to the X drawable with MIT-SHM. A checked
+local request prevents the client from reusing the shared storage before Xorg
+has consumed it. The agent also uses `FD_MESA_DEBUG=notile,noubwc` for bridge
+clients so this readback does not require detiling or UBWC decompression.
+
+This client presentation step is not zero-copy. It is narrower than ShadowFB:
+there is no continuous 1920x1080 screen copy, and non-GL desktop content stays
+on Xorg's GPU-backed root. Only an accelerated drawable is copied when that
+client swaps. The live result was:
+
+```text
+OpenGL vendor:   freedreno
+OpenGL renderer: FD740
+Resolution:      1920x1080
+glxgears:        55.233 and 57.364 FPS over two five-second samples
+```
+
+Both the solid-color GL probe and the gears were visible in root-window XWD
+captures. Three bounded takeover runs restored Android normally, and the
+device did not reboot or crash.
 
 ## Reproducing the checks
 
@@ -179,8 +229,9 @@ DISPLAY=:0 glxinfo -B
 DISPLAY=:0 glxgears -info
 ```
 
-During an active leased-Xorg session, this command verifies GPU context
-creation and command execution, but its window is currently black:
+During a safe ShadowFB leased-Xorg session, this command verifies GPU context
+creation and command execution, but its window is black because that mode has
+no presentation bridge:
 
 ```sh
 DISPLAY=:1 \
@@ -200,14 +251,11 @@ glxgears -info
 ```
 
 The current agent starts LXDE directly with `dbus-run-session`; it does not
-start an interactive login shell. Do not make Zink the LXDE default while its
-windows fail to present. The next accelerated candidate must either expose a
-working screen-level DRI3/Present path without replacing the KMS scanout
-buffer, or implement an explicit copy/presentation bridge into ShadowFB. The
-direct glamor experiment proves that merely enabling DRI3 is insufficient.
-Enabling glamor, DRI3, or the Freedreno DDX changes the X server/KMS path itself
-and requires the full crash-evidence protocol before it can replace the stable
-ShadowFB configuration.
+start an interactive login shell. `kgsl-kms-bridge` supplies the KGSL and
+presentation variables explicitly, so programs launched from that LXDE
+session inherit the working configuration. The direct glamor experiment still
+proves that merely enabling DRI3 is insufficient. Safe ShadowFB remains the
+default until the opt-in bridge has received broader application testing.
 
 ## Starting the takeover as `kiraly`
 
@@ -223,6 +271,17 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 open, then tap the `HDMI Xorg` Quick Settings tile on Android. Pressing
 `Ctrl-C` stops the waiting chroot agent. The tile, volume-button escape, and
 60/65-second deadlines restore Android.
+
+To start the tested accelerated mode instead, the runtime must contain the
+patched private `libgallium-*.so` below `lib/mesa/`, then run:
+
+```sh
+cd /home/kiraly/Downloads/hdmi-los-runtime
+./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge --session lxde
+```
+
+The runner deliberately rejects this mode if the private Mesa library is
+missing. The no-argument form above continues to select safe ShadowFB.
 
 The `0.2.5-diagnostic.1` module disables ordinary tile activation. With that
 older diagnostic package installed, start the foreground agent as above and
