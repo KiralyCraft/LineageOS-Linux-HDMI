@@ -72,6 +72,17 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn(variable, preflight)
         self.assertIn(variable, spawn)
 
+    def test_xorg_ignores_write_only_pointer_properties(self):
+        tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        variable = "HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES"
+        self.assertIn('strcmp(property->name, "RETIRE_FENCE") == 0', tracer)
+        self.assertIn('"IGNORED_XORG_POINTER"', tracer)
+        self.assertIn(f'setenv("{variable}", "1", 1);', agent)
+        preflight, spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)
+        self.assertNotIn(variable, preflight)
+        self.assertIn(variable, spawn)
+
     def test_composer_leases_the_crtc_fixed_primary_plane(self):
         patch = (ROOT / "patches/qcom-display/v1/0008-sdm-lease-the-CRTC-fixed-primary-plane.patch").read_text()
         added = "\n".join(

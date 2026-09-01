@@ -107,6 +107,22 @@ now root:`kiraly` mode `0710`, readiness failures are retained in
 `xdpyinfo.txt`, and input verification uses inherited `DISPLAY` plus the
 configured Xorg device names.
 
+## Write-only retire-fence property
+
+The fixed-plane probe also showed Xorg replaying Qualcomm's `RETIRE_FENCE`
+connector property with value `0xffffffff`. This was not the later failed
+`SETCRTC`: the clocks place it about two seconds earlier, and Xorg continued
+after the kernel returned `EFAULT`. The installed SDE driver treats the
+property value as a userspace pointer, while its getter reports `~0` rather
+than a reusable value. Consequently the normal RandR property initialization
+turns a write-only fence request into an invalid `copy_from_user()` call.
+
+For agent-launched Xorg only, the preload library now returns the exact
+`RETIRE_FENCE` property as unavailable and emits `IGNORED_XORG_POINTER`.
+`RETIRE_FENCE_OFFSET` remains visible because it is an ordinary scalar. The
+existing snapshot no-op guard remains generic; this name-specific filter is
+limited to the vendor ABI whose value is demonstrably a userspace pointer.
+
 ## Sony downstream SDE
 
 The installed `msm_drm.ko` corresponds to Lineage's Sony SM8550 modules at

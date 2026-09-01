@@ -46,6 +46,7 @@ static struct hdmi_los_property_cache g_connector_properties;
 static atomic_flag g_connector_properties_lock = ATOMIC_FLAG_INIT;
 static int g_suppress_connector_property_noops;
 static int g_ignore_xorg_bitmask_properties;
+static int g_ignore_xorg_pointer_properties;
 static __thread int g_in_trace;
 
 typedef struct hdmi_los_drm_mode_property *(*drm_mode_get_property_fn)(int, uint32_t);
@@ -495,6 +496,9 @@ __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   g_suppress_connector_property_noops = suppress && strcmp(suppress, "1") == 0;
   const char *ignore = getenv("HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES");
   g_ignore_xorg_bitmask_properties = ignore && strcmp(ignore, "1") == 0;
+  const char *ignore_pointers = getenv("HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES");
+  g_ignore_xorg_pointer_properties =
+      ignore_pointers && strcmp(ignore_pointers, "1") == 0;
   g_real_drm_mode_get_property =
       (drm_mode_get_property_fn)dlsym(RTLD_NEXT, "drmModeGetProperty");
   g_real_drm_mode_free_property =
@@ -518,9 +522,18 @@ struct hdmi_los_drm_mode_property *drmModeGetProperty(int fd, uint32_t property_
 
   struct hdmi_los_drm_mode_property *property =
       g_real_drm_mode_get_property(fd, property_id);
-  if (!g_ignore_xorg_bitmask_properties || !property ||
-      !hdmi_los_xorg_property_type_is_unsupported(property->flags,
-                                                  DRM_MODE_PROP_BITMASK)) {
+  if (!property) return NULL;
+
+  const char *ignored_reason = NULL;
+  if (g_ignore_xorg_bitmask_properties &&
+      hdmi_los_xorg_property_type_is_unsupported(property->flags,
+                                                 DRM_MODE_PROP_BITMASK)) {
+    ignored_reason = "IGNORED_XORG_BITMASK";
+  } else if (g_ignore_xorg_pointer_properties &&
+             strcmp(property->name, "RETIRE_FENCE") == 0) {
+    ignored_reason = "IGNORED_XORG_POINTER";
+  }
+  if (!ignored_reason) {
     return property;
   }
 
@@ -530,9 +543,8 @@ struct hdmi_los_drm_mode_property *drmModeGetProperty(int fd, uint32_t property_
     char detail[64];
     snprintf(detail, sizeof(detail), "prop=%u flags=0x%x name=%.28s",
              property->prop_id, property->flags, property->name);
-    emit_detail(sequence, fd, DRM_IOCTL_MODE_GETPROPERTY,
-                "IGNORED_XORG_BITMASK", property->prop_id, property->flags, 0, 0,
-                detail);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_GETPROPERTY, ignored_reason,
+                property->prop_id, property->flags, 0, 0, detail);
     g_in_trace = 0;
   }
 
