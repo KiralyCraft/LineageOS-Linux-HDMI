@@ -23,6 +23,7 @@ enum {
   kMaxAtomicObjects = 32,
   kMaxAtomicProperties = 128,
   kMaxCrtcConnectors = 16,
+  kMaxObjectProperties = 128,
 };
 
 static int g_trace_fd = -1;
@@ -79,6 +80,14 @@ static int safe_copy(void *destination, uint64_t source, size_t size) {
 
 static const char *request_name(unsigned long request) {
   switch (request) {
+    case DRM_IOCTL_VERSION: return "VERSION";
+    case DRM_IOCTL_GET_UNIQUE: return "GET_UNIQUE";
+    case DRM_IOCTL_GET_MAGIC: return "GET_MAGIC";
+    case DRM_IOCTL_GEM_CLOSE: return "GEM_CLOSE";
+    case DRM_IOCTL_PRIME_HANDLE_TO_FD: return "PRIME_HANDLE_TO_FD";
+    case DRM_IOCTL_PRIME_FD_TO_HANDLE: return "PRIME_FD_TO_HANDLE";
+    case DRM_IOCTL_SET_MASTER: return "SET_MASTER";
+    case DRM_IOCTL_DROP_MASTER: return "DROP_MASTER";
     case DRM_IOCTL_GET_CAP: return "GET_CAP";
     case DRM_IOCTL_SET_CLIENT_CAP: return "SET_CLIENT_CAP";
     case DRM_IOCTL_MODE_GETRESOURCES: return "MODE_GETRESOURCES";
@@ -86,9 +95,16 @@ static const char *request_name(unsigned long request) {
     case DRM_IOCTL_MODE_SETCRTC: return "MODE_SETCRTC";
     case DRM_IOCTL_MODE_CURSOR: return "MODE_CURSOR";
     case DRM_IOCTL_MODE_GETCONNECTOR: return "MODE_GETCONNECTOR";
+    case DRM_IOCTL_MODE_GETENCODER: return "MODE_GETENCODER";
     case DRM_IOCTL_MODE_GETPROPERTY: return "MODE_GETPROPERTY";
+    case DRM_IOCTL_MODE_SETPROPERTY: return "MODE_SETPROPERTY";
+    case DRM_IOCTL_MODE_GETPROPBLOB: return "MODE_GETPROPBLOB";
+    case DRM_IOCTL_MODE_GETGAMMA: return "MODE_GETGAMMA";
+    case DRM_IOCTL_MODE_SETGAMMA: return "MODE_SETGAMMA";
     case DRM_IOCTL_MODE_ADDFB: return "MODE_ADDFB";
+    case DRM_IOCTL_MODE_GETFB: return "MODE_GETFB";
     case DRM_IOCTL_MODE_RMFB: return "MODE_RMFB";
+    case DRM_IOCTL_MODE_DIRTYFB: return "MODE_DIRTYFB";
     case DRM_IOCTL_MODE_PAGE_FLIP: return "MODE_PAGE_FLIP";
     case DRM_IOCTL_MODE_CREATE_DUMB: return "MODE_CREATE_DUMB";
     case DRM_IOCTL_MODE_MAP_DUMB: return "MODE_MAP_DUMB";
@@ -143,6 +159,17 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
                value.connector_id, value.count_modes, value.count_props,
                value.count_encoders, value.connection);
     }
+  } else if (record->request == DRM_IOCTL_MODE_GETENCODER) {
+    struct drm_mode_get_encoder value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.encoder_id;
+      record->argument[1] = value.crtc_id;
+      record->argument[2] = value.possible_crtcs;
+      record->argument[3] = value.possible_clones;
+      snprintf(record->detail, sizeof(record->detail),
+               "encoder=%u crtc=%u masks=0x%x/0x%x", value.encoder_id,
+               value.crtc_id, value.possible_crtcs, value.possible_clones);
+    }
   } else if (record->request == DRM_IOCTL_MODE_GETCRTC ||
              record->request == DRM_IOCTL_MODE_SETCRTC) {
     struct drm_mode_crtc value;
@@ -186,6 +213,16 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
       snprintf(record->detail, sizeof(record->detail), "prop=%u flags=0x%x values=%u enums=%u name=%.20s",
                value.prop_id, value.flags, value.count_values, value.count_enum_blobs,
                value.name);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETPROPBLOB) {
+    struct drm_mode_get_blob value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.blob_id;
+      record->argument[1] = value.length;
+      record->argument[2] = value.data;
+      snprintf(record->detail, sizeof(record->detail),
+               "blob=%u length=%u data=0x%llx", value.blob_id, value.length,
+               (unsigned long long)value.data);
     }
   } else if (record->request == DRM_IOCTL_MODE_CREATE_DUMB) {
     struct drm_mode_create_dumb value;
@@ -275,8 +312,8 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
       snprintf(record->detail, sizeof(record->detail), "blob=%u", value.blob_id);
     }
   } else {
-    snprintf(record->detail, sizeof(record->detail), "arg=0x%llx",
-             (unsigned long long)address);
+    snprintf(record->detail, sizeof(record->detail), "request=0x%lx arg=0x%llx",
+             record->request, (unsigned long long)address);
   }
 }
 
@@ -357,6 +394,36 @@ static void emit_atomic_details(uint32_t sequence, int fd, unsigned long request
   }
 }
 
+static void emit_object_property_details(uint32_t sequence, int fd,
+                                         unsigned long request,
+                                         const void *argument) {
+  struct drm_mode_obj_get_properties value;
+  if (!safe_copy(&value, (uint64_t)(uintptr_t)argument, sizeof(value)) ||
+      value.count_props == 0) return;
+  if (value.count_props > kMaxObjectProperties) {
+    emit_detail(sequence, fd, request, "OBJECT_PROPERTIES_TRUNCATED", value.obj_id,
+                value.obj_type, value.count_props, 0,
+                "property count exceeds trace bound");
+    return;
+  }
+
+  uint32_t properties[kMaxObjectProperties];
+  uint64_t property_values[kMaxObjectProperties];
+  if (!safe_copy(properties, value.props_ptr,
+                 (size_t)value.count_props * sizeof(properties[0])) ||
+      !safe_copy(property_values, value.prop_values_ptr,
+                 (size_t)value.count_props * sizeof(property_values[0]))) return;
+
+  for (uint32_t index = 0; index < value.count_props; ++index) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "obj=%u prop=%u value=%llu index=%u",
+             value.obj_id, properties[index],
+             (unsigned long long)property_values[index], index);
+    emit_detail(sequence, fd, request, "OBJECT_PROPERTY", value.obj_id,
+                properties[index], property_values[index], index, detail);
+  }
+}
+
 __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   const char *descriptor = getenv("HDMI_LOS_TRACE_FD");
   if (!descriptor || !*descriptor) return;
@@ -406,6 +473,9 @@ int ioctl(int fd, unsigned long request, ...) {
   after.error = result < 0 ? saved_errno : 0;
   decode_record(&after, argument);
   if (!exchange_record(&after)) _exit(125);
+  if (result >= 0 && request == DRM_IOCTL_MODE_OBJ_GETPROPERTIES) {
+    emit_object_property_details(sequence, fd, request, argument);
+  }
   g_in_trace = 0;
   errno = saved_errno;
   return (int)result;

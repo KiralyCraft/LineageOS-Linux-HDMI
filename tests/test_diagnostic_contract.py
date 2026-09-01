@@ -38,6 +38,13 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('cp "$BUILD/native/chroot/lib/"* "$CHROOT/lib/"', package)
         self.assertIn("libhdmi-los-drmtrace.so", build)
 
+    def test_tracer_identifies_blob_reads_and_object_property_values(self):
+        tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        self.assertIn('case DRM_IOCTL_MODE_GETPROPBLOB: return "MODE_GETPROPBLOB";', tracer)
+        self.assertIn('"blob=%u length=%u data=0x%llx"', tracer)
+        self.assertIn('"OBJECT_PROPERTY"', tracer)
+        self.assertIn('"request=0x%lx arg=0x%llx"', tracer)
+
 
 if __name__ == "__main__":
     unittest.main()
