@@ -28,6 +28,8 @@ enum {
 
 static int g_trace_fd = -1;
 static _Atomic uint32_t g_sequence = 1;
+static _Atomic uint32_t g_autorefresh_property_id;
+static int g_suppress_autorefresh_setproperty;
 static __thread int g_in_trace;
 
 static int wait_readable(int fd) {
@@ -214,6 +216,16 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
                value.prop_id, value.flags, value.count_values, value.count_enum_blobs,
                value.name);
     }
+  } else if (record->request == DRM_IOCTL_MODE_SETPROPERTY) {
+    struct drm_mode_connector_set_property value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.connector_id;
+      record->argument[1] = value.prop_id;
+      record->argument[2] = value.value;
+      snprintf(record->detail, sizeof(record->detail),
+               "connector=%u prop=%u value=%llu", value.connector_id,
+               value.prop_id, (unsigned long long)value.value);
+    }
   } else if (record->request == DRM_IOCTL_MODE_GETPROPBLOB) {
     struct drm_mode_get_blob value;
     if (safe_copy(&value, address, sizeof(value))) {
@@ -315,6 +327,22 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
     snprintf(record->detail, sizeof(record->detail), "request=0x%lx arg=0x%llx",
              record->request, (unsigned long long)address);
   }
+}
+
+static void remember_property_name(const void *argument) {
+  struct drm_mode_get_property value;
+  if (!safe_copy(&value, (uint64_t)(uintptr_t)argument, sizeof(value))) return;
+  if (strncmp(value.name, "autorefresh", sizeof(value.name)) == 0) {
+    atomic_store(&g_autorefresh_property_id, value.prop_id);
+  }
+}
+
+static int should_suppress_autorefresh_setproperty(
+    const void *argument, struct drm_mode_connector_set_property *value) {
+  if (!g_suppress_autorefresh_setproperty ||
+      !safe_copy(value, (uint64_t)(uintptr_t)argument, sizeof(*value))) return 0;
+  uint32_t property_id = atomic_load(&g_autorefresh_property_id);
+  return property_id != 0 && value->prop_id == property_id;
 }
 
 static void emit_detail(uint32_t sequence, int fd, unsigned long request, const char *name,
@@ -432,6 +460,8 @@ __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   long parsed = strtol(descriptor, &end, 10);
   if (errno != 0 || !end || *end != '\0' || parsed < 0 || parsed > INT32_MAX) _exit(125);
   g_trace_fd = (int)parsed;
+  const char *suppress = getenv("HDMI_LOS_SUPPRESS_AUTOREFRESH_SETPROPERTY");
+  g_suppress_autorefresh_setproperty = suppress && strcmp(suppress, "1") == 0;
 
   struct hdmi_los_trace_record loaded;
   initialize_record(&loaded, HDMI_LOS_TRACE_LOADED, 0, g_trace_fd, 0, "DRMTRACE_LOADED");
@@ -462,9 +492,34 @@ int ioctl(int fd, unsigned long request, ...) {
     emit_atomic_details(sequence, fd, request, argument);
   }
 
+  struct drm_mode_connector_set_property suppressed = {0};
+  if (request == DRM_IOCTL_MODE_SETPROPERTY &&
+      should_suppress_autorefresh_setproperty(argument, &suppressed)) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "connector=%u prop=%u value=%llu",
+             suppressed.connector_id, suppressed.prop_id,
+             (unsigned long long)suppressed.value);
+    emit_detail(sequence, fd, request, "SUPPRESSED_AUTOREFRESH_SETPROPERTY",
+                suppressed.connector_id, suppressed.prop_id, suppressed.value, 0,
+                detail);
+
+    struct hdmi_los_trace_record after;
+    initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
+                      request_name(request));
+    after.result = 0;
+    decode_record(&after, argument);
+    if (!exchange_record(&after)) _exit(125);
+    g_in_trace = 0;
+    errno = 0;
+    return 0;
+  }
+
   errno = 0;
   long result = syscall(SYS_ioctl, fd, request, argument);
   int saved_errno = errno;
+  if (result >= 0 && request == DRM_IOCTL_MODE_GETPROPERTY) {
+    remember_property_name(argument);
+  }
 
   struct hdmi_los_trace_record after;
   initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,

@@ -38,12 +38,26 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('cp "$BUILD/native/chroot/lib/"* "$CHROOT/lib/"', package)
         self.assertIn("libhdmi-los-drmtrace.so", build)
 
-    def test_tracer_identifies_blob_reads_and_object_property_values(self):
+    def test_tracer_identifies_property_operations_and_values(self):
         tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
         self.assertIn('case DRM_IOCTL_MODE_GETPROPBLOB: return "MODE_GETPROPBLOB";', tracer)
         self.assertIn('"blob=%u length=%u data=0x%llx"', tracer)
+        self.assertIn('"connector=%u prop=%u value=%llu"', tracer)
         self.assertIn('"OBJECT_PROPERTY"', tracer)
         self.assertIn('"request=0x%lx arg=0x%llx"', tracer)
+
+    def test_xorg_only_suppresses_dynamically_identified_autorefresh_write(self):
+        tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        variable = "HDMI_LOS_SUPPRESS_AUTOREFRESH_SETPROPERTY"
+        self.assertIn('strncmp(value.name, "autorefresh", sizeof(value.name)) == 0', tracer)
+        self.assertIn("value->prop_id == property_id", tracer)
+        self.assertIn('"SUPPRESSED_AUTOREFRESH_SETPROPERTY"', tracer)
+        self.assertNotIn("prop_id == 53", tracer)
+        self.assertIn(f'setenv("{variable}", "1", 1);', agent)
+        preflight, spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)
+        self.assertNotIn(variable, preflight)
+        self.assertIn(variable, spawn)
 
 
 if __name__ == "__main__":
