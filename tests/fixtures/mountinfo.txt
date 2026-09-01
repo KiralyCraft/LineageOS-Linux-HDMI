@@ -1,0 +1,5 @@
+40 55 254:47 /adb/modules/hdmi-los/vendor/bin/hw/composer /vendor/bin/hw/composer rw,nosuid,nodev,noatime shared:46 - f2fs /dev/block/dm-47 rw,lazytime,seclabel
+62 31 0:19 / /debug_ramdisk/.magisk/modules ro,relatime shared:7 - f2fs /dev/block/dm-47 rw,lazytime,seclabel
+63 31 0:19 / /debug_ramdisk/.magisk/modules-noexec ro,noexec,relatime shared:7 - f2fs /dev/block/dm-47 rw,lazytime,seclabel
+64 31 0:19 / /debug_ramdisk/.magisk/modules-nosuid ro,nosuid,relatime shared:7 - f2fs /dev/block/dm-47 rw,lazytime,seclabel
+65 31 0:19 / /vendor/bin/hw/vendor.qti.hardware.display.composer-service ro,nodev,noatime shared:46 - f2fs /dev/block/dm-47 rw,lazytime,seclabel

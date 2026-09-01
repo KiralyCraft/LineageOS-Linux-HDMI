@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 PROFILE=${1:-current-install}
+EXPECTED_BINARY_COMMIT=${2:-}
 ROOT=$(git rev-parse --show-toplevel)
 DIST=$ROOT/dist
 ZIP=$DIST/hdmi-los-$PROFILE-magisk.zip
@@ -12,8 +13,14 @@ test -f "$ZIP" && test -f "$TAR" && test -f "$INFO" && test -f "$DIST/SHA256SUMS
 (cd "$DIST" && sha256sum -c SHA256SUMS)
 unzip -t "$ZIP" >/dev/null
 tar -tzf "$TAR" >/dev/null
-python "$ROOT/tests/check-package.py" "$ZIP" "$TAR" "$INFO" \
-    "$ROOT/profiles/$PROFILE.json" "$(git -C "$ROOT" rev-parse HEAD)"
+package_args=(
+    "$ZIP" "$TAR" "$INFO" "$ROOT/profiles/$PROFILE.json"
+    "$(git -C "$ROOT" rev-parse HEAD)"
+)
+if [[ -n $EXPECTED_BINARY_COMMIT ]]; then
+    package_args+=("$EXPECTED_BINARY_COMMIT")
+fi
+python "$ROOT/tests/check-package.py" "${package_args[@]}"
 
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
@@ -31,4 +38,3 @@ for binary in "$tmp/module/bin/hdmi-losd" "$tmp/module/vendor/bin/hw/"* \
 done
 
 printf 'Offline verification: PASS (nothing installed or executed on Android)\n'
-

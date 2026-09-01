@@ -7,7 +7,9 @@ display, or start Xorg.
 Do not use release 0.1 or the ZIP whose SHA-256 is
 `e0a0dfec34a8cbd3395c0c4b8aa3583230e09835ab752cafdbdc8aad036c5ff9`.
 That package shifted proprietary Qualcomm/Sony C++ vtables and failed before
-the Lineage boot animation.  These instructions apply to release 0.2 or later.
+the Lineage boot animation. Release 0.2 corrected the ABI but inherited
+`nosuid` by binding its executable directly from `/data`; do not install it
+either. These instructions apply to release 0.2.1 or later.
 
 ## Before installation
 
@@ -48,6 +50,10 @@ sudo -n nsenter -t 1 -m -- /system/bin/su -c \
 The last gate line must begin with `PASS`, and the marker must say
 `current-install`.  A missing marker or any `FAIL CLOSED` line means stop; the
 original vendor files were left in use.
+
+Also inspect `/proc/1/mountinfo` for the composer service, `libsdmcore.so`, and
+`libsdmdal.so`. Each target must be read-only and must not contain `nosuid` or
+`noexec` in its per-mount options.
 
 The module installs the signed `HDMI Xorg` tile app after Android finishes
 booting.  It grants no Android permissions.  Add its tile to Quick Settings.

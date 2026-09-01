@@ -4,6 +4,7 @@ set -Eeuo pipefail
 MODE=${1:-}
 PROFILE=${2:-current-install}
 SERVER=${3:-root@192.168.104.201}
+BASE_COMMIT=${4:-}
 ROOT=$(git rev-parse --show-toplevel)
 REMOTE_ROOT=/bigdata/hdmi-los-build
 
@@ -38,16 +39,39 @@ fi
 printf 'Only stale work directories below %s/work were removed. Caches and signing keys were preserved.\n' "$root"
 REMOTE
         ;;
-    zip|port)
+    zip|port|repackage)
         ;;
     *)
-        printf 'usage: %s preflight|zip|port PROFILE SERVER\n' "$0" >&2
+        printf 'usage: %s preflight|zip|port|repackage PROFILE SERVER [BASE_COMMIT]\n' "$0" >&2
         exit 2
         ;;
 esac
 
 [[ $PROFILE =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { printf 'invalid profile name\n' >&2; exit 2; }
 test -f "$ROOT/profiles/$PROFILE.json"
+
+if [[ $MODE == repackage ]]; then
+    [[ $BASE_COMMIT =~ ^[0-9a-f]{40}$ ]] || {
+        printf 'repackage requires a full 40-character BASE_COMMIT\n' >&2
+        exit 2
+    }
+    git -C "$ROOT" cat-file -e "$BASE_COMMIT^{commit}"
+    while IFS= read -r changed; do
+        case "$changed" in
+            module/*|docs/*|tests/*|README.md|release.json|Makefile|\
+            scripts/remote-build.sh|scripts/verify-dist.sh|\
+            build-support/remote-entry.sh|build-support/package.sh|\
+            build-support/write-build-info.py|build-support/reuse-build.sh|\
+            build-support/verify-reused-build.py)
+                ;;
+            *)
+                printf 'Refusing binary reuse: binary-producing path changed: %s\n' \
+                    "$changed" >&2
+                exit 1
+                ;;
+        esac
+    done < <(git -C "$ROOT" diff --name-only "$BASE_COMMIT" HEAD)
+fi
 
 if ! git -C "$ROOT" diff --quiet -- || ! git -C "$ROOT" diff --cached --quiet --; then
     printf 'Refusing to build an uncommitted tracked tree. Commit the intended source first.\n' >&2
@@ -89,9 +113,10 @@ rm -f -- "$work/incoming.tar.gz"
 REMOTE
 
 ssh -o BatchMode=yes -- "$SERVER" \
-    "$WORK/source/build-support/remote-entry.sh" "$MODE" "$PROFILE" "$COMMIT" "$WORK"
+    "$WORK/source/build-support/remote-entry.sh" "$MODE" "$PROFILE" "$COMMIT" \
+    "$WORK" "${BASE_COMMIT:-$COMMIT}"
 
-if [[ $MODE == zip ]]; then
+if [[ $MODE == zip || $MODE == repackage ]]; then
     mkdir -p "$ROOT/dist" "$ROOT/.local/signing"
     rsync -a --delete --exclude '.keep' -- "$SERVER:$WORK/output/" "$ROOT/dist/"
     if ssh -o BatchMode=yes -- "$SERVER" test -f "$REMOTE_ROOT/signing/hdmi-los.jks"; then

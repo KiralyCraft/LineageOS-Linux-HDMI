@@ -30,7 +30,10 @@ methods shifted Qualcomm derived-class vtable slots used by proprietary Sony
 display code. Magisk safe mode recovered the phone. Release 0.2 replaces those
 hooks with a non-virtual bridge and adds an exact vtable-slot build gate. The
 [incident record](docs/BOOT_FAILURE_2026-09-01.md) contains the evidence. The
-0.2 correction is not yet runtime-validated, and the 0.1 ZIP must not be used.
+first 0.2 package also failed before animation: its custom bind mounts bypassed
+Magisk's executable module mirror and inherited `nosuid` from `/data`. Release
+0.2.1 binds from Magisk's read-only, cleared-`nosuid` mirror instead. Neither
+the 0.1 nor the 0.2 ZIP should be installed.
 
 Runtime escape paths are:
 
@@ -52,6 +55,17 @@ make server-preflight
 make zip
 make verify
 ```
+
+For a module-script or documentation-only correction, reuse an already
+verified binary build without running the Android/native toolchains:
+
+```sh
+make repackage BASE_COMMIT=<full-verified-build-commit>
+make verify BASE_COMMIT=<full-verified-build-commit>
+```
+
+The repackage command refuses changes outside an explicit packaging/deployment
+allowlist and records separate package-source and binary-source commits.
 
 Artifacts are copied into `dist/`. The local machine only stores source,
 patches, profiles, signing material, and returned artifacts.

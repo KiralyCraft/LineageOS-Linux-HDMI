@@ -6,6 +6,7 @@ BUILD=${2:?build}
 OUTPUT=${3:?output}
 PROFILE=${4:?profile}
 COMMIT=${5:?commit}
+BINARY_COMMIT=${6:-$COMMIT}
 STAGE=$BUILD/package
 MODULE=$STAGE/module
 CHROOT=$STAGE/chroot
@@ -34,7 +35,8 @@ for relative in \
 done
 
 python "$SOURCE/build-support/write-build-info.py" \
-    "$SOURCE" "$BUILD" "$PROFILE" "$COMMIT" "$MODULE/build-info.json"
+    "$SOURCE" "$BUILD" "$PROFILE" "$COMMIT" "$MODULE/build-info.json" \
+    "$BINARY_COMMIT"
 
 cp "$BUILD/native/chroot/"* "$CHROOT/bin/"
 cp "$SOURCE/native/agent/run-agent.sh" "$CHROOT/"

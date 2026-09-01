@@ -5,6 +5,7 @@ MODE=${1:?mode}
 PROFILE=${2:?profile}
 COMMIT=${3:?commit}
 WORK=${4:?work}
+BINARY_COMMIT=${5:-$COMMIT}
 SOURCE=$WORK/source
 BUILD=$WORK/build
 OUTPUT=$WORK/output
@@ -16,6 +17,15 @@ REMOTE_ROOT=/bigdata/hdmi-los-build
 
 mkdir -p "$BUILD" "$OUTPUT" "$REMOTE_ROOT/cache" "$REMOTE_ROOT/signing"
 rm -rf -- "$OUTPUT"/*
+
+if [[ $MODE == repackage ]]; then
+    [[ $BINARY_COMMIT =~ ^[0-9a-f]{40}$ ]]
+    "$SOURCE/build-support/reuse-build.sh" "$SOURCE" "$BUILD" "$PROFILE" \
+        "$BINARY_COMMIT" "$REMOTE_ROOT"
+    "$SOURCE/build-support/package.sh" "$SOURCE" "$BUILD" "$OUTPUT" \
+        "$PROFILE" "$COMMIT" "$BINARY_COMMIT"
+    exit 0
+fi
 
 "$SOURCE/build-support/port-patches.sh" "$SOURCE" "$BUILD" "$PROFILE"
 if [[ $MODE == port ]]; then
