@@ -1,6 +1,6 @@
 id=hdmi-los
 name=HDMI Xorg takeover for LineageOS pdx234
-version=0.2.5-diagnostic.1-current-install
-versionCode=20260906
+version=0.2.6-candidate.1-current-install
+versionCode=20260907
 author=KiralyCraft
-description=Diagnostic-only staged DRM lease and traced Xorg probes. Normal tile takeover is disabled.
+description=Atomic Xorg DRM-lease takeover candidate with traced ioctl guards and automatic Android restore.

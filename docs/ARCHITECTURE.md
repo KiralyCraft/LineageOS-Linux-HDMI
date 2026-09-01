@@ -30,8 +30,9 @@ versioned composer socket remains at version 1 so the exact verified 0.2.4
 composer can be reused. `lease-hold` stops after receiving the lease and closes
 it three seconds later without starting the chroot agent. `xorg-legacy` and
 `xorg-atomic` pass the same leased objects to Xorg with explicit legacy/atomic
-configuration. The diagnostic module rejects normal tile starts, and its
-version-2 broker rejects the older untraced agent.
+configuration. The candidate tile selects the atomic configuration; root-only
+probes retain both variants for comparison. The version-2 broker rejects the
+older untraced agent.
 
 Diagnostic Xorg loads `libhdmi-los-drmtrace.so`. Before every DRM ioctl, the
 library sends a structured record through the agent to the Android broker.
@@ -68,10 +69,10 @@ At `post-fs-data` it compares five build properties and SHA-256 hashes of all
 three untouched files.  Only a complete match permits early bind mounts.  The
 runtime broker also requires the gate marker.
 
-The diagnostic release uses Magisk `resetprop` before composer startup to
-request Qualcomm display hardware-recovery dumps. The broker refuses probes if
-that property is no longer `0`. This override is diagnostic-only and does not
-modify a partition or persist after the module is disabled.
+When the optional `diagnostic-only` package marker is present, Magisk
+`resetprop` requests Qualcomm display hardware-recovery dumps before composer
+startup and the broker refuses probes if that property is no longer `0`. The
+candidate package omits the marker and does not change that property.
 
 The chroot agent creates two stable uinput devices for Xorg and hot-grabs only
 the configured Bluetooth mouse and keyboard.  The Android broker separately

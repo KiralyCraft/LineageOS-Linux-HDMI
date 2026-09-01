@@ -822,7 +822,7 @@ class Broker {
                  "diagnostic build: use a root probe command");
       } else {
         std::string detail;
-        int start_status = Start(HDMI_LOS_PROBE_XORG_LEGACY, &detail);
+        int start_status = Start(HDMI_LOS_PROBE_XORG_ATOMIC, &detail);
         response = Status(request.request_id);
         response.status = start_status;
         if (!detail.empty()) snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());

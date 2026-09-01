@@ -17,13 +17,16 @@ class DiagnosticContractTests(unittest.TestCase):
         tile = (ROOT / "android/tile/app/src/main/java/dev/kiraly/hdmilos/BrokerClient.java").read_text()
         self.assertIn("private static final short VERSION = 2", tile)
 
-    def test_diagnostic_release_fails_safe(self):
+    def test_candidate_release_selects_atomic_tile_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.5-diagnostic.1")
-        self.assertEqual(release["version_code"], 20260906)
-        self.assertTrue((ROOT / "module/diagnostic-only").is_file())
+        self.assertEqual(release["version"], "0.2.6-candidate.1")
+        self.assertEqual(release["version_code"], 20260907)
+        self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
-        self.assertIn("diagnostic build: use a root probe command", broker)
+        toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
+        toggle = toggle.split("} else if (request.opcode == HDMI_LOS_OP_PROBE)", 1)[0]
+        self.assertIn("Start(HDMI_LOS_PROBE_XORG_ATOMIC", toggle)
+        self.assertNotIn("Start(HDMI_LOS_PROBE_XORG_LEGACY", toggle)
         post_fs = (ROOT / "module/post-fs-data.sh").read_text()
         self.assertIn("resetprop -n vendor.display.disable_hw_recovery_dump 0", post_fs)
 

@@ -13,7 +13,6 @@ required = {
     "module.prop", "customize.sh", "post-fs-data.sh", "service.sh",
     "uninstall.sh", "mount-utils.sh", "skip_mount", "sepolicy.rule", "profile.env",
     "original-checksums.list", "patched-checksums.list", "build-info.json",
-    "diagnostic-only",
     "bin/hdmi-losd", "apk/HdmiLosTile.apk",
     "vendor/bin/hw/vendor.qti.hardware.display.composer-service",
     "vendor/lib64/libsdmcore.so", "vendor/lib64/libsdmdal.so",
@@ -28,6 +27,7 @@ with zipfile.ZipFile(zip_path) as archive:
         mode = archive.getinfo(name).external_attr >> 16
         assert not (mode & 0o170000) == 0o120000, f"symlink in ZIP: {name}"
     assert required <= set(names), sorted(required - set(names))
+    assert "diagnostic-only" not in names, "candidate package must enable the tile"
     embedded = json.loads(archive.read("build-info.json"))
     post_fs_data = archive.read("post-fs-data.sh").decode()
     assert 'mount -o bind "$bind_source" "$target"' in post_fs_data

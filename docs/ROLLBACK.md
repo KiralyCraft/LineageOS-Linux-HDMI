@@ -28,6 +28,7 @@ device's matching original boot/init_boot image is a last-resort recovery for a
 damaged Magisk installation itself, not a normal rollback for this patch.  The
 module does not alter either image or `/vendor` on disk.
 
-The diagnostic `vendor.display.disable_hw_recovery_dump=0` override is applied
-at boot with Magisk `resetprop`; disabling the module and rebooting restores
-the ROM's property behavior.
+The candidate package does not override
+`vendor.display.disable_hw_recovery_dump`. A package carrying the optional
+`diagnostic-only` marker applies that override with Magisk `resetprop`; disabling
+such a module and rebooting restores the ROM's property behavior.

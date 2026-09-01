@@ -1,8 +1,9 @@
-# Staged diagnostic installation and test
+# Atomic takeover candidate installation and test
 
-Release `0.2.5-diagnostic.1` is not a production takeover build. Its Quick
-Settings tile cannot start Xorg. The only activation paths are explicit root
-commands, and the old protocol-v1 chroot agent is rejected.
+Release `0.2.6-candidate.1` enables the Quick Settings tile and selects the
+traced atomic+ShadowFB Xorg path. It retains the 60/65-second automatic restore
+timers and the root-only diagnostic probes. The old protocol-v1 chroot agent is
+rejected.
 
 Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
 a probe after a freeze or reset until all available evidence has been copied.
@@ -26,13 +27,9 @@ a probe after a freeze or reset until all available evidence has been copied.
    `dist/hdmi-los-current-install-chroot.tar.gz`. Do not mix a protocol-v1
    agent with this module.
 6. Verify `/data/adb/hdmi-los/logs/gate.log`, `compatible.ok`, and the three
-   read-only executable composer bind mounts. Also require:
-
-   ```sh
-   getprop vendor.display.disable_hw_recovery_dump
-   ```
-
-   to print `0`, with the same value recorded in `diagnostic.log` after boot.
+   read-only executable composer bind mounts. The candidate omits the
+   `diagnostic-only` marker and does not override the ROM's display-recovery
+   property.
 
 ## Gate 1: ordinary Android mirroring
 
@@ -54,7 +51,7 @@ lease, holds the unused fd for three seconds, closes it, and restores Android.
 Run this exactly three times. Android mirroring and the internal display must
 recover after every cycle. Do not proceed to Xorg if any cycle resets.
 
-## Gate 3: one traced legacy Xorg start
+## Gate 3: traced atomic Xorg takeover
 
 Start the matching chroot bundle without phone-side capture:
 
@@ -63,10 +60,11 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 sudo -n ./run-agent.sh --capture none
 ```
 
-Then run one root command on Android:
+Add the `HDMI Xorg` Quick Settings tile and tap it. The equivalent root-only
+diagnostic command is:
 
 ```sh
-/data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-legacy
+/data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
 Every DRM ioctl is synced to `/data/adb/hdmi-los/logs/broker.log` before it is
@@ -83,20 +81,18 @@ The recovery pass preserves `/tmp/recovery.log` and `/sys/fs/pstore`. Run the
 collector again into a second new directory after normal boot to preserve
 module logs, `/data/misc/recovery`, and Qualcomm display recovery dumps.
 
-## Gate 4: atomic candidate, only when justified
+## Gate 4: legacy comparison, only for diagnosis
 
-Run `probe xorg-atomic` only if the last durable legacy record identifies a
-legacy modeset, cursor, or page-flip boundary. The atomic probe changes only:
+The selected atomic mode changes these Xorg options from the legacy probe:
 
 ```text
 Option "Atomic" "true"
 Option "ShadowFB" "true"
 ```
 
-It retains software rendering, disabled DRI page flips, and `SWcursor`. A
-failure during resource queries, dumb-buffer creation, or framebuffer
-registration must first be reduced to a one-operation probe because atomic
-Xorg shares those setup calls.
+It retains software rendering, disabled DRI page flips, and `SWcursor`. Use
+`probe xorg-legacy` only to compare a regression; on this device its initial
+legacy modeset returns `EINVAL` and produces a black capture.
 
 ## Success criteria
 

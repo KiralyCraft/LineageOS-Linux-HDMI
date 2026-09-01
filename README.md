@@ -50,11 +50,16 @@ durably records every boundary before entering composer or Xorg code.
 The first 0.2.4 Xorg start still reset the whole phone after the lease was
 successfully delivered. Its Xorg log and lock file remained zero-length, and
 the OTG dock lost power with the phone. Release `0.2.5-diagnostic.1` therefore
-does not permit normal tile activation. It separates an unused three-second
-lease hold from two root-only, synchronously traced Xorg starts. Every DRM
-ioctl is durably acknowledged by the Android broker before it enters the
-kernel. The capture card must be powered by the workstation, not the phone.
-The upstream and downstream comparison is recorded in
+isolated every DRM ioctl behind a durable trace and disabled tile activation.
+Those probes identified unsafe Qualcomm connector-property replays, an Xorg
+bitmask-property crash, and an intermittently wrong leased primary plane.
+
+Release `0.2.6-candidate.1` filters the write-only `RETIRE_FENCE` property,
+leases the CRTC's fixed primary plane, and selects Xorg's atomic+ShadowFB path.
+That exact path produced a visible LXDE desktop on the workstation capture and
+the 60-second failsafe restored Android mirroring. The Quick Settings tile is
+enabled again; forensic root probes remain available. The capture card must be
+powered by the workstation, not the phone. The investigation is recorded in
 [`docs/QUALCOMM_DRM_RESEARCH.md`](docs/QUALCOMM_DRM_RESEARCH.md).
 
 Runtime escape paths are:
@@ -139,7 +144,5 @@ thunks and the derived-vtable shifting that caused the 0.1 boot failure.
 ## Manual activation outline
 
 The exact staged checklist is in `docs/MANUAL_TEST.md`. Install the matching
-ZIP and chroot bundle, establish ten minutes of workstation-powered Android
-mirroring, run three root-only lease holds, and only then start one traced Xorg
-probe. The diagnostic tile cannot start a takeover, and no takeover starts at
-boot.
+ZIP and chroot bundle, start the agent, and use the Quick Settings tile for the
+traced atomic takeover. No takeover starts at boot.
