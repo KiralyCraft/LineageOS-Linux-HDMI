@@ -39,6 +39,8 @@ int g_broker = -1;
 int g_trace = -1;
 uint32_t g_probe_mode = HDMI_LOS_PROBE_NONE;
 std::string g_bundle;
+bool g_kgsl_glamor = false;
+bool g_start_lxde = true;
 
 bool relay_trace_record(int timeout_ms);
 
@@ -428,7 +430,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Identifier \"HDMI Modesetting\"\n"
       "  Driver \"modesetting\"\n"
       "  Option \"kmsdev\" \"/dev/dri/card0\"\n"
-      "  Option \"AccelMethod\" \"none\"\n"
+      "  Option \"AccelMethod\" \"%s\"\n"
       "  Option \"PageFlip\" \"false\"\n"
       "  Option \"ShadowFB\" \"%s\"\n"
       "  Option \"Atomic\" \"%s\"\n"
@@ -447,13 +449,24 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  InputDevice \"HDMI Mouse\" \"CorePointer\"\n"
       "  InputDevice \"HDMI Keyboard\" \"CoreKeyboard\"\n"
       "EndSection\n", mouse.c_str(), keyboard.c_str(),
-      probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false",
+      g_kgsl_glamor ? "glamor" : "none",
+      g_kgsl_glamor ? "false" :
+          (probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false"),
       probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false");
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
   if (fclose(file) != 0) ok = false;
   if (chmod(path.c_str(), 0600) != 0) ok = false;
   return ok;
+}
+
+void configure_gpu_environment() {
+  if (!g_kgsl_glamor) return;
+  unsetenv("GALLIUM_DRIVER");
+  unsetenv("VK_DRIVER_FILES");
+  setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);
+  setenv("FD_FORCE_KGSL", "1", 1);
+  setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);
 }
 
 bool prepare_session(uint32_t probe_mode) {
@@ -559,6 +572,7 @@ pid_t spawn_xorg(int lease_fd) {
   setenv("HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES", "1", 1);
   setenv("HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES", "1", 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
+  configure_gpu_environment();
   execl("/usr/lib/Xorg", "/usr/lib/Xorg", kDisplay, "-masterfd", fd_text,
         "-config", config.c_str(), "-configdir", config_dir.c_str(),
         "-auth", auth.c_str(), "-logfile", log.c_str(), "-nolisten", "tcp",
@@ -589,6 +603,7 @@ pid_t spawn_lxde() {
   setenv("TMPDIR", "/tmp", 1);
   setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   setenv("XDG_RUNTIME_DIR", (std::string(kRuntime) + "/user-runtime").c_str(), 1);
+  configure_gpu_environment();
   execl("/usr/bin/dbus-run-session", "/usr/bin/dbus-run-session", "--",
         "/usr/bin/startlxde", static_cast<char *>(nullptr));
   _exit(127);
@@ -644,6 +659,7 @@ bool start_xorg(int lease_fd) {
     if (!relay_trace_record(100)) return false;
     if (xorg_ready()) {
       if (!verify_xorg()) return false;
+      if (!g_start_lxde) return true;
       g_session = spawn_lxde();
       return g_session > 0;
     }
@@ -753,7 +769,9 @@ int run_agent() {
       }
       reply = response_for(request, ok ? HDMI_LOS_OP_AGENT_READY : HDMI_LOS_OP_AGENT_FAILED,
                            ok ? HDMI_LOS_OK : HDMI_LOS_ERR_AGENT,
-                           ok ? "Xorg and LXDE ready on DP-1" : "Xorg startup verification failed");
+                           ok ? (g_start_lxde ? "Xorg and LXDE ready on DP-1" :
+                                                   "Xorg ready on DP-1; session disabled") :
+                                "Xorg startup verification failed");
       write_full(g_broker, &reply, sizeof(reply));
     } else if (request.opcode == HDMI_LOS_OP_AGENT_STOP) {
       if (lease_fd >= 0) close(lease_fd);
@@ -785,10 +803,30 @@ int main(int argc, char **argv) {
     return 1;
   }
   g_bundle = executable_dir();
-  if (argc == 3 && strcmp(argv[1], "--bundle") == 0) g_bundle = argv[2];
-  else if (argc != 1) {
-    fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR]\n");
-    return 2;
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "--bundle") == 0 && i + 1 < argc) {
+      g_bundle = argv[++i];
+    } else if (strcmp(argv[i], "--xorg-accel") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "safe") == 0) g_kgsl_glamor = false;
+      else if (strcmp(value, "kgsl-glamor") == 0) g_kgsl_glamor = true;
+      else {
+        fprintf(stderr, "invalid Xorg acceleration mode: %s\n", value);
+        return 2;
+      }
+    } else if (strcmp(argv[i], "--session") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "lxde") == 0) g_start_lxde = true;
+      else if (strcmp(value, "none") == 0) g_start_lxde = false;
+      else {
+        fprintf(stderr, "invalid session mode: %s\n", value);
+        return 2;
+      }
+    } else {
+      fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
+                      "[--xorg-accel safe|kgsl-glamor] [--session lxde|none]\n");
+      return 2;
+    }
   }
   struct sigaction action = {};
   action.sa_handler = on_signal;

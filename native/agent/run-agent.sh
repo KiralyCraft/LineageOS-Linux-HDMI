@@ -6,9 +6,11 @@ CAPTURE=none
 RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
 AGENT_PID=0
+XORG_ACCEL=safe
+SESSION=lxde
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor] [--session lxde|none]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -18,6 +20,16 @@ while (($#)); do
             CAPTURE=$2
             shift 2
             ;;
+        --xorg-accel)
+            (($# >= 2)) || { usage; exit 2; }
+            XORG_ACCEL=$2
+            shift 2
+            ;;
+        --session)
+            (($# >= 2)) || { usage; exit 2; }
+            SESSION=$2
+            shift 2
+            ;;
         *)
             usage
             exit 2
@@ -25,8 +37,11 @@ while (($#)); do
     esac
 done
 
+[[ $XORG_ACCEL == safe || $XORG_ACCEL == kgsl-glamor ]] || { usage; exit 2; }
+[[ $SESSION == lxde || $SESSION == none ]] || { usage; exit 2; }
+
 if ((EUID != 0)); then
-    exec sudo -n -- "$0" --capture "$CAPTURE"
+    exec sudo -n -- "$0" --capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" --session "$SESSION"
 fi
 
 for required in \
@@ -112,7 +127,12 @@ if [[ $CAPTURE != none ]]; then
     fi
 fi
 
-"$BUNDLE/bin/hdmi-los-agent" --bundle "$BUNDLE" >>"$RUNTIME/agent.log" 2>&1 &
+if [[ $XORG_ACCEL == kgsl-glamor ]]; then
+    printf 'WARNING: KGSL glamor is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
+fi
+
+"$BUNDLE/bin/hdmi-los-agent" --bundle "$BUNDLE" \
+    --xorg-accel "$XORG_ACCEL" --session "$SESSION" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!
 set +e
 wait "$AGENT_PID"

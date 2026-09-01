@@ -41,6 +41,21 @@ class DiagnosticContractTests(unittest.TestCase):
         spawn = spawn.split("bool xorg_ready()", 1)[0]
         self.assertIn('setenv("TMPDIR", "/tmp", 1);', spawn)
 
+    def test_kgsl_glamor_is_explicit_and_safe_mode_remains_default(self):
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        self.assertIn("bool g_kgsl_glamor = false;", agent)
+        self.assertIn('strcmp(value, "kgsl-glamor") == 0', agent)
+        self.assertIn('setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);', agent)
+        self.assertIn('setenv("FD_FORCE_KGSL", "1", 1);', agent)
+        self.assertIn('setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);', agent)
+        self.assertIn('g_kgsl_glamor ? "glamor" : "none"', agent)
+        self.assertIn('g_kgsl_glamor ? "false"', agent)
+        self.assertIn("XORG_ACCEL=safe", runner)
+        self.assertIn("SESSION=lxde", runner)
+        self.assertIn("--xorg-accel safe|kgsl-glamor", runner)
+        self.assertIn("--session lxde|none", runner)
+
     def test_tracer_is_packaged_from_chroot_lib(self):
         package = (ROOT / "build-support/package.sh").read_text()
         build = (ROOT / "build-support/build-native.sh").read_text()
