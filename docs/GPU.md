@@ -42,6 +42,7 @@ does.
 | Leased Xorg `:1`, default LXDE environment | Mesa llvmpipe | no | Works, but CPU-rendered |
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
+| Leased Xorg `:1`, modesetting glamor plus native KGSL | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -114,6 +115,61 @@ The X server's 2D rendering remains software-based. llvmpipe is currently the
 only GLX path verified to produce visible application pixels on the leased
 display.
 
+## Native KGSL glamor diagnostic
+
+A bounded Xorg-only probe on 2026-09-02 replaced the safe screen options with:
+
+```text
+Option "AccelMethod" "glamor"
+Option "ShadowFB" "false"
+Option "PageFlip" "false"
+Option "Atomic" "true"
+```
+
+Both Xorg and the test client received:
+
+```sh
+MESA_LOADER_DRIVER_OVERRIDE=kgsl
+FD_FORCE_KGSL=1
+FD_KGSL_ENABLE_DMABUF=1
+```
+
+This successfully reached the intended rendering stack. Xorg reported:
+
+```text
+glamor X acceleration enabled on FD740
+glamor initialized
+[DRI2] DRI driver: kgsl
+Initializing extension Present
+Initializing extension DRI3
+AIGLX: Loaded and initialized kgsl
+```
+
+`glxinfo -B` used DRI3, reported direct rendering, native Freedreno `FD740`,
+and `Accelerated: yes`. Native-KGSL `glxgears` ran at approximately 57 FPS.
+
+The result still could not be scanned out. Xorg repeatedly logged:
+
+```text
+failed to add fb -6
+modeset(0): failed to set mode: No such device or address
+```
+
+An XWD root capture taken while `glxgears` was running was entirely black.
+The important boundary is therefore below DRI3/Present: downstream Qualcomm
+SDE KMS does not accept the KGSL/dma-heap buffer that stock glamor tries to
+register as its scanout framebuffer. Disabling page flips does not avoid that
+initial framebuffer registration. The phone remained stable and the normal
+timeout restored Android.
+
+The next useful target is a hybrid path, not another direct-glamor attempt:
+retain the known-good dumb framebuffer and ShadowFB modeset, add screen-level
+DRI3 import for the native KGSL client's linear dma-bufs, wait on the Mesa
+Present fence, and copy the completed pixels into ShadowFB. A CPU copy is the
+safest first implementation; a GPU-assisted copy can be evaluated only after
+the buffer and fence contract is proven. This preserves the already-tested KMS
+scanout object instead of asking SDE to scan out a KGSL sharing buffer.
+
 ## Reproducing the checks
 
 For Termux:X11, run from an interactive `kiraly` shell:
@@ -146,10 +202,11 @@ glxgears -info
 The current agent starts LXDE directly with `dbus-run-session`; it does not
 start an interactive login shell. Do not make Zink the LXDE default while its
 windows fail to present. The next accelerated candidate must either expose a
-working screen-level DRI3/Present path so the custom Mesa fence bridge is used,
-or implement an explicit copy/presentation bridge into ShadowFB. Enabling
-glamor, DRI3, or the Freedreno DDX changes the X server/KMS path itself and
-requires the full crash-evidence protocol before it can replace the stable
+working screen-level DRI3/Present path without replacing the KMS scanout
+buffer, or implement an explicit copy/presentation bridge into ShadowFB. The
+direct glamor experiment proves that merely enabling DRI3 is insufficient.
+Enabling glamor, DRI3, or the Freedreno DDX changes the X server/KMS path itself
+and requires the full crash-evidence protocol before it can replace the stable
 ShadowFB configuration.
 
 ## Starting the takeover as `kiraly`
