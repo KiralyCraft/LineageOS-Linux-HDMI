@@ -26,6 +26,7 @@ gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
   /source/native/capture-keeper/main.c -o /output/chroot/bin/hdmi-capture-keeper
 gcc -std=gnu17 -O2 -fPIC -shared -Wall -Wextra -Werror \
   -I/source/native/common /source/native/drm-trace/drmtrace.c \
+  -ldl \
   -o /output/chroot/lib/libhdmi-los-drmtrace.so
 gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
   -I/source/native/common /source/native/drm-trace/selftest.c \

@@ -45,4 +45,9 @@ static int hdmi_los_property_cache_is_noop(const struct hdmi_los_property_cache 
   return 0;
 }
 
+static int hdmi_los_xorg_property_type_is_unsupported(uint32_t flags,
+                                                      uint32_t bitmask_flag) {
+  return (flags & bitmask_flag) != 0;
+}
+
 #endif

@@ -2,6 +2,7 @@
 
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <poll.h>
 #include <stdarg.h>
@@ -19,6 +20,18 @@
 #include "hdmi_los_trace.h"
 #include "property_cache.h"
 
+struct hdmi_los_drm_mode_property {
+  uint32_t prop_id;
+  uint32_t flags;
+  char name[DRM_PROP_NAME_LEN];
+  int count_values;
+  uint64_t *values;
+  int count_enums;
+  struct drm_mode_property_enum *enums;
+  int count_blobs;
+  uint32_t *blob_ids;
+};
+
 enum {
   kTraceTimeoutMs = 2000,
   kMaxAtomicObjects = 32,
@@ -32,7 +45,13 @@ static _Atomic uint32_t g_sequence = 1;
 static struct hdmi_los_property_cache g_connector_properties;
 static atomic_flag g_connector_properties_lock = ATOMIC_FLAG_INIT;
 static int g_suppress_connector_property_noops;
+static int g_ignore_xorg_bitmask_properties;
 static __thread int g_in_trace;
+
+typedef struct hdmi_los_drm_mode_property *(*drm_mode_get_property_fn)(int, uint32_t);
+typedef void (*drm_mode_free_property_fn)(struct hdmi_los_drm_mode_property *);
+static drm_mode_get_property_fn g_real_drm_mode_get_property;
+static drm_mode_free_property_fn g_real_drm_mode_free_property;
 
 static int wait_readable(int fd) {
   struct pollfd descriptor = {fd, POLLIN, 0};
@@ -474,11 +493,55 @@ __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   g_trace_fd = (int)parsed;
   const char *suppress = getenv("HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS");
   g_suppress_connector_property_noops = suppress && strcmp(suppress, "1") == 0;
+  const char *ignore = getenv("HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES");
+  g_ignore_xorg_bitmask_properties = ignore && strcmp(ignore, "1") == 0;
+  g_real_drm_mode_get_property =
+      (drm_mode_get_property_fn)dlsym(RTLD_NEXT, "drmModeGetProperty");
+  g_real_drm_mode_free_property =
+      (drm_mode_free_property_fn)dlsym(RTLD_NEXT, "drmModeFreeProperty");
 
   struct hdmi_los_trace_record loaded;
   initialize_record(&loaded, HDMI_LOS_TRACE_LOADED, 0, g_trace_fd, 0, "DRMTRACE_LOADED");
   snprintf(loaded.detail, sizeof(loaded.detail), "protocol=%u", HDMI_LOS_TRACE_VERSION);
   if (!exchange_record(&loaded)) _exit(125);
+}
+
+struct hdmi_los_drm_mode_property *drmModeGetProperty(int fd, uint32_t property_id) {
+  if (!g_real_drm_mode_get_property) {
+    g_real_drm_mode_get_property =
+        (drm_mode_get_property_fn)dlsym(RTLD_NEXT, "drmModeGetProperty");
+  }
+  if (!g_real_drm_mode_get_property) {
+    errno = ENOSYS;
+    return NULL;
+  }
+
+  struct hdmi_los_drm_mode_property *property =
+      g_real_drm_mode_get_property(fd, property_id);
+  if (!g_ignore_xorg_bitmask_properties || !property ||
+      !hdmi_los_xorg_property_type_is_unsupported(property->flags,
+                                                  DRM_MODE_PROP_BITMASK)) {
+    return property;
+  }
+
+  if (g_trace_fd >= 0 && !g_in_trace) {
+    g_in_trace = 1;
+    uint32_t sequence = atomic_fetch_add(&g_sequence, 1);
+    char detail[64];
+    snprintf(detail, sizeof(detail), "prop=%u flags=0x%x name=%.28s",
+             property->prop_id, property->flags, property->name);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_GETPROPERTY,
+                "IGNORED_XORG_BITMASK", property->prop_id, property->flags, 0, 0,
+                detail);
+    g_in_trace = 0;
+  }
+
+  if (!g_real_drm_mode_free_property) {
+    g_real_drm_mode_free_property =
+        (drm_mode_free_property_fn)dlsym(RTLD_NEXT, "drmModeFreeProperty");
+  }
+  if (g_real_drm_mode_free_property) g_real_drm_mode_free_property(property);
+  return NULL;
 }
 
 int ioctl(int fd, unsigned long request, ...) {

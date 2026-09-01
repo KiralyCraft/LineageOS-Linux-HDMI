@@ -27,6 +27,10 @@ static int property_cache_case(void) {
   if (!hdmi_los_property_cache_store(&cache, 79, 55, 2048) ||
       !hdmi_los_property_cache_is_noop(&cache, 79, 55, 2048) ||
       hdmi_los_property_cache_is_noop(&cache, 79, 55, 1024)) return 44;
+  if (!hdmi_los_xorg_property_type_is_unsupported(DRM_MODE_PROP_BITMASK,
+                                                   DRM_MODE_PROP_BITMASK) ||
+      hdmi_los_xorg_property_type_is_unsupported(DRM_MODE_PROP_ENUM,
+                                                 DRM_MODE_PROP_BITMASK)) return 45;
   return 0;
 }
 

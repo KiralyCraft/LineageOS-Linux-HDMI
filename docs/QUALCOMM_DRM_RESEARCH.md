@@ -62,6 +62,22 @@ unsafe RandR initialization no-ops. Each suppression emits
 `SUPPRESSED_CONNECTOR_NOOP` before returning success so a live test can prove
 that the guard, rather than the kernel driver, handled the request.
 
+That guard let Xorg proceed without resetting the phone, but Xorg then
+segfaulted after the `topology_name` property and before issuing an ioctl for
+the following `topology_control` property. Qualcomm exposes
+`topology_control` as `DRM_MODE_PROP_BITMASK`. Xorg 21.1.24 retains that
+property but creates RandR atoms only for range and enum properties; its
+property setter later dereferences `p->atoms[0]` for every retained property.
+The bitmask entry therefore has a null `atoms` pointer. Current upstream Xorg
+still has the same unchecked loop:
+
+- https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/drmmode_display.c
+
+For agent-launched Xorg only, the preload library now wraps libdrm's
+`drmModeGetProperty` and returns unsupported bitmask properties as unavailable.
+That follows the modesetting driver's existing ignore path, keeps the system
+Xorg binary unchanged, and emits `IGNORED_XORG_BITMASK` for verification.
+
 ## Sony downstream SDE
 
 The installed `msm_drm.ko` corresponds to Lineage's Sony SM8550 modules at

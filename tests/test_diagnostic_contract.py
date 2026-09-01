@@ -60,6 +60,18 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn(variable, preflight)
         self.assertIn(variable, spawn)
 
+    def test_xorg_ignores_unsupported_bitmask_properties(self):
+        tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        variable = "HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES"
+        self.assertIn('dlsym(RTLD_NEXT, "drmModeGetProperty")', tracer)
+        self.assertIn("DRM_MODE_PROP_BITMASK", tracer)
+        self.assertIn('"IGNORED_XORG_BITMASK"', tracer)
+        self.assertIn(f'setenv("{variable}", "1", 1);', agent)
+        preflight, spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)
+        self.assertNotIn(variable, preflight)
+        self.assertIn(variable, spawn)
+
 
 if __name__ == "__main__":
     unittest.main()
