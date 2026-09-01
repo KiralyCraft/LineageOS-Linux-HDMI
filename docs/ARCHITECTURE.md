@@ -14,6 +14,11 @@ lock:
 4. On release, revoke the lease, detach any lessee plane state, reset the DAL's
    cached CRTC/plane state, and resume the same `HWCDisplay` object.
 
+Lease readiness is gated by the composer-owned `HWCDisplay` power and pause
+state.  It deliberately does not use `HWDeviceDRM::active_`: that legacy DAL
+member is never maintained in this source tree and remains false even while an
+external CRTC and primary plane are actively scanning out.
+
 The composer independently revokes after 65 seconds or when its broker
 disconnects.  Unplug and secure-display entry also force release.  SurfaceFlinger
 hotplug notifications are suppressed only while this already-created external

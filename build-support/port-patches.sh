@@ -38,6 +38,12 @@ if git -C "$DISPLAY" grep -n -E \
     printf 'patch-port check failed: HDMI lease hooks must not enter vendor-facing vtables\n' >&2
     exit 1
 fi
+lease_source=$DISPLAY/sdm/libs/dal/hw_device_drm.cpp
+if sed -n '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::IsExternalDisplayLeaseConnected/p' \
+    "$lease_source" | grep -q -E '\|\|[[:space:]]*!?active_|\|\|[[:space:]]*active_'; then
+    printf 'patch-port check failed: HDMI lease lifecycle must not use the unmaintained active_ flag\n' >&2
+    exit 1
+fi
 test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
 printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
 git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"
