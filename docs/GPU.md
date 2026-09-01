@@ -40,12 +40,16 @@ does.
 | --- | --- | --- | --- |
 | Termux:X11 `:0`, interactive `kiraly` login | native Freedreno `FD740` | yes | Works |
 | Leased Xorg `:1`, default LXDE environment | Mesa llvmpipe | no | Works, but CPU-rendered |
-| Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | yes | Works |
+| Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
-over Turnip run measured approximately 504 and 467 FPS. These are diagnostic
-figures, not a general graphics benchmark.
+over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
+are misleading: root-window XWD captures showed a completely black client
+area while the surrounding LXDE desktop and window decorations remained
+visible. The same capture procedure showed colored gears with llvmpipe. Zink
+therefore proves GPU context creation and command submission here, not working
+presentation to the Xorg drawable.
 
 The exact native-Freedreno login test succeeded on Termux:X11 `:0`:
 
@@ -83,13 +87,32 @@ server level, but this screen does not provide the screen-level DRI3 interface
 needed by the KGSL loader. This is why copying the interactive-login KGSL
 override to `:1` does not reproduce Termux:X11's native Freedreno path.
 
-Zink is the narrower working solution. Setting only `GALLIUM_DRIVER=zink`
-allows a GLX client on `:1` to render through Vulkan Turnip/KGSL while keeping
-the already-tested ShadowFB scanout and DRM ioctl behavior. Do not also set
-`MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
+Setting only `GALLIUM_DRIVER=zink` makes GLX identify the renderer as Zink over
+Turnip/KGSL and execute GPU work, but it does not make the result visible on
+this ShadowFB screen. `LIBGL_KOPPER_DRI2=true` confirms the missing interface:
+Mesa reports that DRI3 is required for presentation and then fails to create a
+swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black.
+Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
-The X server's 2D rendering remains software-based in this configuration.
-OpenGL applications can nevertheless be GPU-accelerated through Zink.
+The installed Mesa comes from the custom
+[`fix/kgsl-present-wait-fence`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-present-wait-fence)
+branch. Its relevant custom commits are:
+
+```text
+91f7e8c6 freedreno/kgsl: retain merged submits through GPU command ioctl
+a3eb373e dri3: bridge native render fences to Present
+```
+
+The latter patch exports a native Freedreno render fence and attaches it as an
+X Present wait fence through Mesa's DRI3 loader and GLX/EGL DRI3 paths. That is
+the appropriate synchronization fix once Xorg exposes a working DRI3 screen,
+but the stable takeover currently initializes GLX with `DRISWRAST` and does
+not enter those DRI3 drawable and Present paths. The custom patch therefore
+cannot repair presentation in the present ShadowFB configuration.
+
+The X server's 2D rendering remains software-based. llvmpipe is currently the
+only GLX path verified to produce visible application pixels on the leased
+display.
 
 ## Reproducing the checks
 
@@ -100,7 +123,8 @@ DISPLAY=:0 glxinfo -B
 DISPLAY=:0 glxgears -info
 ```
 
-During an active leased-Xorg session, the working accelerated client path is:
+During an active leased-Xorg session, this command verifies GPU context
+creation and command execution, but its window is currently black:
 
 ```sh
 DISPLAY=:1 \
@@ -120,11 +144,13 @@ glxgears -info
 ```
 
 The current agent starts LXDE directly with `dbus-run-session`; it does not
-start an interactive login shell. Making Zink the LXDE default therefore needs
-an explicit environment setting in the agent. That change should be tested as
-a separate candidate. Enabling glamor, DRI3, or the Freedreno DDX changes the
-X server/KMS path itself and requires the full crash-evidence protocol before
-it can replace the stable ShadowFB configuration.
+start an interactive login shell. Do not make Zink the LXDE default while its
+windows fail to present. The next accelerated candidate must either expose a
+working screen-level DRI3/Present path so the custom Mesa fence bridge is used,
+or implement an explicit copy/presentation bridge into ShadowFB. Enabling
+glamor, DRI3, or the Freedreno DDX changes the X server/KMS path itself and
+requires the full crash-evidence protocol before it can replace the stable
+ShadowFB configuration.
 
 ## Starting the takeover as `kiraly`
 
