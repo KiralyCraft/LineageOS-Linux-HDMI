@@ -462,7 +462,10 @@ bool prepare_session(uint32_t probe_mode) {
   terminate_group(&g_session);
   terminate_group(&g_xorg);
   terminate_group(&g_bridge);
-  if ((mkdir(kRuntime, 0700) < 0 && errno != EEXIST) || chmod(kRuntime, 0700) != 0) {
+  passwd *user = getpwnam("kiraly");
+  if (!user) return false;
+  if ((mkdir(kRuntime, 0710) < 0 && errno != EEXIST) ||
+      chown(kRuntime, 0, user->pw_gid) != 0 || chmod(kRuntime, 0710) != 0) {
     return false;
   }
   unlink((std::string(kRuntime) + "/input.env").c_str());
@@ -511,8 +514,6 @@ bool prepare_session(uint32_t probe_mode) {
   if (cookie.empty() || run_wait({"/usr/bin/xauth", "-f", auth, "add", kDisplay,
                                   "MIT-MAGIC-COOKIE-1", cookie}) != 0) return false;
 
-  passwd *user = getpwnam("kiraly");
-  if (!user) return false;
   if (chown(auth.c_str(), user->pw_uid, user->pw_gid) != 0) return false;
   std::string user_runtime = std::string(kRuntime) + "/user-runtime";
   if ((mkdir(user_runtime.c_str(), 0700) < 0 && errno != EEXIST) ||
@@ -592,10 +593,11 @@ bool xorg_ready() {
   passwd *user = getpwnam("kiraly");
   if (!user) return false;
   std::string auth = std::string(kRuntime) + "/Xauthority";
+  std::string output = std::string(kRuntime) + "/xdpyinfo.txt";
   setenv("DISPLAY", kDisplay, 1);
   setenv("XAUTHORITY", auth.c_str(), 1);
   return run_wait({"/usr/bin/xdpyinfo", "-display", kDisplay}, user->pw_uid, user->pw_gid,
-                  "/dev/null") == 0;
+                  output.c_str()) == 0;
 }
 
 bool verify_xorg() {
