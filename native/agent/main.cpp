@@ -334,6 +334,7 @@ bool trace_preflight() {
 
   int status = 0;
   bool exited = false;
+  bool trace_open = true;
   int64_t end = monotonic_ms() + 3000;
   while (monotonic_ms() < end) {
     pid_t waited = waitpid(child, &status, WNOHANG);
@@ -342,7 +343,14 @@ bool trace_preflight() {
       break;
     }
     if (waited < 0 && errno != EINTR) break;
-    if (!relay_trace_record(50)) break;
+    // The peer can close the trace socket just before its clean process exit
+    // becomes visible to waitpid(). Stop polling a closed relay, but retain the
+    // existing bounded wait for the authoritative child status.
+    if (trace_open) {
+      trace_open = relay_trace_record(50);
+    } else {
+      usleep(10000);
+    }
   }
   // A clean child exit and the trace socket hangup can become visible in
   // either order. Reap once more after the relay loop before deciding that
