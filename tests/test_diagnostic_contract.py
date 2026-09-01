@@ -72,6 +72,18 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn(variable, preflight)
         self.assertIn(variable, spawn)
 
+    def test_composer_leases_the_crtc_fixed_primary_plane(self):
+        patch = (ROOT / "patches/qcom-display/v1/0008-sdm-lease-the-CRTC-fixed-primary-plane.patch").read_text()
+        added = "\n".join(
+            line[1:] for line in patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        self.assertIn("drmModeGetResources(dev_fd_)", patch)
+        self.assertIn("drm_resources->crtcs[i] == token_.crtc_id", patch)
+        self.assertIn("primary_index == crtc_index", patch)
+        self.assertIn("fixed-primary-plane", patch)
+        self.assertNotIn("plane->crtc_id == token_.crtc_id &&", added)
+
 
 if __name__ == "__main__":
     unittest.main()

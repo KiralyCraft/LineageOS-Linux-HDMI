@@ -78,6 +78,35 @@ For agent-launched Xorg only, the preload library now wraps libdrm's
 That follows the modesetting driver's existing ignore path, keeps the system
 Xorg binary unchanged, and emits `IGNORED_XORG_BITMASK` for verification.
 
+## Fixed primary plane required by legacy SETCRTC
+
+After filtering the bitmask property, Xorg initialized completely and reached
+its first framebuffer modeset. With atomic client capability disabled, legacy
+`MODE_SETCRTC` returned `EINVAL`. Enabling Xorg's atomic option caused it to set
+`DRM_CLIENT_CAP_ATOMIC`; its initial modeset still used legacy `SETCRTC`, but
+one cycle succeeded. Later cycles returned `EACCES` while composer logs showed
+the selected active primary-type plane changing from `112` to `118` and `115`.
+
+The exact installed kernel source has only one `EACCES` exit at that boundary:
+`drm_mode_setcrtc()` requires the lease to hold the fixed
+`crtc->primary->base.id`. Qualcomm SDE creates an array of primary planes, then
+creates CRTCs from that array in the same index order. Its custom-client path
+subsequently makes every plane compatible with every CRTC, so an active
+primary-type plane is not proof that it is that CRTC's fixed primary object.
+
+The composer patch now resolves the external CRTC's index in
+`drmModeGetResources()` and leases the primary plane at the corresponding
+index in `drmModeGetPlaneResources()`. It still rejects the transition if that
+fixed plane has been reassigned to another CRTC. This is derived from the
+driver's construction contract and does not hardcode runtime DRM object ids.
+
+The same probe exposed two independent agent readiness defects. The root-owned
+runtime directory prevented user `kiraly` from reading its Xauthority cookie,
+and the installed `xinput` does not accept a `--display` option. The runtime is
+now root:`kiraly` mode `0710`, readiness failures are retained in
+`xdpyinfo.txt`, and input verification uses inherited `DISPLAY` plus the
+configured Xorg device names.
+
 ## Sony downstream SDE
 
 The installed `msm_drm.ko` corresponds to Lineage's Sony SM8550 modules at

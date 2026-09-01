@@ -5,3 +5,4 @@
 0005-sdm-keep-HDMI-lease-hooks-out-of-vendor-vtables.patch
 0006-sdm-do-not-gate-leases-on-unused-active-flag.patch
 0007-composer-stage-lease-acquisition-outside-hotplug-lock.patch
+0008-sdm-lease-the-CRTC-fixed-primary-plane.patch

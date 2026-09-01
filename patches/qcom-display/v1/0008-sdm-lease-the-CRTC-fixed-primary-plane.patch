@@ -1,0 +1,99 @@
+From c2da993c165da95ca475a452f96c9f65f010260d Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Tue, 1 Sep 2026 22:05:00 +0300
+Subject: [PATCH] sdm: lease the CRTC fixed primary plane
+
+Legacy DRM SETCRTC validates the fixed crtc->primary object, not whichever
+primary-type SDE plane happens to be scanning out. SDE creates its fixed
+primary-plane array and CRTCs in matching order, but its custom-client path
+later makes every plane compatible with every CRTC. Selecting the active
+primary-type plane is therefore intermittent: it works only when Android
+happens to use the CRTC's fixed primary object.
+
+Resolve the CRTC's index in DRM resources and select the primary plane at the
+same index, matching SDE's object construction. Retain the later assignment
+check so the takeover fails closed if that fixed plane is currently used by a
+different CRTC.
+
+---
+ sdm/libs/dal/hw_device_drm.cpp | 42 ++++++++++++++++++++++++++++------
+ 1 file changed, 35 insertions(+), 7 deletions(-)
+
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 006b4f4..1532a0e 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -2634,27 +2634,55 @@ DisplayError HWDeviceDRM::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+     return kErrorNotSupported;
+   }
+ 
++  drmModeResPtr drm_resources = drmModeGetResources(dev_fd_);
++  if (!drm_resources) {
++    DLOGE("hdmi-los: cannot enumerate DRM resources: %s", strerror(errno));
++    return kErrorHardware;
++  }
++
++  uint32_t crtc_index = UINT32_MAX;
++  for (int i = 0; i < drm_resources->count_crtcs; ++i) {
++    if (drm_resources->crtcs[i] == token_.crtc_id) {
++      crtc_index = static_cast<uint32_t>(i);
++      break;
++    }
++  }
++  if (crtc_index >= 32) {
++    drmModeFreeResources(drm_resources);
++    DLOGE("hdmi-los: external CRTC %u has no usable DRM resource index", token_.crtc_id);
++    return kErrorResources;
++  }
++
+   drmModePlaneResPtr resources = drmModeGetPlaneResources(dev_fd_);
+   if (!resources) {
++    drmModeFreeResources(drm_resources);
+     DLOGE("hdmi-los: cannot enumerate DRM planes: %s", strerror(errno));
+     return kErrorHardware;
+   }
+ 
+   uint32_t selected = 0;
++  uint32_t primary_index = 0;
+   for (uint32_t i = 0; i < resources->count_planes; ++i) {
+     drmModePlanePtr plane = drmModeGetPlane(dev_fd_, resources->planes[i]);
+     uint64_t type = UINT64_MAX;
+-    if (plane && plane->crtc_id == token_.crtc_id &&
+-        GetDrmProperty(dev_fd_, plane->plane_id, DRM_MODE_OBJECT_PLANE, "type", nullptr, &type) &&
+-        type == DRM_PLANE_TYPE_PRIMARY) {
+-      selected = plane->plane_id;
++    const bool is_primary =
++        plane && GetDrmProperty(dev_fd_, plane->plane_id, DRM_MODE_OBJECT_PLANE, "type",
++                                nullptr, &type) &&
++        type == DRM_PLANE_TYPE_PRIMARY;
++    if (is_primary) {
++      if (primary_index == crtc_index &&
++          (plane->possible_crtcs & (1U << crtc_index)) != 0) {
++        selected = plane->plane_id;
++      }
++      ++primary_index;
+     }
+     if (plane) drmModeFreePlane(plane);
+     if (selected) break;
+   }
+   drmModeFreePlaneResources(resources);
++  drmModeFreeResources(drm_resources);
+   if (!selected) {
+-    DLOGE("hdmi-los: external CRTC %u has no active primary plane", token_.crtc_id);
++    DLOGE("hdmi-los: external CRTC %u has no fixed primary plane", token_.crtc_id);
+     return kErrorResources;
+   }
+ 
+@@ -2664,8 +2692,8 @@ DisplayError HWDeviceDRM::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+   lease->connector_id = token_.conn_id;
+   lease->crtc_id = token_.crtc_id;
+   lease->plane_id = selected;
+-  DLOGI("hdmi-los: prepared connector=%u crtc=%u primary-plane=%u",
+-        token_.conn_id, token_.crtc_id, selected);
++  DLOGI("hdmi-los: prepared connector=%u crtc=%u crtc-index=%u fixed-primary-plane=%u",
++        token_.conn_id, token_.crtc_id, crtc_index, selected);
+   return kErrorNone;
+ }
+ 
+-- 
+2.53.0

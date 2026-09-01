@@ -44,6 +44,17 @@ if sed -n '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::IsExternalDi
     printf 'patch-port check failed: HDMI lease lifecycle must not use the unmaintained active_ flag\n' >&2
     exit 1
 fi
+lease_prepare=$(sed -n \
+    '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::CreateExternalDisplayLease/p' \
+    "$lease_source")
+grep -q 'drm_resources->crtcs\[i\] == token_.crtc_id' <<<"$lease_prepare" || {
+    printf 'patch-port check failed: external CRTC resource index is not resolved\n' >&2
+    exit 1
+}
+grep -q 'primary_index == crtc_index' <<<"$lease_prepare" || {
+    printf 'patch-port check failed: lease does not use the CRTC fixed primary plane\n' >&2
+    exit 1
+}
 composer_source=$DISPLAY/composer/hwc_session.cpp
 composer_header=$DISPLAY/composer/hdmi_los_protocol.h
 for phase in PREPARE PAUSE CREATE; do

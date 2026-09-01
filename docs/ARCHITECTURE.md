@@ -4,8 +4,10 @@ The Android composer remains the DRM master.  The patch adds a private,
 root-only control endpoint inside the existing Qualcomm composer process.  For
 one connected pluggable display it performs this staged sequence:
 
-1. Identify the connector, its current CRTC, and the primary plane already
-   selected by the DAL.
+1. Identify the connector and current CRTC. Resolve the CRTC's fixed primary
+   plane by matching its DRM resource index to SDE's primary-plane construction
+   order; the primary-type plane Android currently scans out is not necessarily
+   the CRTC's `crtc->primary` object.
 2. Release the global pluggable-display handler lock. The non-Android takeover
    state defers hotplug teardown, while the per-display sequence lock pins each
    short operation without blocking a driver callback on the global lock.
