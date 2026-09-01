@@ -583,6 +583,10 @@ pid_t spawn_lxde() {
   setenv("USER", user->pw_name, 1);
   setenv("LOGNAME", user->pw_name, 1);
   setenv("DISPLAY", kDisplay, 1);
+  // Android commonly exports TMPDIR=/data/local/tmp, which is outside the
+  // chroot. GTK/gdk-pixbuf otherwise loses icons when its temporary decoder
+  // files are directed at that nonexistent path.
+  setenv("TMPDIR", "/tmp", 1);
   setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   setenv("XDG_RUNTIME_DIR", (std::string(kRuntime) + "/user-runtime").c_str(), 1);
   execl("/usr/bin/dbus-run-session", "/usr/bin/dbus-run-session", "--",

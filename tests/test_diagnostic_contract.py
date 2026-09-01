@@ -35,6 +35,12 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("CAPTURE=none", runner)
         self.assertIn("workstation-powered capture", runner)
 
+    def test_lxde_uses_a_chroot_local_temp_directory(self):
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        spawn = agent.split("pid_t spawn_lxde()", 1)[1]
+        spawn = spawn.split("bool xorg_ready()", 1)[0]
+        self.assertIn('setenv("TMPDIR", "/tmp", 1);', spawn)
+
     def test_tracer_is_packaged_from_chroot_lib(self):
         package = (ROOT / "build-support/package.sh").read_text()
         build = (ROOT / "build-support/build-native.sh").read_text()
