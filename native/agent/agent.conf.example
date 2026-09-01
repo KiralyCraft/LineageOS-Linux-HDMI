@@ -1,5 +1,7 @@
-# run-agent.sh defaults to auto-detecting the MacroSilicon 534d:2109 capture card.
-# Disable capture explicitly when using a normal monitor:
-#   sudo ./run-agent.sh --capture none
+# run-agent.sh defaults to no phone-side capture. Power and capture the HDMI
+# card from the workstation, then run:
+#   sudo ./run-agent.sh
+# Legacy phone-side auto-detection is explicit and diagnostic-only:
+#   sudo ./run-agent.sh --capture auto
 # Or select a particular node:
 #   sudo ./run-agent.sh --capture /dev/video2

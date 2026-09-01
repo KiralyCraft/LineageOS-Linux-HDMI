@@ -27,6 +27,13 @@ until [ "$(getprop sys.boot_completed)" = 1 ]; do
   sleep 2
 done
 
+if [ -f "$MODDIR/diagnostic-only" ]; then
+  printf '[%s] vendor.display.disable_hw_recovery_dump=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      "$(getprop vendor.display.disable_hw_recovery_dump)" \
+      >>"$LOGDIR/diagnostic.log"
+fi
+
 apk_hash="$(sha256sum "$MODDIR/apk/HdmiLosTile.apk" | awk '{print $1}')"
 installed_hash="$(cat "$STATE/tile.sha256" 2>/dev/null)"
 if [ "$apk_hash" != "$installed_hash" ] || ! pm path dev.kiraly.hdmilos >/dev/null 2>&1; then

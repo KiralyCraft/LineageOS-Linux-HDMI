@@ -47,6 +47,16 @@ performs prepare, pause, and lease creation as separately acknowledged phases,
 refreshes SurfaceFlinger after pause as the stock display-status path does, and
 durably records every boundary before entering composer or Xorg code.
 
+The first 0.2.4 Xorg start still reset the whole phone after the lease was
+successfully delivered. Its Xorg log and lock file remained zero-length, and
+the OTG dock lost power with the phone. Release `0.2.5-diagnostic.1` therefore
+does not permit normal tile activation. It separates an unused three-second
+lease hold from two root-only, synchronously traced Xorg starts. Every DRM
+ioctl is durably acknowledged by the Android broker before it enters the
+kernel. The capture card must be powered by the workstation, not the phone.
+The upstream and downstream comparison is recorded in
+[`docs/QUALCOMM_DRM_RESEARCH.md`](docs/QUALCOMM_DRM_RESEARCH.md).
+
 Runtime escape paths are:
 
 - Hold Volume Up and Volume Down together for three seconds.
@@ -79,10 +89,22 @@ make verify BASE_COMMIT=<full-verified-build-commit>
 The repackage command refuses changes outside an explicit packaging/deployment
 allowlist and records separate package-source and binary-source commits.
 
+For native/agent diagnostics, reuse only a verified composer while rebuilding
+the broker, tracer, chroot tools, and signed tile:
+
+```sh
+make reuse-composer BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
+make verify BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
+```
+
+This mode refuses any change to the profile, Qualcomm patch series, or
+composer build inputs. Build-info schema 3 records the repository commit of
+every individual artifact.
+
 Artifacts are copied into `dist/`. The local machine only stores source,
 patches, profiles, signing material, and returned artifacts.
 
-The output consists of the Magisk ZIP, a chroot agent bundle, signed-APK
+The output consists of the Magisk ZIP, a chroot agent/tracer bundle, signed-APK
 certificate details, a provenance manifest, and `SHA256SUMS`. No boot or vendor
 partition image is built or flashed.
 
@@ -116,6 +138,8 @@ thunks and the derived-vtable shifting that caused the 0.1 boot failure.
 
 ## Manual activation outline
 
-The exact manual test checklist is in `docs/MANUAL_TEST.md`. In short: install
-the ZIP in Magisk, reboot, start the chroot agent, accept Android mirroring,
-add the `HDMI Xorg` Quick Settings tile, and tap it. No takeover starts at boot.
+The exact staged checklist is in `docs/MANUAL_TEST.md`. Install the matching
+ZIP and chroot bundle, establish ten minutes of workstation-powered Android
+mirroring, run three root-only lease holds, and only then start one traced Xorg
+probe. The diagnostic tile cannot start a takeover, and no takeover starts at
+boot.

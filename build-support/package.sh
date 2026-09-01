@@ -6,14 +6,17 @@ BUILD=${2:?build}
 OUTPUT=${3:?output}
 PROFILE=${4:?profile}
 COMMIT=${5:?commit}
-BINARY_COMMIT=${6:-$COMMIT}
+COMPOSER_COMMIT=${6:-$COMMIT}
+NATIVE_COMMIT=${7:-$COMMIT}
+TILE_COMMIT=${8:-$COMMIT}
+BUILD_MODE=${9:-full}
 STAGE=$BUILD/package
 MODULE=$STAGE/module
 CHROOT=$STAGE/chroot
 
 rm -rf -- "$STAGE" "$OUTPUT"
 mkdir -p "$MODULE/bin" "$MODULE/apk" "$MODULE/vendor/bin/hw" "$MODULE/vendor/lib64" \
-    "$MODULE/docs" "$CHROOT/bin" "$CHROOT/config" "$OUTPUT"
+    "$MODULE/docs" "$CHROOT/bin" "$CHROOT/lib" "$CHROOT/config" "$OUTPUT"
 cp -a "$SOURCE/module/." "$MODULE/"
 python "$SOURCE/build-support/render-module.py" "$SOURCE/profiles/$PROFILE.json" "$MODULE"
 cp "$BUILD/native/android/hdmi-losd" "$MODULE/bin/"
@@ -36,13 +39,15 @@ done
 
 python "$SOURCE/build-support/write-build-info.py" \
     "$SOURCE" "$BUILD" "$PROFILE" "$COMMIT" "$MODULE/build-info.json" \
-    "$BINARY_COMMIT"
+    "$COMPOSER_COMMIT" "$NATIVE_COMMIT" "$TILE_COMMIT" "$BUILD_MODE"
 
-cp "$BUILD/native/chroot/"* "$CHROOT/bin/"
+cp "$BUILD/native/chroot/bin/"* "$CHROOT/bin/"
+cp "$BUILD/native/chroot/lib/"* "$CHROOT/lib/"
 cp "$SOURCE/native/agent/run-agent.sh" "$CHROOT/"
 cp "$SOURCE/native/agent/agent.conf.example" "$CHROOT/config/"
 cp "$MODULE/build-info.json" "$CHROOT/"
 chmod 0755 "$CHROOT/bin/"* "$CHROOT/run-agent.sh"
+chmod 0644 "$CHROOT/lib/"*.so
 
 module_zip=$OUTPUT/hdmi-los-$PROFILE-magisk.zip
 chroot_tar=$OUTPUT/hdmi-los-$PROFILE-chroot.tar.gz

@@ -4,7 +4,12 @@
 #include <stdint.h>
 
 #define HDMI_LOS_MAGIC 0x48444d49u
+// The patched composer in the verified v0.2.4 base build speaks version 1.
+// Broker clients and the chroot agent use version 2 for diagnostic probes and
+// synchronous DRM trace progress records. Keep these versions separate so a
+// composer-only reuse build cannot silently create a wire incompatibility.
 #define HDMI_LOS_VERSION 1u
+#define HDMI_LOS_BROKER_VERSION 2u
 #define HDMI_LOS_MESSAGE_SIZE 160u
 #define HDMI_LOS_COMPOSER_SOCKET "hdmi-los-composer-v1"
 #define HDMI_LOS_BROKER_SOCKET "hdmi-los-broker-v1"
@@ -15,13 +20,23 @@ enum hdmi_los_opcode {
   HDMI_LOS_OP_RELEASE = 3,
   HDMI_LOS_OP_PING = 4,
   HDMI_LOS_OP_TOGGLE = 5,
+  HDMI_LOS_OP_PROBE = 6,
   HDMI_LOS_OP_AGENT_REGISTER = 16,
   HDMI_LOS_OP_AGENT_PREPARE = 17,
   HDMI_LOS_OP_AGENT_START = 18,
   HDMI_LOS_OP_AGENT_STOP = 19,
   HDMI_LOS_OP_AGENT_READY = 20,
   HDMI_LOS_OP_AGENT_FAILED = 21,
+  HDMI_LOS_OP_AGENT_PROGRESS = 22,
+  HDMI_LOS_OP_AGENT_PROGRESS_ACK = 23,
   HDMI_LOS_OP_RESPONSE = 0x8000
+};
+
+enum hdmi_los_probe_mode {
+  HDMI_LOS_PROBE_NONE = 0,
+  HDMI_LOS_PROBE_LEASE_HOLD = 1,
+  HDMI_LOS_PROBE_XORG_LEGACY = 2,
+  HDMI_LOS_PROBE_XORG_ATOMIC = 3
 };
 
 enum hdmi_los_acquire_phase {
@@ -39,7 +54,8 @@ enum hdmi_los_state {
   HDMI_LOS_STATE_UNAVAILABLE = 4,
   HDMI_LOS_STATE_ERROR = 5,
   HDMI_LOS_STATE_AGENT_READY = 6,
-  HDMI_LOS_STATE_STARTING_X = 7
+  HDMI_LOS_STATE_STARTING_X = 7,
+  HDMI_LOS_STATE_PROBING = 8
 };
 
 enum hdmi_los_status {

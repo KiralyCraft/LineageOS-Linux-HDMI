@@ -45,6 +45,10 @@ public final class HdmiTileService extends TileService {
                 tile.setState(Tile.STATE_ACTIVE);
                 subtitle = "Starting Xorg";
             }
+            case BrokerClient.STATE_PROBING -> {
+                tile.setState(Tile.STATE_UNAVAILABLE);
+                subtitle = "Root diagnostic running";
+            }
             case BrokerClient.STATE_RESTORING -> {
                 tile.setState(Tile.STATE_INACTIVE);
                 subtitle = "Restoring Android";
@@ -68,4 +72,3 @@ public final class HdmiTileService extends TileService {
         tile.updateTile();
     }
 }
-

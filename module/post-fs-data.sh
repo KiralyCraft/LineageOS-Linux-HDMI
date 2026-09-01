@@ -41,6 +41,17 @@ check_prop ro.build.id "$EXPECTED_BUILD_ID"
 check_prop ro.build.version.sdk "$EXPECTED_SDK"
 check_prop ro.build.version.security_patch "$EXPECTED_SECURITY_PATCH"
 
+if [ -f "$MODDIR/diagnostic-only" ]; then
+  command -v resetprop >/dev/null 2>&1 ||
+    fail_closed 'diagnostic build requires Magisk resetprop'
+  resetprop -n vendor.display.disable_hw_recovery_dump 0 ||
+    fail_closed 'could not enable diagnostic display recovery dumps'
+  diagnostic_dump="$(getprop vendor.display.disable_hw_recovery_dump)"
+  [ "$diagnostic_dump" = 0 ] ||
+    fail_closed "display recovery dump property remained '$diagnostic_dump'"
+  printf 'PASS: diagnostic display recovery dumps requested before composer start\n'
+fi
+
 # post-fs-data normally runs before class hal.  Refuse to replace executable
 # mappings if this ROM has started composer unusually early.
 if pidof vendor.qti.hardware.display.composer-service >/dev/null 2>&1; then

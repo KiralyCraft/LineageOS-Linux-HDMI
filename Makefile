@@ -4,12 +4,13 @@ SHELL := /usr/bin/env bash
 PROFILE ?= current-install
 SERVER ?= root@192.168.104.201
 
-.PHONY: help test zip repackage verify profile port server-preflight clean-remote
+.PHONY: help test zip repackage reuse-composer verify profile port server-preflight clean-remote
 
 help:
 	@printf '%s\n' \
 	  'make zip [PROFILE=current-install]  build and package exclusively on $(SERVER)' \
 	  'make repackage BASE_COMMIT=<sha>      reuse a verified prior binary build' \
+	  'make reuse-composer BASE_COMMIT=<sha> reuse composer; rebuild native and tile' \
 	  'make test                           run source-level regression tests' \
 	  'make verify                         verify fetched artifacts offline' \
 	  'make profile PROFILE=name            capture a future installed build profile' \
@@ -23,10 +24,16 @@ zip:
 repackage:
 	@./scripts/remote-build.sh repackage '$(PROFILE)' '$(SERVER)' '$(BASE_COMMIT)'
 
+reuse-composer:
+	@./scripts/remote-build.sh reuse-composer '$(PROFILE)' '$(SERVER)' '$(BASE_COMMIT)'
+
 test:
 	@python3 -m unittest discover -s tests -p 'test_*.py'
 	@bash tests/test-mount-utils.sh
-	@for script in module/*.sh; do bash -n "$$script"; done
+	@bash tests/test-native.sh
+	@for script in module/*.sh native/agent/*.sh scripts/*.sh build-support/*.sh; do \
+		bash -n "$$script"; \
+	done
 
 verify:
 	@./scripts/verify-dist.sh '$(PROFILE)' '$(BASE_COMMIT)'

@@ -20,9 +20,10 @@ final class BrokerClient {
     static final int STATE_ERROR = 5;
     static final int STATE_AGENT_READY = 6;
     static final int STATE_STARTING_X = 7;
+    static final int STATE_PROBING = 8;
 
     private static final int MAGIC = 0x48444d49;
-    private static final short VERSION = 1;
+    private static final short VERSION = 2;
     private static final short OP_STATUS = 1;
     private static final short OP_TOGGLE = 5;
     private static final int MESSAGE_SIZE = 160;

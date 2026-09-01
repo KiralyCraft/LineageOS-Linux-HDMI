@@ -1,0 +1,412 @@
+#define _GNU_SOURCE
+
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
+#include <errno.h>
+#include <poll.h>
+#include <stdarg.h>
+#include <stdatomic.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/syscall.h>
+#include <sys/uio.h>
+#include <unistd.h>
+
+#include "hdmi_los_trace.h"
+
+enum {
+  kTraceTimeoutMs = 2000,
+  kMaxAtomicObjects = 32,
+  kMaxAtomicProperties = 128,
+  kMaxCrtcConnectors = 16,
+};
+
+static int g_trace_fd = -1;
+static _Atomic uint32_t g_sequence = 1;
+static __thread int g_in_trace;
+
+static int wait_readable(int fd) {
+  struct pollfd descriptor = {fd, POLLIN, 0};
+  for (;;) {
+    int result = poll(&descriptor, 1, kTraceTimeoutMs);
+    if (result < 0 && errno == EINTR) continue;
+    return result > 0 && (descriptor.revents & POLLIN) != 0;
+  }
+}
+
+static int exchange_record(const struct hdmi_los_trace_record *record) {
+  struct hdmi_los_trace_record ack = {0};
+  ssize_t sent;
+  do {
+    sent = send(g_trace_fd, record, sizeof(*record), MSG_NOSIGNAL);
+  } while (sent < 0 && errno == EINTR);
+  if (sent != (ssize_t)sizeof(*record) || !wait_readable(g_trace_fd)) return 0;
+  ssize_t received;
+  do {
+    received = recv(g_trace_fd, &ack, sizeof(ack), MSG_WAITALL);
+  } while (received < 0 && errno == EINTR);
+  return received == (ssize_t)sizeof(ack) && ack.magic == HDMI_LOS_TRACE_MAGIC &&
+         ack.version == HDMI_LOS_TRACE_VERSION && ack.phase == HDMI_LOS_TRACE_ACK &&
+         ack.sequence == record->sequence;
+}
+
+static void initialize_record(struct hdmi_los_trace_record *record, uint16_t phase,
+                              uint32_t sequence, int fd, unsigned long request,
+                              const char *name) {
+  memset(record, 0, sizeof(*record));
+  record->magic = HDMI_LOS_TRACE_MAGIC;
+  record->version = HDMI_LOS_TRACE_VERSION;
+  record->phase = phase;
+  record->sequence = sequence;
+  record->pid = (int32_t)getpid();
+  record->tid = (int32_t)syscall(SYS_gettid);
+  record->fd = fd;
+  record->request = request;
+  if (name) snprintf(record->name, sizeof(record->name), "%s", name);
+}
+
+static int safe_copy(void *destination, uint64_t source, size_t size) {
+  if (!source || !destination || !size) return 0;
+  struct iovec local = {destination, size};
+  struct iovec remote = {(void *)(uintptr_t)source, size};
+  ssize_t result = syscall(SYS_process_vm_readv, getpid(), &local, 1, &remote, 1, 0);
+  return result == (ssize_t)size;
+}
+
+static const char *request_name(unsigned long request) {
+  switch (request) {
+    case DRM_IOCTL_GET_CAP: return "GET_CAP";
+    case DRM_IOCTL_SET_CLIENT_CAP: return "SET_CLIENT_CAP";
+    case DRM_IOCTL_MODE_GETRESOURCES: return "MODE_GETRESOURCES";
+    case DRM_IOCTL_MODE_GETCRTC: return "MODE_GETCRTC";
+    case DRM_IOCTL_MODE_SETCRTC: return "MODE_SETCRTC";
+    case DRM_IOCTL_MODE_CURSOR: return "MODE_CURSOR";
+    case DRM_IOCTL_MODE_GETCONNECTOR: return "MODE_GETCONNECTOR";
+    case DRM_IOCTL_MODE_GETPROPERTY: return "MODE_GETPROPERTY";
+    case DRM_IOCTL_MODE_ADDFB: return "MODE_ADDFB";
+    case DRM_IOCTL_MODE_RMFB: return "MODE_RMFB";
+    case DRM_IOCTL_MODE_PAGE_FLIP: return "MODE_PAGE_FLIP";
+    case DRM_IOCTL_MODE_CREATE_DUMB: return "MODE_CREATE_DUMB";
+    case DRM_IOCTL_MODE_MAP_DUMB: return "MODE_MAP_DUMB";
+    case DRM_IOCTL_MODE_DESTROY_DUMB: return "MODE_DESTROY_DUMB";
+    case DRM_IOCTL_MODE_GETPLANERESOURCES: return "MODE_GETPLANERESOURCES";
+    case DRM_IOCTL_MODE_GETPLANE: return "MODE_GETPLANE";
+    case DRM_IOCTL_MODE_ADDFB2: return "MODE_ADDFB2";
+    case DRM_IOCTL_MODE_OBJ_GETPROPERTIES: return "MODE_OBJ_GETPROPERTIES";
+    case DRM_IOCTL_MODE_CURSOR2: return "MODE_CURSOR2";
+    case DRM_IOCTL_MODE_ATOMIC: return "MODE_ATOMIC";
+    case DRM_IOCTL_MODE_CREATEPROPBLOB: return "MODE_CREATEPROPBLOB";
+    case DRM_IOCTL_MODE_DESTROYPROPBLOB: return "MODE_DESTROYPROPBLOB";
+    default: return "DRM_IOCTL";
+  }
+}
+
+static void decode_record(struct hdmi_los_trace_record *record, const void *argument) {
+  uint64_t address = (uint64_t)(uintptr_t)argument;
+  if (!address) {
+    snprintf(record->detail, sizeof(record->detail), "arg=null");
+    return;
+  }
+
+  if (record->request == DRM_IOCTL_GET_CAP) {
+    struct drm_get_cap value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.capability;
+      record->argument[1] = value.value;
+      snprintf(record->detail, sizeof(record->detail), "cap=%llu value=%llu",
+               (unsigned long long)value.capability, (unsigned long long)value.value);
+    }
+  } else if (record->request == DRM_IOCTL_SET_CLIENT_CAP) {
+    struct drm_set_client_cap value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.capability;
+      record->argument[1] = value.value;
+      snprintf(record->detail, sizeof(record->detail), "cap=%llu value=%llu",
+               (unsigned long long)value.capability, (unsigned long long)value.value);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETRESOURCES) {
+    struct drm_mode_card_res value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      snprintf(record->detail, sizeof(record->detail), "fb=%u crtc=%u conn=%u enc=%u",
+               value.count_fbs, value.count_crtcs, value.count_connectors,
+               value.count_encoders);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETCONNECTOR) {
+    struct drm_mode_get_connector value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.connector_id;
+      snprintf(record->detail, sizeof(record->detail), "id=%u modes=%u props=%u enc=%u status=%u",
+               value.connector_id, value.count_modes, value.count_props,
+               value.count_encoders, value.connection);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETCRTC ||
+             record->request == DRM_IOCTL_MODE_SETCRTC) {
+    struct drm_mode_crtc value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.crtc_id;
+      record->argument[1] = value.fb_id;
+      record->argument[2] = value.count_connectors;
+      record->argument[3] = value.mode_valid;
+      snprintf(record->detail, sizeof(record->detail), "crtc=%u fb=%u xy=%u,%u conns=%u mode=%u",
+               value.crtc_id, value.fb_id, value.x, value.y, value.count_connectors,
+               value.mode_valid);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETPLANERESOURCES) {
+    struct drm_mode_get_plane_res value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      snprintf(record->detail, sizeof(record->detail), "planes=%u", value.count_planes);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETPLANE) {
+    struct drm_mode_get_plane value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.plane_id;
+      record->argument[1] = value.crtc_id;
+      record->argument[2] = value.fb_id;
+      snprintf(record->detail, sizeof(record->detail), "plane=%u crtc=%u fb=%u mask=0x%x fmts=%u",
+               value.plane_id, value.crtc_id, value.fb_id, value.possible_crtcs,
+               value.count_format_types);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_OBJ_GETPROPERTIES) {
+    struct drm_mode_obj_get_properties value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.obj_id;
+      record->argument[1] = value.obj_type;
+      record->argument[2] = value.count_props;
+      snprintf(record->detail, sizeof(record->detail), "obj=%u type=0x%x props=%u",
+               value.obj_id, value.obj_type, value.count_props);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_GETPROPERTY) {
+    struct drm_mode_get_property value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.prop_id;
+      snprintf(record->detail, sizeof(record->detail), "prop=%u flags=0x%x values=%u enums=%u name=%.20s",
+               value.prop_id, value.flags, value.count_values, value.count_enum_blobs,
+               value.name);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_CREATE_DUMB) {
+    struct drm_mode_create_dumb value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.handle;
+      record->argument[1] = value.size;
+      snprintf(record->detail, sizeof(record->detail), "w=%u h=%u bpp=%u handle=%u pitch=%u size=%llu",
+               value.width, value.height, value.bpp, value.handle, value.pitch,
+               (unsigned long long)value.size);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_MAP_DUMB) {
+    struct drm_mode_map_dumb value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      snprintf(record->detail, sizeof(record->detail), "handle=%u offset=%llu", value.handle,
+               (unsigned long long)value.offset);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_DESTROY_DUMB) {
+    struct drm_mode_destroy_dumb value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      snprintf(record->detail, sizeof(record->detail), "handle=%u", value.handle);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_ADDFB) {
+    struct drm_mode_fb_cmd value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.fb_id;
+      record->argument[1] = value.handle;
+      snprintf(record->detail, sizeof(record->detail), "fb=%u w=%u h=%u pitch=%u bpp=%u depth=%u handle=%u",
+               value.fb_id, value.width, value.height, value.pitch, value.bpp, value.depth,
+               value.handle);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_ADDFB2) {
+    struct drm_mode_fb_cmd2 value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.fb_id;
+      record->argument[1] = value.handles[0];
+      snprintf(record->detail, sizeof(record->detail), "fb=%u w=%u h=%u fmt=0x%x flags=0x%x h0=%u p0=%u",
+               value.fb_id, value.width, value.height, value.pixel_format, value.flags,
+               value.handles[0], value.pitches[0]);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_RMFB) {
+    uint32_t value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value;
+      snprintf(record->detail, sizeof(record->detail), "fb=%u", value);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_CURSOR ||
+             record->request == DRM_IOCTL_MODE_CURSOR2) {
+    struct drm_mode_cursor2 value = {0};
+    size_t size = record->request == DRM_IOCTL_MODE_CURSOR ?
+        sizeof(struct drm_mode_cursor) : sizeof(value);
+    if (safe_copy(&value, address, size)) {
+      record->argument[0] = value.crtc_id;
+      record->argument[1] = value.handle;
+      snprintf(record->detail, sizeof(record->detail), "crtc=%u flags=0x%x handle=%u wh=%ux%u xy=%d,%d",
+               value.crtc_id, value.flags, value.handle, value.width, value.height,
+               value.x, value.y);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_PAGE_FLIP) {
+    struct drm_mode_crtc_page_flip value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.crtc_id;
+      record->argument[1] = value.fb_id;
+      record->argument[2] = value.flags;
+      snprintf(record->detail, sizeof(record->detail), "crtc=%u fb=%u flags=0x%x",
+               value.crtc_id, value.fb_id, value.flags);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_ATOMIC) {
+    struct drm_mode_atomic value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.flags;
+      record->argument[1] = value.count_objs;
+      snprintf(record->detail, sizeof(record->detail), "flags=0x%x objs=%u userdata=%llu",
+               value.flags, value.count_objs, (unsigned long long)value.user_data);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_CREATEPROPBLOB) {
+    struct drm_mode_create_blob value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.blob_id;
+      record->argument[1] = value.length;
+      snprintf(record->detail, sizeof(record->detail), "blob=%u length=%u",
+               value.blob_id, value.length);
+    }
+  } else if (record->request == DRM_IOCTL_MODE_DESTROYPROPBLOB) {
+    struct drm_mode_destroy_blob value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.blob_id;
+      snprintf(record->detail, sizeof(record->detail), "blob=%u", value.blob_id);
+    }
+  } else {
+    snprintf(record->detail, sizeof(record->detail), "arg=0x%llx",
+             (unsigned long long)address);
+  }
+}
+
+static void emit_detail(uint32_t sequence, int fd, unsigned long request, const char *name,
+                        uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
+                        const char *detail) {
+  struct hdmi_los_trace_record record;
+  initialize_record(&record, HDMI_LOS_TRACE_DETAIL, sequence, fd, request, name);
+  record.argument[0] = a0;
+  record.argument[1] = a1;
+  record.argument[2] = a2;
+  record.argument[3] = a3;
+  if (detail) snprintf(record.detail, sizeof(record.detail), "%s", detail);
+  if (!exchange_record(&record)) _exit(125);
+}
+
+static void emit_setcrtc_details(uint32_t sequence, int fd, unsigned long request,
+                                 const void *argument) {
+  struct drm_mode_crtc value;
+  if (!safe_copy(&value, (uint64_t)(uintptr_t)argument, sizeof(value)) ||
+      value.count_connectors == 0 || value.count_connectors > kMaxCrtcConnectors) return;
+  uint32_t connectors[kMaxCrtcConnectors];
+  size_t bytes = (size_t)value.count_connectors * sizeof(connectors[0]);
+  if (!safe_copy(connectors, value.set_connectors_ptr, bytes)) return;
+  for (uint32_t index = 0; index < value.count_connectors; ++index) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "index=%u connector=%u", index, connectors[index]);
+    emit_detail(sequence, fd, request, "SETCRTC_CONNECTOR", value.crtc_id, index,
+                connectors[index], 0, detail);
+  }
+}
+
+static void emit_atomic_details(uint32_t sequence, int fd, unsigned long request,
+                                const void *argument) {
+  struct drm_mode_atomic value;
+  if (!safe_copy(&value, (uint64_t)(uintptr_t)argument, sizeof(value)) ||
+      value.count_objs == 0) return;
+  if (value.count_objs > kMaxAtomicObjects) {
+    emit_detail(sequence, fd, request, "ATOMIC_TRUNCATED", value.count_objs, 0, 0, 0,
+                "object count exceeds trace bound");
+    return;
+  }
+
+  uint32_t objects[kMaxAtomicObjects];
+  uint32_t counts[kMaxAtomicObjects];
+  size_t object_bytes = (size_t)value.count_objs * sizeof(objects[0]);
+  if (!safe_copy(objects, value.objs_ptr, object_bytes) ||
+      !safe_copy(counts, value.count_props_ptr, object_bytes)) return;
+
+  uint32_t total = 0;
+  for (uint32_t index = 0; index < value.count_objs; ++index) {
+    if (counts[index] > kMaxAtomicProperties - total) {
+      emit_detail(sequence, fd, request, "ATOMIC_TRUNCATED", value.count_objs,
+                  total, counts[index], index, "property count exceeds trace bound");
+      return;
+    }
+    total += counts[index];
+  }
+
+  uint32_t properties[kMaxAtomicProperties];
+  uint64_t property_values[kMaxAtomicProperties];
+  if (total > 0 &&
+      (!safe_copy(properties, value.props_ptr, (size_t)total * sizeof(properties[0])) ||
+       !safe_copy(property_values, value.prop_values_ptr,
+                  (size_t)total * sizeof(property_values[0])))) return;
+
+  uint32_t property_index = 0;
+  for (uint32_t object_index = 0; object_index < value.count_objs; ++object_index) {
+    for (uint32_t local_index = 0; local_index < counts[object_index];
+         ++local_index, ++property_index) {
+      char detail[64];
+      snprintf(detail, sizeof(detail), "obj=%u prop=%u value=%llu", objects[object_index],
+               properties[property_index], (unsigned long long)property_values[property_index]);
+      emit_detail(sequence, fd, request, "ATOMIC_PROPERTY", objects[object_index],
+                  properties[property_index], property_values[property_index], local_index,
+                  detail);
+    }
+  }
+}
+
+__attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
+  const char *descriptor = getenv("HDMI_LOS_TRACE_FD");
+  if (!descriptor || !*descriptor) return;
+  char *end = NULL;
+  errno = 0;
+  long parsed = strtol(descriptor, &end, 10);
+  if (errno != 0 || !end || *end != '\0' || parsed < 0 || parsed > INT32_MAX) _exit(125);
+  g_trace_fd = (int)parsed;
+
+  struct hdmi_los_trace_record loaded;
+  initialize_record(&loaded, HDMI_LOS_TRACE_LOADED, 0, g_trace_fd, 0, "DRMTRACE_LOADED");
+  snprintf(loaded.detail, sizeof(loaded.detail), "protocol=%u", HDMI_LOS_TRACE_VERSION);
+  if (!exchange_record(&loaded)) _exit(125);
+}
+
+int ioctl(int fd, unsigned long request, ...) {
+  va_list arguments;
+  va_start(arguments, request);
+  void *argument = va_arg(arguments, void *);
+  va_end(arguments);
+
+  if (g_trace_fd < 0 || g_in_trace || _IOC_TYPE(request) != DRM_IOCTL_BASE) {
+    return (int)syscall(SYS_ioctl, fd, request, argument);
+  }
+
+  g_in_trace = 1;
+  uint32_t sequence = atomic_fetch_add(&g_sequence, 1);
+  struct hdmi_los_trace_record before;
+  initialize_record(&before, HDMI_LOS_TRACE_BEFORE, sequence, fd, request,
+                    request_name(request));
+  decode_record(&before, argument);
+  if (!exchange_record(&before)) _exit(125);
+  if (request == DRM_IOCTL_MODE_SETCRTC) {
+    emit_setcrtc_details(sequence, fd, request, argument);
+  } else if (request == DRM_IOCTL_MODE_ATOMIC) {
+    emit_atomic_details(sequence, fd, request, argument);
+  }
+
+  errno = 0;
+  long result = syscall(SYS_ioctl, fd, request, argument);
+  int saved_errno = errno;
+
+  struct hdmi_los_trace_record after;
+  initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
+                    request_name(request));
+  after.result = result;
+  after.error = result < 0 ? saved_errno : 0;
+  decode_record(&after, argument);
+  if (!exchange_record(&after)) _exit(125);
+  g_in_trace = 0;
+  errno = saved_errno;
+  return (int)result;
+}

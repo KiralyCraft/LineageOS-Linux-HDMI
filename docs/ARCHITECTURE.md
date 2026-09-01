@@ -23,6 +23,23 @@ Composer rolls back a prepared or paused partial transition when the broker
 disconnects or a phase fails; its independent 65-second deadline begins with
 the first preparation phase.
 
+Broker protocol version 2 adds root-only diagnostic probes. The independently
+versioned composer socket remains at version 1 so the exact verified 0.2.4
+composer can be reused. `lease-hold` stops after receiving the lease and closes
+it three seconds later without starting the chroot agent. `xorg-legacy` and
+`xorg-atomic` pass the same leased objects to Xorg with explicit legacy/atomic
+configuration. The diagnostic module rejects normal tile starts, and its
+version-2 broker rejects the older untraced agent.
+
+Diagnostic Xorg loads `libhdmi-los-drmtrace.so`. Before every DRM ioctl, the
+library sends a structured record through the agent to the Android broker.
+The broker appends and `fdatasync`s that record before acknowledging both hops;
+the ioctl is not issued without that acknowledgement. Atomic object/property
+tuples and legacy CRTC connector ids are recorded separately. Xorg is first
+executed with `-version` and the same preload before composer is paused, so a
+setuid or suppressed-preload configuration fails closed without touching the
+external display.
+
 Lease readiness is gated by the composer-owned `HWCDisplay` power and pause
 state.  It deliberately does not use `HWDeviceDRM::active_`: that legacy DAL
 member is never maintained in this source tree and remains false even while an
@@ -48,6 +65,11 @@ The Magisk module has `skip_mount`; it never unconditionally overlays `/vendor`.
 At `post-fs-data` it compares five build properties and SHA-256 hashes of all
 three untouched files.  Only a complete match permits early bind mounts.  The
 runtime broker also requires the gate marker.
+
+The diagnostic release uses Magisk `resetprop` before composer startup to
+request Qualcomm display hardware-recovery dumps. The broker refuses probes if
+that property is no longer `0`. This override is diagnostic-only and does not
+modify a partition or persist after the module is disabled.
 
 The chroot agent creates two stable uinput devices for Xorg and hot-grabs only
 the configured Bluetooth mouse and keyboard.  The Android broker separately

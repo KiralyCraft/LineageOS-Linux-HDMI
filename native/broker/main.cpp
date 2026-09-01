@@ -15,6 +15,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#if defined(__ANDROID__)
+#include <sys/system_properties.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 
@@ -32,6 +35,7 @@ constexpr int kAgentPrepareMs = 5000;
 constexpr int kAgentStartMs = 15000;
 constexpr int kAgentStopMs = 2000;
 constexpr int kComposerRequestSeconds = 10;
+constexpr int kLeaseHoldMs = 3000;
 constexpr const char *kModuleDir = "/data/adb/modules/hdmi-los";
 
 std::atomic<bool> g_stop(false);
@@ -107,7 +111,7 @@ int listen_abstract(const char *name) {
 hdmi_los_message make_message(uint16_t opcode) {
   hdmi_los_message message = {};
   message.magic = HDMI_LOS_MAGIC;
-  message.version = HDMI_LOS_VERSION;
+  message.version = HDMI_LOS_BROKER_VERSION;
   message.opcode = opcode;
   message.request_id = g_request_id++;
   return message;
@@ -191,6 +195,11 @@ bool recv_with_fd(int fd, hdmi_los_message *message, int *passed_fd) {
 }
 
 bool valid_message(const hdmi_los_message &message) {
+  return message.magic == HDMI_LOS_MAGIC &&
+         message.version == HDMI_LOS_BROKER_VERSION;
+}
+
+bool valid_composer_message(const hdmi_los_message &message) {
   return message.magic == HDMI_LOS_MAGIC && message.version == HDMI_LOS_VERSION;
 }
 
@@ -216,6 +225,23 @@ bool compatible() {
   std::string marker(kModuleDir);
   marker += "/compatible.ok";
   return access(marker.c_str(), R_OK) == 0;
+}
+
+bool diagnostic_only() {
+  std::string marker(kModuleDir);
+  marker += "/diagnostic-only";
+  return access(marker.c_str(), R_OK) == 0;
+}
+
+bool diagnostic_dump_ready() {
+  if (!diagnostic_only()) return true;
+#if defined(__ANDROID__)
+  char value[PROP_VALUE_MAX] = {};
+  return __system_property_get("vendor.display.disable_hw_recovery_dump", value) > 0 &&
+         strcmp(value, "0") == 0;
+#else
+  return true;
+#endif
 }
 
 bool set_wake_lock(bool acquire) {
@@ -350,7 +376,7 @@ class Broker {
       } else if (agent_fd_ >= 0 && (fds[2].revents & POLLIN)) {
         hdmi_los_message event = {};
         if (!read_full(agent_fd_, &event, sizeof(event)) || !valid_message(event) ||
-            event.opcode == HDMI_LOS_OP_AGENT_FAILED) {
+            !HandleAgentEvent(event)) {
           if (active_) Release("Xorg agent reported failure", true);
         }
       }
@@ -384,15 +410,31 @@ class Broker {
                        uint32_t flags = 0) {
     if (!EnsureComposer()) return false;
     hdmi_los_message request = make_message(opcode);
+    request.version = HDMI_LOS_VERSION;
     request.flags = flags;
     if (!send_with_fd(composer_fd_, request, -1) ||
-        !recv_with_fd(composer_fd_, response, lease_fd) || !valid_message(*response) ||
+        !recv_with_fd(composer_fd_, response, lease_fd) ||
+        !valid_composer_message(*response) ||
         response->request_id != request.request_id) {
       close(composer_fd_);
       composer_fd_ = -1;
       return false;
     }
     return true;
+  }
+
+  bool HandleAgentEvent(const hdmi_los_message &event) {
+    if (event.opcode == HDMI_LOS_OP_AGENT_PROGRESS) {
+      char text[sizeof(event.detail) + 1] = {};
+      memcpy(text, event.detail, sizeof(event.detail));
+      log_transition(text);
+      hdmi_los_message acknowledgement = make_message(HDMI_LOS_OP_AGENT_PROGRESS_ACK);
+      acknowledgement.request_id = event.request_id;
+      acknowledgement.status = HDMI_LOS_OK;
+      acknowledgement.flags = event.flags;
+      return write_full(agent_fd_, &acknowledgement, sizeof(acknowledgement));
+    }
+    return event.opcode != HDMI_LOS_OP_AGENT_FAILED;
   }
 
   bool WaitAgent(uint16_t wanted, int timeout_ms, hdmi_los_message *response) {
@@ -417,6 +459,10 @@ class Broker {
         if (!read_full(agent_fd_, response, sizeof(*response)) || !valid_message(*response)) {
           return false;
         }
+        if (response->opcode == HDMI_LOS_OP_AGENT_PROGRESS) {
+          if (!HandleAgentEvent(*response)) return false;
+          continue;
+        }
         if (response->opcode == wanted || response->opcode == HDMI_LOS_OP_AGENT_FAILED) {
           return response->opcode == wanted && response->status == HDMI_LOS_OK;
         }
@@ -425,10 +471,19 @@ class Broker {
     return false;
   }
 
-  int Start(std::string *detail) {
+  int Start(uint32_t probe_mode, std::string *detail) {
     if (active_) return HDMI_LOS_ERR_BUSY;
+    if (probe_mode != HDMI_LOS_PROBE_XORG_LEGACY &&
+        probe_mode != HDMI_LOS_PROBE_XORG_ATOMIC) {
+      *detail = "invalid Xorg probe mode";
+      return HDMI_LOS_ERR_PROTOCOL;
+    }
     if (!compatible()) {
       *detail = "module compatibility gate is closed";
+      return HDMI_LOS_ERR_INCOMPATIBLE;
+    }
+    if (!diagnostic_dump_ready()) {
+      *detail = "display recovery dump gate is not enabled";
       return HDMI_LOS_ERR_INCOMPATIBLE;
     }
     if (agent_fd_ < 0) {
@@ -449,6 +504,7 @@ class Broker {
 
     log_transition("takeover agent-prepare begin");
     hdmi_los_message request = make_message(HDMI_LOS_OP_AGENT_PREPARE);
+    request.flags = probe_mode;
     hdmi_los_message response = {};
     if (!write_full(agent_fd_, &request, sizeof(request)) ||
         !WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentPrepareMs, &response)) {
@@ -513,6 +569,7 @@ class Broker {
     request.connector_id = response.connector_id;
     request.crtc_id = response.crtc_id;
     request.plane_id = response.plane_id;
+    request.flags = probe_mode;
     if (!send_with_fd(agent_fd_, request, lease_fd)) {
       close(lease_fd);
       ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
@@ -532,10 +589,120 @@ class Broker {
     log_transition("takeover agent-start complete");
 
     active_ = true;
-    state_detail_ = "Xorg owns external display";
+    state_detail_ = probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ?
+        "traced atomic Xorg owns external display" :
+        "traced legacy Xorg owns external display";
     *detail = state_detail_;
     log_line("info", "Xorg session active; 60 second timer armed");
     return HDMI_LOS_OK;
+  }
+
+  int FinishLeaseProbe(int lease_fd, int status, const std::string &message,
+                       std::string *detail) {
+    if (lease_fd >= 0) {
+      log_transition("probe lease-hold lease-close begin");
+      close(lease_fd);
+      log_transition("probe lease-hold lease-close complete");
+    }
+    log_transition("probe lease-hold composer-release begin");
+    hdmi_los_message response = {};
+    bool released = ComposerRequest(HDMI_LOS_OP_RELEASE, &response) &&
+                    response.status == HDMI_LOS_OK;
+    log_transition(released ? "probe lease-hold composer-release complete" :
+                              "probe lease-hold composer-release failed");
+    probing_ = false;
+    CleanupGuards();
+    state_detail_ = message;
+    *detail = message;
+    if (status == HDMI_LOS_OK && !released) {
+      *detail = "lease probe completed but composer restore failed";
+      return HDMI_LOS_ERR_IO;
+    }
+    return status;
+  }
+
+  int ProbeLease(std::string *detail) {
+    if (active_ || probing_) return HDMI_LOS_ERR_BUSY;
+    if (!compatible()) {
+      *detail = "module compatibility gate is closed";
+      return HDMI_LOS_ERR_INCOMPATIBLE;
+    }
+    if (!diagnostic_dump_ready()) {
+      *detail = "display recovery dump gate is not enabled";
+      return HDMI_LOS_ERR_INCOMPATIBLE;
+    }
+    if (!volumes_.Acquire()) {
+      *detail = "both physical volume inputs are required";
+      return HDMI_LOS_ERR_UNAVAILABLE;
+    }
+    if (!set_wake_lock(true)) {
+      *detail = "could not acquire the mandatory suspend blocker";
+      CleanupGuards();
+      return HDMI_LOS_ERR_UNAVAILABLE;
+    }
+    probing_ = true;
+    deadline_ms_ = monotonic_ms() + 15000;
+    state_detail_ = "lease-only diagnostic probe running";
+
+    hdmi_los_message response = {};
+    log_transition("probe lease-hold composer-prepare begin");
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
+                         HDMI_LOS_ACQUIRE_PREPARE) || response.status != HDMI_LOS_OK) {
+      log_transition("probe lease-hold composer-prepare failed");
+      int status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      std::string message = response.detail[0] ? response.detail :
+          "composer lease preparation failed";
+      return FinishLeaseProbe(-1, status, message, detail);
+    }
+    log_transition("probe lease-hold composer-prepare complete");
+
+    log_transition("probe lease-hold composer-pause begin");
+    response = {};
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
+                         HDMI_LOS_ACQUIRE_PAUSE) || response.status != HDMI_LOS_OK) {
+      log_transition("probe lease-hold composer-pause failed");
+      int status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      std::string message = response.detail[0] ? response.detail :
+          "composer display pause failed";
+      return FinishLeaseProbe(-1, status, message, detail);
+    }
+    log_transition("probe lease-hold composer-pause complete");
+
+    int lease_fd = -1;
+    log_transition("probe lease-hold composer-create begin");
+    response = {};
+    if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, &lease_fd,
+                         HDMI_LOS_ACQUIRE_CREATE) || response.status != HDMI_LOS_OK ||
+        lease_fd < 0) {
+      log_transition("probe lease-hold composer-create failed");
+      int status = response.status ? response.status : HDMI_LOS_ERR_IO;
+      std::string message = response.detail[0] ? response.detail :
+          "composer lease creation failed";
+      return FinishLeaseProbe(lease_fd, status, message, detail);
+    }
+    log_transition("probe lease-hold composer-create complete");
+    log_transition("probe lease-hold three-second hold begin");
+
+    int64_t end = monotonic_ms() + kLeaseHoldMs;
+    bool escaped = false;
+    while (!g_stop && monotonic_ms() < end) {
+      pollfd fds[2] = {
+          {volumes_.down, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+          {volumes_.up, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+      };
+      int result = poll(fds, 2, 50);
+      if (result < 0 && errno == EINTR) continue;
+      if (result < 0 || volumes_.Update(fds[0].revents, fds[1].revents)) {
+        escaped = true;
+        break;
+      }
+    }
+    log_transition(escaped ? "probe lease-hold ended by volume escape" :
+                             "probe lease-hold three-second hold complete");
+    return FinishLeaseProbe(lease_fd, HDMI_LOS_OK,
+                            escaped ? "lease-only probe restored early by volume escape" :
+                                      "lease-only probe completed and Android restored",
+                            detail);
   }
 
   void CleanupGuards() {
@@ -568,10 +735,19 @@ class Broker {
   hdmi_los_message Status(uint32_t request_id) {
     hdmi_los_message status = make_message(HDMI_LOS_OP_STATUS | HDMI_LOS_OP_RESPONSE);
     status.request_id = request_id;
-    status.status = compatible() ? HDMI_LOS_OK : HDMI_LOS_ERR_INCOMPATIBLE;
+    status.status = compatible() && diagnostic_dump_ready() ?
+        HDMI_LOS_OK : HDMI_LOS_ERR_INCOMPATIBLE;
     if (!compatible()) {
       status.state = HDMI_LOS_STATE_UNAVAILABLE;
       snprintf(status.detail, sizeof(status.detail), "incompatible or unverified Lineage build");
+    } else if (!diagnostic_dump_ready()) {
+      status.state = HDMI_LOS_STATE_UNAVAILABLE;
+      snprintf(status.detail, sizeof(status.detail), "diagnostic display recovery dump gate is closed");
+    } else if (probing_) {
+      status.state = HDMI_LOS_STATE_PROBING;
+      status.remaining_seconds = static_cast<uint32_t>(
+          std::max<int64_t>(0, (deadline_ms_ - monotonic_ms() + 999) / 1000));
+      snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
     } else if (active_) {
       status.state = HDMI_LOS_STATE_LEASED;
       status.remaining_seconds = static_cast<uint32_t>(
@@ -579,7 +755,9 @@ class Broker {
       snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
     } else if (agent_fd_ >= 0) {
       status.state = HDMI_LOS_STATE_AGENT_READY;
-      snprintf(status.detail, sizeof(status.detail), "chroot agent ready; Android owns display");
+      snprintf(status.detail, sizeof(status.detail), "%s",
+               diagnostic_only() ? "diagnostic build ready; use a root probe command" :
+                                   "chroot agent ready; Android owns display");
     } else {
       status.state = HDMI_LOS_STATE_ANDROID;
       snprintf(status.detail, sizeof(status.detail), "Android owns display; chroot agent absent");
@@ -617,7 +795,7 @@ class Broker {
     }
 
     if (request.opcode == HDMI_LOS_OP_AGENT_REGISTER && root) {
-      if (active_ || agent_fd_ >= 0) {
+      if (active_ || probing_ || agent_fd_ >= 0) {
         hdmi_los_message busy = Status(request.request_id);
         busy.status = HDMI_LOS_ERR_BUSY;
         write_full(client, &busy, sizeof(busy));
@@ -638,11 +816,35 @@ class Broker {
       if (active_) {
         Release("Quick Settings tile requested restore", true);
         response = Status(request.request_id);
+      } else if (diagnostic_only()) {
+        response.status = HDMI_LOS_ERR_STATE;
+        snprintf(response.detail, sizeof(response.detail),
+                 "diagnostic build: use a root probe command");
       } else {
         std::string detail;
-        int start_status = Start(&detail);
+        int start_status = Start(HDMI_LOS_PROBE_XORG_LEGACY, &detail);
         response = Status(request.request_id);
         response.status = start_status;
+        if (!detail.empty()) snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());
+      }
+    } else if (request.opcode == HDMI_LOS_OP_PROBE) {
+      if (!root) {
+        response.status = HDMI_LOS_ERR_PERMISSION;
+        snprintf(response.detail, sizeof(response.detail), "diagnostic probes require root");
+      } else {
+        std::string detail;
+        int probe_status;
+        if (request.flags == HDMI_LOS_PROBE_LEASE_HOLD) {
+          probe_status = ProbeLease(&detail);
+        } else if (request.flags == HDMI_LOS_PROBE_XORG_LEGACY ||
+                   request.flags == HDMI_LOS_PROBE_XORG_ATOMIC) {
+          probe_status = Start(request.flags, &detail);
+        } else {
+          probe_status = HDMI_LOS_ERR_PROTOCOL;
+          detail = "unknown diagnostic probe mode";
+        }
+        response = Status(request.request_id);
+        response.status = probe_status;
         if (!detail.empty()) snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());
       }
     } else if (request.opcode != HDMI_LOS_OP_STATUS && request.opcode != HDMI_LOS_OP_PING) {
@@ -657,16 +859,35 @@ class Broker {
   int composer_fd_ = -1;
   int agent_fd_ = -1;
   bool active_ = false;
+  bool probing_ = false;
   int64_t deadline_ms_ = 0;
   VolumeGuard volumes_;
   std::string state_detail_ = "Android owns display";
 };
 
-int client_main(const char *command) {
+void print_usage() {
+  fprintf(stderr,
+          "usage: hdmi-losd [daemon|status|toggle|probe lease-hold|probe xorg-legacy|probe xorg-atomic]\n");
+}
+
+int client_main(int argc, char **argv) {
   uint16_t opcode = HDMI_LOS_OP_STATUS;
-  if (strcmp(command, "toggle") == 0) opcode = HDMI_LOS_OP_TOGGLE;
-  else if (strcmp(command, "status") != 0) {
-    fprintf(stderr, "usage: hdmi-losd [daemon|status|toggle]\n");
+  uint32_t flags = HDMI_LOS_PROBE_NONE;
+  if (argc == 1 && strcmp(argv[0], "toggle") == 0) {
+    opcode = HDMI_LOS_OP_TOGGLE;
+  } else if (argc == 1 && strcmp(argv[0], "status") == 0) {
+    opcode = HDMI_LOS_OP_STATUS;
+  } else if (argc == 2 && strcmp(argv[0], "probe") == 0) {
+    opcode = HDMI_LOS_OP_PROBE;
+    if (strcmp(argv[1], "lease-hold") == 0) flags = HDMI_LOS_PROBE_LEASE_HOLD;
+    else if (strcmp(argv[1], "xorg-legacy") == 0) flags = HDMI_LOS_PROBE_XORG_LEGACY;
+    else if (strcmp(argv[1], "xorg-atomic") == 0) flags = HDMI_LOS_PROBE_XORG_ATOMIC;
+    else {
+      print_usage();
+      return 2;
+    }
+  } else {
+    print_usage();
     return 2;
   }
   int fd = connect_abstract(HDMI_LOS_BROKER_SOCKET, SOCK_STREAM);
@@ -675,6 +896,7 @@ int client_main(const char *command) {
     return 1;
   }
   hdmi_los_message request = make_message(opcode);
+  request.flags = flags;
   hdmi_los_message response = {};
   bool ok = write_full(fd, &request, sizeof(request)) && read_full(fd, &response, sizeof(response));
   close(fd);
@@ -687,9 +909,9 @@ int client_main(const char *command) {
 }  // namespace
 
 int main(int argc, char **argv) {
-  if (argc == 2 && strcmp(argv[1], "daemon") != 0) return client_main(argv[1]);
+  if (argc >= 2 && strcmp(argv[1], "daemon") != 0) return client_main(argc - 1, argv + 1);
   if (argc > 2) {
-    fprintf(stderr, "usage: hdmi-losd [daemon|status|toggle]\n");
+    print_usage();
     return 2;
   }
   struct sigaction action = {};

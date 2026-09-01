@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROFILE=${1:-current-install}
-EXPECTED_BINARY_COMMIT=${2:-}
+EXPECTED_COMPOSER_COMMIT=${2:-}
 ROOT=$(git rev-parse --show-toplevel)
 DIST=$ROOT/dist
 ZIP=$DIST/hdmi-los-$PROFILE-magisk.zip
@@ -17,8 +17,8 @@ package_args=(
     "$ZIP" "$TAR" "$INFO" "$ROOT/profiles/$PROFILE.json"
     "$(git -C "$ROOT" rev-parse HEAD)"
 )
-if [[ -n $EXPECTED_BINARY_COMMIT ]]; then
-    package_args+=("$EXPECTED_BINARY_COMMIT")
+if [[ -n $EXPECTED_COMPOSER_COMMIT ]]; then
+    package_args+=("$EXPECTED_COMPOSER_COMMIT")
 fi
 python "$ROOT/tests/check-package.py" "${package_args[@]}"
 
@@ -31,9 +31,9 @@ for script in "$tmp/module/"*.sh "$tmp/chroot/run-agent.sh"; do
     bash -n "$script"
 done
 file "$tmp/module/bin/hdmi-losd" "$tmp/module/vendor/bin/hw/"* \
-    "$tmp/module/vendor/lib64/"* "$tmp/chroot/bin/"*
+    "$tmp/module/vendor/lib64/"* "$tmp/chroot/bin/"* "$tmp/chroot/lib/"*
 for binary in "$tmp/module/bin/hdmi-losd" "$tmp/module/vendor/bin/hw/"* \
-    "$tmp/module/vendor/lib64/"* "$tmp/chroot/bin/"*; do
+    "$tmp/module/vendor/lib64/"* "$tmp/chroot/bin/"* "$tmp/chroot/lib/"*; do
     readelf -h "$binary" | grep -q 'AArch64'
 done
 

@@ -23,7 +23,21 @@ if [[ $MODE == repackage ]]; then
     "$SOURCE/build-support/reuse-build.sh" "$SOURCE" "$BUILD" "$PROFILE" \
         "$BINARY_COMMIT" "$REMOTE_ROOT"
     "$SOURCE/build-support/package.sh" "$SOURCE" "$BUILD" "$OUTPUT" \
-        "$PROFILE" "$COMMIT" "$BINARY_COMMIT"
+        "$PROFILE" "$COMMIT" "$BINARY_COMMIT" "$BINARY_COMMIT" \
+        "$BINARY_COMMIT" repackage
+    exit 0
+fi
+
+if [[ $MODE == reuse-composer ]]; then
+    [[ $BINARY_COMMIT =~ ^[0-9a-f]{40}$ ]]
+    "$SOURCE/build-support/reuse-composer.sh" "$SOURCE" "$BUILD" "$PROFILE" \
+        "$BINARY_COMMIT" "$REMOTE_ROOT"
+    "$SOURCE/build-support/build-native.sh" "$SOURCE" "$BUILD"
+    "$SOURCE/build-support/build-tile.sh" "$SOURCE" "$BUILD" \
+        "$REMOTE_ROOT/signing" "$PROFILE"
+    "$SOURCE/build-support/package.sh" "$SOURCE" "$BUILD" "$OUTPUT" \
+        "$PROFILE" "$COMMIT" "$BINARY_COMMIT" "$COMMIT" "$COMMIT" \
+        reuse-composer
     exit 0
 fi
 

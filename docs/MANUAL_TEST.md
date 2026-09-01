@@ -1,92 +1,107 @@
-# Manual installation and first test
+# Staged diagnostic installation and test
 
-This is an experimental graphics-stack replacement.  `make zip` and
-`make verify` are offline checks only; they do not install, reboot, connect a
-display, or start Xorg.
+Release `0.2.5-diagnostic.1` is not a production takeover build. Its Quick
+Settings tile cannot start Xorg. The only activation paths are explicit root
+commands, and the old protocol-v1 chroot agent is rejected.
 
-Do not use release 0.1 or the ZIP whose SHA-256 is
-`e0a0dfec34a8cbd3395c0c4b8aa3583230e09835ab752cafdbdc8aad036c5ff9`.
-That package shifted proprietary Qualcomm/Sony C++ vtables and failed before
-the Lineage boot animation. Release 0.2 corrected the ABI but inherited
-`nosuid` by binding its executable directly from `/data`; do not install it
-either. The first 0.2.3 live takeover hard-reset the device; that path also held
-the global pluggable-display lock across synchronous power and lease operations.
-These instructions apply to release 0.2.4 or later.
+Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
+a probe after a freeze or reset until all available evidence has been copied.
 
-## Before installation
+## Topology and installation
 
-1. Keep the HDMI capture card connected so you can observe the external output.
-2. Ensure the phone is stable and the dock is not cycling between charging and
-   OTG power.
-3. Keep both physical volume buttons accessible.  There is no proximity-sensor
-   escape path.
-4. In this repository, run `make verify`.  Preserve `dist/SHA256SUMS` with the
-   two artifacts.
-5. Extract the returned chroot bundle somewhere stable in this Arch filesystem,
-   for example:
+1. Power the MacroSilicon capture card from the workstation. Connect its HDMI
+   input to the phone dock, but do not connect its USB cable to the phone.
+2. Keep the phone charged and both physical volume buttons accessible.
+3. Build and verify the matching artifacts:
 
    ```sh
-   mkdir -p /home/kiraly/Downloads/hdmi-los-runtime
-   tar -xzf dist/hdmi-los-current-install-chroot.tar.gz \
-       -C /home/kiraly/Downloads/hdmi-los-runtime
+   make reuse-composer \
+     BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
+   make verify \
+     BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
    ```
 
-## Install, but do not take over yet
+4. Install `dist/hdmi-los-current-install-magisk.zip` in Magisk and reboot.
+5. Replace the complete prior chroot bundle with
+   `dist/hdmi-los-current-install-chroot.tar.gz`. Do not mix a protocol-v1
+   agent with this module.
+6. Verify `/data/adb/hdmi-los/logs/gate.log`, `compatible.ok`, and the three
+   read-only executable composer bind mounts. Also require:
 
-If the failed 0.1 module is still present and disabled, remove it in Magisk and
-complete one stock boot before installing the corrected package. This avoids
-carrying its safe-mode `disable` marker or zero-filled interrupted-boot logs
-into the corrected installation.
+   ```sh
+   getprop vendor.display.disable_hw_recovery_dump
+   ```
 
-Copy `dist/hdmi-los-current-install-magisk.zip` to Android-visible storage and
-select it manually in the Magisk app.  The installer must show that the exact
-Lineage version was accepted.  Reboot manually.
+   to print `0`, with the same value recorded in `diagnostic.log` after boot.
 
-After boot, inspect the gate before proceeding:
+## Gate 1: ordinary Android mirroring
+
+Approve Android mirroring and use both the internal display and external
+capture for ten minutes. Do not start the chroot agent yet. If the phone,
+dock, or capture signal resets, stop: this is a power/PD/HPD problem rather
+than an Xorg ioctl problem.
+
+## Gate 2: unused lease only
+
+Run from an Android root shell:
 
 ```sh
-sudo -n nsenter -t 1 -m -- /system/bin/su -c \
-  'cat /data/adb/hdmi-los/logs/gate.log; cat /data/adb/modules/hdmi-los/compatible.ok'
+/data/adb/modules/hdmi-los/bin/hdmi-losd probe lease-hold
 ```
 
-The last gate line must begin with `PASS`, and the marker must say
-`current-install`.  A missing marker or any `FAIL CLOSED` line means stop; the
-original vendor files were left in use.
+The broker prepares and pauses the external Android display, creates the DRM
+lease, holds the unused fd for three seconds, closes it, and restores Android.
+Run this exactly three times. Android mirroring and the internal display must
+recover after every cycle. Do not proceed to Xorg if any cycle resets.
 
-Also inspect `/proc/1/mountinfo` for the composer service, `libsdmcore.so`, and
-`libsdmdal.so`. Each target must be read-only and must not contain `nosuid` or
-`noexec` in its per-mount options.
+## Gate 3: one traced legacy Xorg start
 
-The module installs the signed `HDMI Xorg` tile app after Android finishes
-booting.  It grants no Android permissions.  Add its tile to Quick Settings.
+Start the matching chroot bundle without phone-side capture:
 
-## First bounded takeover
+```sh
+cd /home/kiraly/Downloads/hdmi-los-runtime
+sudo -n ./run-agent.sh --capture none
+```
 
-1. Start the chroot agent from a terminal you can still reach:
+Then run one root command on Android:
 
-   ```sh
-   cd /home/kiraly/Downloads/hdmi-los-runtime
-   sudo -n ./run-agent.sh --capture auto
-   ```
+```sh
+/data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-legacy
+```
 
-   `--capture auto` keeps the MacroSilicon capture stream active when its
-   `534d:2109` video node is present; use `--capture none` otherwise.
+Every DRM ioctl is synced to `/data/adb/hdmi-los/logs/broker.log` before it is
+issued. If LXDE appears, verify the internal Android display, mouse, and
+keyboard, then hold both volume buttons for three seconds to restore Android.
 
-2. Wake the Bluetooth mouse and keyboard.  The bridge recognizes the recorded
-   input names `ASUS MD100 Mouse` and `BT Keyboard` and reconnects when either
-   device wakes again.
-3. Connect HDMI and approve Android mirroring.  The compositor needs a live
-   external display object before it can lease that display.
-4. Open the diagnostics activity.  It must say `Ready`, not `Unavailable`.
-5. Tap the `HDMI Xorg` tile once.  Do not tap repeatedly while it says
-   `Starting Xorg`.
-6. Confirm from the capture feed that only `DP-1` changes to LXDE and that mouse
-   and keyboard input reach Xorg.  The internal phone UI should remain Android.
-7. End the first run early by holding Volume Up and Volume Down together for at
-   least three seconds.  Confirm Android mirroring returns.  If untouched, the
-   broker forces the same transition at 60 seconds and composer has a 65-second
-   backstop.
+If the phone resets, do not retry. In Lineage Recovery, capture evidence with:
 
-Logs are in `/data/adb/hdmi-los/logs/` on Android and `/run/hdmi-los/` in the
-chroot.  Do not retry after a freeze or unexpected reboot; preserve those logs
-and the previous boot's pstore/ramoops first.
+```sh
+scripts/collect-crash-evidence.sh SERIAL NEW_DESTINATION_DIRECTORY
+```
+
+The recovery pass preserves `/tmp/recovery.log` and `/sys/fs/pstore`. Run the
+collector again into a second new directory after normal boot to preserve
+module logs, `/data/misc/recovery`, and Qualcomm display recovery dumps.
+
+## Gate 4: atomic candidate, only when justified
+
+Run `probe xorg-atomic` only if the last durable legacy record identifies a
+legacy modeset, cursor, or page-flip boundary. The atomic probe changes only:
+
+```text
+Option "Atomic" "true"
+Option "ShadowFB" "true"
+```
+
+It retains software rendering, disabled DRI page flips, and `SWcursor`. A
+failure during resource queries, dumb-buffer creation, or framebuffer
+registration must first be reduced to a one-operation probe because atomic
+Xorg shares those setup calls.
+
+## Success criteria
+
+A production configuration is not selected after one successful start. It
+requires ten minutes of stable Android mirroring, three unused lease cycles,
+three complete Xorg takeovers, volume-chord restore, the 60-second timeout,
+safe HDMI unplug restoration, responsive internal Android UI, working input,
+and no pstore, display-recovery, or broker error evidence.

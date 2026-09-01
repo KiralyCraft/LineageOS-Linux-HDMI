@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 BUNDLE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-CAPTURE=auto
+CAPTURE=none
 RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
 AGENT_PID=0
@@ -100,6 +100,7 @@ elif [[ $CAPTURE != none && ! $CAPTURE =~ ^/dev/video[0-9]+$ ]]; then
 fi
 
 if [[ $CAPTURE != none ]]; then
+    printf 'WARNING: phone-side capture is diagnostic-only; prefer workstation-powered capture\n' >&2
     printf 'Starting optional HPD/capture keeper on %s\n' "$CAPTURE" >&2
     "$BUNDLE/bin/hdmi-capture-keeper" --device "$CAPTURE" \
         --latest "$RUNTIME/latest.jpg" >>"$RUNTIME/capture.log" 2>&1 &

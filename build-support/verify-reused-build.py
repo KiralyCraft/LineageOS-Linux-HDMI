@@ -9,11 +9,6 @@ build = pathlib.Path(sys.argv[2])
 expected_commit = sys.argv[3]
 info = json.loads(info_path.read_text())
 
-recorded_commit = info.get("binary_repository_commit", info["repository_commit"])
-assert recorded_commit == expected_commit, (
-    f"base build commit mismatch: expected {expected_commit}, found {recorded_commit}"
-)
-
 artifacts = {
     "vendor.qti.hardware.display.composer-service":
         build / "composer/vendor.qti.hardware.display.composer-service",
@@ -21,13 +16,29 @@ artifacts = {
     "libsdmdal.so": build / "composer/libsdmdal.so",
     "hdmi-losd": build / "native/android/hdmi-losd",
     "HdmiLosTile.apk": build / "tile/HdmiLosTile.apk",
-    "hdmi-los-agent": build / "native/chroot/hdmi-los-agent",
-    "hdmi-input-bridge": build / "native/chroot/hdmi-input-bridge",
-    "hdmi-capture-keeper": build / "native/chroot/hdmi-capture-keeper",
+    "hdmi-los-agent": build / "native/chroot/bin/hdmi-los-agent",
+    "hdmi-input-bridge": build / "native/chroot/bin/hdmi-input-bridge",
+    "hdmi-capture-keeper": build / "native/chroot/bin/hdmi-capture-keeper",
 }
+
+if not (build / "native/chroot/bin").is_dir():
+    artifacts["hdmi-los-agent"] = build / "native/chroot/hdmi-los-agent"
+    artifacts["hdmi-input-bridge"] = build / "native/chroot/hdmi-input-bridge"
+    artifacts["hdmi-capture-keeper"] = build / "native/chroot/hdmi-capture-keeper"
+if "libhdmi-los-drmtrace.so" in info["artifacts"]:
+    artifacts["libhdmi-los-drmtrace.so"] = \
+        build / "native/chroot/lib/libhdmi-los-drmtrace.so"
 
 for name, path in artifacts.items():
     expected = info["artifacts"][name]
+    recorded_commit = expected.get(
+        "repository_commit",
+        info.get("binary_repository_commit", info["repository_commit"]),
+    )
+    assert recorded_commit == expected_commit, (
+        f"base build commit mismatch for {name}: expected {expected_commit}, "
+        f"found {recorded_commit}"
+    )
     assert path.is_file(), f"missing reusable artifact: {path}"
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     assert digest == expected["sha256"], f"reusable artifact hash mismatch: {name}"
