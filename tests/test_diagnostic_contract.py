@@ -104,13 +104,16 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("last frame remains active", added)
 
     def test_composer_synchronizes_hwc_power_state_during_release(self):
+        patch_name = "0012-composer-synchronize-power-state-after-lease.patch"
         patch = (
-            ROOT / "patches/qcom-display/v1/0012-composer-synchronize-power-state-after-lease.patch"
+            ROOT / "patches/qcom-display/v1" / patch_name
         ).read_text()
+        series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
         added = "\n".join(
             line[1:] for line in patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
         )
+        self.assertEqual(series[-1], patch_name)
         pause = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause)"
         resume = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume)"
         self.assertIn(pause, added)
