@@ -182,11 +182,20 @@ sudo -n ./run-agent.sh \
 No takeover starts merely because the module or agent is present. The tile or
 an explicit root diagnostic command initiates it.
 
+After the bounded path has been validated, append `--no-timeout` to either
+agent command to allow the session to run continuously. This removes the
+broker's fixed 60-second session deadline, but it does not remove automatic
+recovery: the broker renews the composer's 65-second watchdog every 20 seconds.
+If renewal stops, the agent or broker disconnects, Xorg exits, HDMI is
+unplugged, or the volume escape is used, Android is restored.
+
 ## Safety and recovery
 
 - Hold Volume Up and Volume Down together for three seconds to restore Android.
-- The agent forces restoration after 60 seconds; the composer has an
-  independent 65-second backstop.
+- Bounded sessions restore after 60 seconds; the composer has an independent
+  65-second backstop.
+- `--no-timeout` sessions renew that composer backstop every 20 seconds and can
+  run indefinitely only while the broker remains healthy.
 - Broker or agent disconnect, HDMI unplug, and secure-display entry also force
   lease release.
 - Disable or uninstall the Magisk module and reboot to restore the original

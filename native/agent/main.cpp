@@ -42,6 +42,7 @@ std::string g_bundle;
 bool g_kgsl_glamor = false;
 bool g_kgsl_kms_bridge = false;
 bool g_start_lxde = true;
+bool g_no_timeout = false;
 
 bool relay_trace_record(int timeout_ms);
 
@@ -728,6 +729,7 @@ int run_agent() {
   registration.version = HDMI_LOS_BROKER_VERSION;
   registration.opcode = HDMI_LOS_OP_AGENT_REGISTER;
   registration.request_id = static_cast<uint32_t>(getpid());
+  registration.flags = g_no_timeout ? HDMI_LOS_FLAG_CONTINUOUS : 0;
   if (!write_full(g_broker, &registration, sizeof(registration))) return 1;
   int ignored_fd = -1;
   hdmi_los_message reply = {};
@@ -735,7 +737,13 @@ int run_agent() {
     log_message("error", "broker rejected agent registration");
     return 1;
   }
-  log_message("info", "registered; waiting for a root diagnostic probe");
+  if (g_no_timeout && !(reply.flags & HDMI_LOS_FLAG_CONTINUOUS)) {
+    log_message("error", "installed broker does not support continuous sessions");
+    return 1;
+  }
+  log_message("info", g_no_timeout ?
+      "registered for continuous sessions; composer watchdog renewal required" :
+      "registered for bounded sessions; waiting for a takeover request");
 
   while (!g_stop) {
     pollfd fds[2] = {
@@ -856,10 +864,12 @@ int main(int argc, char **argv) {
         fprintf(stderr, "invalid session mode: %s\n", value);
         return 2;
       }
+    } else if (strcmp(argv[i], "--no-timeout") == 0) {
+      g_no_timeout = true;
     } else {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
                       "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
-                      "[--session lxde|none]\n");
+                      "[--session lxde|none] [--no-timeout]\n");
       return 2;
     }
   }

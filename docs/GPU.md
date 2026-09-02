@@ -273,7 +273,7 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 `sudo -n`; it is expected to remain in the foreground. Leave that terminal
 open, then tap the `HDMI Xorg` Quick Settings tile on Android. Pressing
 `Ctrl-C` stops the waiting chroot agent. The tile, volume-button escape, and
-60/65-second deadlines restore Android.
+60/65-second deadlines restore Android in the default bounded mode.
 
 To start the tested accelerated mode instead, the runtime must contain the
 patched private `libgallium-*.so` below `lib/mesa/`, then run:
@@ -286,6 +286,12 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 The runner deliberately rejects this mode if the private Mesa library is
 missing. The no-argument form above continues to select safe ShadowFB.
 
+After bounded takeover testing succeeds, add `--no-timeout` to either command
+to keep the leased Xorg session running. The broker then renews the composer's
+65-second watchdog every 20 seconds instead of ending the session at 60
+seconds. The tile, volume chord, disconnect, Xorg failure, HDMI unplug, and
+watchdog-renewal failure still restore Android.
+
 The `0.2.5-diagnostic.1` module disables ordinary tile activation. With that
 older diagnostic package installed, start the foreground agent as above and
 trigger the takeover separately from an Android root shell:
@@ -294,5 +300,6 @@ trigger the takeover separately from an Android root shell:
 /data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
-Release `0.2.6-candidate.1` enables the tile and selects the same atomic probe
-mode without requiring that separate root command.
+Release `0.2.7-candidate.1` enables the tile, selects the same atomic probe mode
+without requiring that separate root command, and supports the explicit
+renewable continuous-session option.

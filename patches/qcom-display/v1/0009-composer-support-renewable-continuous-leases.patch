@@ -1,0 +1,125 @@
+From a4084f945273b87a5e5cf2f626531c7e377b7529 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Wed, 2 Sep 2026 06:53:37 +0300
+Subject: [PATCH] composer: support renewable continuous leases
+
+---
+ composer/hdmi_lease_server.cpp | 36 +++++++++++++++++++++++++++++++++-
+ composer/hdmi_lease_server.h   |  1 +
+ composer/hdmi_los_protocol.h   |  2 ++
+ 3 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/composer/hdmi_lease_server.cpp b/composer/hdmi_lease_server.cpp
+index 051a267a5..c65629963 100644
+--- a/composer/hdmi_lease_server.cpp
++++ b/composer/hdmi_lease_server.cpp
+@@ -140,18 +140,48 @@ bool HdmiLeaseServer::HandleRequest(int client_fd, const hdmi_los_message &reque
+   int lease_fd = -1;
+   switch (request.opcode) {
+     case HDMI_LOS_OP_STATUS:
++      controller_->GetHdmiLeaseStatus(&response);
++      break;
+     case HDMI_LOS_OP_PING:
+       controller_->GetHdmiLeaseStatus(&response);
++      if (request.flags == HDMI_LOS_FLAG_CONTINUOUS) {
++        if (!continuous_lease_ || response.state != HDMI_LOS_STATE_LEASED) {
++          FillError(&response, HDMI_LOS_ERR_STATE, "continuous lease is not active");
++        } else {
++          deadline_ms_ = BootTimeMs() + kComposerFailsafeSeconds * 1000;
++          response.flags |= HDMI_LOS_FLAG_CONTINUOUS;
++        }
++      } else if (request.flags != 0) {
++        FillError(&response, HDMI_LOS_ERR_PROTOCOL, "unknown ping flag");
++      }
+       break;
+     case HDMI_LOS_OP_ACQUIRE:
+-      response.status = controller_->AcquireHdmiLease(request.flags, &response, &lease_fd);
++      if (request.flags & ~(HDMI_LOS_ACQUIRE_PHASE_MASK | HDMI_LOS_FLAG_CONTINUOUS)) {
++        FillError(&response, HDMI_LOS_ERR_PROTOCOL, "unknown acquire flag");
++        break;
++      }
++      {
++        uint32_t phase = request.flags & HDMI_LOS_ACQUIRE_PHASE_MASK;
++        bool continuous = request.flags & HDMI_LOS_FLAG_CONTINUOUS;
++        if (phase == HDMI_LOS_ACQUIRE_PREPARE) {
++          continuous_lease_ = continuous;
++        } else if (continuous != continuous_lease_) {
++          FillError(&response, HDMI_LOS_ERR_PROTOCOL, "acquire timeout policy changed");
++          break;
++        }
++        response.status = controller_->AcquireHdmiLease(phase, &response, &lease_fd);
++      }
+       if (response.status == HDMI_LOS_OK) {
+         deadline_ms_ = BootTimeMs() + kComposerFailsafeSeconds * 1000;
++        if (continuous_lease_) {
++          ALOGI("hdmi-los: continuous lease watchdog armed");
++        }
+       }
+       break;
+     case HDMI_LOS_OP_RELEASE:
+       response.status = controller_->ReleaseHdmiLease("broker request");
+       deadline_ms_ = 0;
++      continuous_lease_ = false;
+       controller_->GetHdmiLeaseStatus(&response);
+       break;
+     default:
+@@ -164,6 +194,7 @@ bool HdmiLeaseServer::HandleRequest(int client_fd, const hdmi_los_message &reque
+   if (!delivered && request.opcode == HDMI_LOS_OP_ACQUIRE && response.status == HDMI_LOS_OK) {
+     controller_->ReleaseHdmiLease("lease fd delivery failed");
+     deadline_ms_ = 0;
++    continuous_lease_ = false;
+   }
+   return delivered;
+ }
+@@ -191,6 +222,7 @@ void HdmiLeaseServer::ThreadMain() {
+       ALOGW("hdmi-los: composer failsafe expired");
+       controller_->ReleaseHdmiLease("composer 65 second failsafe");
+       deadline_ms_ = 0;
++      continuous_lease_ = false;
+     }
+ 
+     if (result > 0 && (fds[0].revents & POLLIN)) {
+@@ -222,6 +254,7 @@ void HdmiLeaseServer::ThreadMain() {
+         client_fd = -1;
+         controller_->ReleaseHdmiLease("broker disconnected");
+         deadline_ms_ = 0;
++        continuous_lease_ = false;
+       }
+     }
+     if (client_fd >= 0 && result > 0 &&
+@@ -231,6 +264,7 @@ void HdmiLeaseServer::ThreadMain() {
+       client_fd = -1;
+       controller_->ReleaseHdmiLease("broker disconnected");
+       deadline_ms_ = 0;
++      continuous_lease_ = false;
+     }
+   }
+ 
+diff --git a/composer/hdmi_lease_server.h b/composer/hdmi_lease_server.h
+index 9e2d49f19..8750dfc6f 100644
+--- a/composer/hdmi_lease_server.h
++++ b/composer/hdmi_lease_server.h
+@@ -40,6 +40,7 @@ class HdmiLeaseServer {
+   int wake_read_fd_ = -1;
+   int wake_write_fd_ = -1;
+   int64_t deadline_ms_ = 0;
++  bool continuous_lease_ = false;
+ };
+ 
+ }  // namespace sdm
+diff --git a/composer/hdmi_los_protocol.h b/composer/hdmi_los_protocol.h
+index 8bb4705ab..28fd72b89 100644
+--- a/composer/hdmi_los_protocol.h
++++ b/composer/hdmi_los_protocol.h
+@@ -7,6 +7,8 @@
+ #define HDMI_LOS_VERSION 1u
+ #define HDMI_LOS_MESSAGE_SIZE 160u
+ #define HDMI_LOS_COMPOSER_SOCKET "hdmi-los-composer-v1"
++#define HDMI_LOS_ACQUIRE_PHASE_MASK 0xffu
++#define HDMI_LOS_FLAG_CONTINUOUS 0x80000000u
+ 
+ enum hdmi_los_opcode {
+   HDMI_LOS_OP_STATUS = 1,
+-- 
+2.53.0
+

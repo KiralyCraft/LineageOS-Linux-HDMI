@@ -63,6 +63,14 @@ for phase in PREPARE PAUSE CREATE; do
         exit 1
     }
 done
+grep -q 'HDMI_LOS_FLAG_CONTINUOUS' "$composer_header" || {
+    printf 'patch-port check failed: continuous composer watchdog protocol is missing\n' >&2
+    exit 1
+}
+grep -q 'continuous lease watchdog armed' "$DISPLAY/composer/hdmi_lease_server.cpp" || {
+    printf 'patch-port check failed: continuous composer watchdog renewal is missing\n' >&2
+    exit 1
+}
 grep -q 'must not retain this global lock and deadlock a driver callback' "$composer_source" || {
     printf 'patch-port check failed: composer hotplug-lock boundary is missing\n' >&2
     exit 1

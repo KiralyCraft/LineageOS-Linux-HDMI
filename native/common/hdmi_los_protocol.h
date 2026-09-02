@@ -13,6 +13,8 @@
 #define HDMI_LOS_MESSAGE_SIZE 160u
 #define HDMI_LOS_COMPOSER_SOCKET "hdmi-los-composer-v1"
 #define HDMI_LOS_BROKER_SOCKET "hdmi-los-broker-v1"
+#define HDMI_LOS_ACQUIRE_PHASE_MASK 0xffu
+#define HDMI_LOS_FLAG_CONTINUOUS 0x80000000u
 
 enum hdmi_los_opcode {
   HDMI_LOS_OP_STATUS = 1,

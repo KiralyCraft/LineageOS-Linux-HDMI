@@ -30,6 +30,7 @@
 namespace {
 
 constexpr int kSessionSeconds = 60;
+constexpr int kComposerHeartbeatSeconds = 20;
 constexpr int kChordHoldMs = 3000;
 constexpr int kAgentPrepareMs = 5000;
 constexpr int kAgentStartMs = 15000;
@@ -372,6 +373,7 @@ class Broker {
       if (agent_fd_ >= 0 && (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
         close(agent_fd_);
         agent_fd_ = -1;
+        agent_continuous_ = false;
         if (active_) Release("chroot agent disconnected", true);
       } else if (agent_fd_ >= 0 && (fds[2].revents & POLLIN)) {
         hdmi_los_message event = {};
@@ -383,7 +385,20 @@ class Broker {
       if (active_ && volumes_.Update(fds[3].revents, fds[4].revents)) {
         Release("both-volume escape or volume input loss", true);
       }
-      if (active_ && monotonic_ms() >= deadline_ms_) {
+      if (active_ && session_continuous_ &&
+          monotonic_ms() >= composer_heartbeat_ms_) {
+        hdmi_los_message response = {};
+        if (!ComposerRequest(HDMI_LOS_OP_PING, &response, nullptr,
+                             HDMI_LOS_FLAG_CONTINUOUS) ||
+            response.status != HDMI_LOS_OK ||
+            response.state != HDMI_LOS_STATE_LEASED ||
+            !(response.flags & HDMI_LOS_FLAG_CONTINUOUS)) {
+          Release("continuous composer watchdog renewal failed", true);
+        } else {
+          composer_heartbeat_ms_ = monotonic_ms() + kComposerHeartbeatSeconds * 1000;
+        }
+      }
+      if (active_ && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) {
         Release("mandatory 60 second timeout", true);
       }
     }
@@ -499,8 +514,15 @@ class Broker {
       CleanupGuards();
       return HDMI_LOS_ERR_UNAVAILABLE;
     }
+    session_continuous_ = agent_continuous_;
     // Count preparation and Xorg verification inside the mandatory window.
-    deadline_ms_ = monotonic_ms() + kSessionSeconds * 1000;
+    // Continuous sessions retain all bounded startup waits and renew the
+    // composer's independent watchdog only after Xorg is active.
+    deadline_ms_ = session_continuous_ ? 0 :
+        monotonic_ms() + kSessionSeconds * 1000;
+    auto composer_acquire_flags = [&](uint32_t phase) {
+      return phase | (session_continuous_ ? HDMI_LOS_FLAG_CONTINUOUS : 0);
+    };
 
     log_transition("takeover agent-prepare begin");
     hdmi_los_message request = make_message(HDMI_LOS_OP_AGENT_PREPARE);
@@ -520,7 +542,8 @@ class Broker {
     log_transition("takeover composer-prepare begin");
     response = {};
     if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
-                         HDMI_LOS_ACQUIRE_PREPARE) || response.status != HDMI_LOS_OK) {
+                         composer_acquire_flags(HDMI_LOS_ACQUIRE_PREPARE)) ||
+        response.status != HDMI_LOS_OK) {
       *detail = response.detail[0] ? response.detail : "composer lease request failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
       log_transition("takeover composer-prepare failed");
@@ -535,7 +558,8 @@ class Broker {
     log_transition("takeover composer-pause begin");
     response = {};
     if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, nullptr,
-                         HDMI_LOS_ACQUIRE_PAUSE) || response.status != HDMI_LOS_OK) {
+                         composer_acquire_flags(HDMI_LOS_ACQUIRE_PAUSE)) ||
+        response.status != HDMI_LOS_OK) {
       *detail = response.detail[0] ? response.detail : "composer display pause failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
       log_transition("takeover composer-pause failed");
@@ -550,7 +574,8 @@ class Broker {
     log_transition("takeover composer-create begin");
     response = {};
     if (!ComposerRequest(HDMI_LOS_OP_ACQUIRE, &response, &lease_fd,
-                         HDMI_LOS_ACQUIRE_CREATE) || response.status != HDMI_LOS_OK ||
+                         composer_acquire_flags(HDMI_LOS_ACQUIRE_CREATE)) ||
+        response.status != HDMI_LOS_OK ||
         lease_fd < 0) {
       *detail = response.detail[0] ? response.detail : "composer lease creation failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
@@ -589,11 +614,17 @@ class Broker {
     log_transition("takeover agent-start complete");
 
     active_ = true;
+    if (session_continuous_) {
+      composer_heartbeat_ms_ = monotonic_ms() + kComposerHeartbeatSeconds * 1000;
+    }
     state_detail_ = probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ?
         "traced atomic Xorg owns external display" :
         "traced legacy Xorg owns external display";
+    if (session_continuous_) state_detail_ += "; continuous watchdog mode";
     *detail = state_detail_;
-    log_line("info", "Xorg session active; 60 second timer armed");
+    log_line("info", session_continuous_ ?
+        "Xorg session active; continuous composer watchdog armed" :
+        "Xorg session active; 60 second timer armed");
     return HDMI_LOS_OK;
   }
 
@@ -709,6 +740,8 @@ class Broker {
     volumes_.Release();
     set_wake_lock(false);
     deadline_ms_ = 0;
+    composer_heartbeat_ms_ = 0;
+    session_continuous_ = false;
   }
 
   void Release(const char *reason, bool tell_composer) {
@@ -750,14 +783,20 @@ class Broker {
       snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
     } else if (active_) {
       status.state = HDMI_LOS_STATE_LEASED;
-      status.remaining_seconds = static_cast<uint32_t>(
-          std::max<int64_t>(0, (deadline_ms_ - monotonic_ms() + 999) / 1000));
+      if (session_continuous_) {
+        status.flags |= HDMI_LOS_FLAG_CONTINUOUS;
+      } else {
+        status.remaining_seconds = static_cast<uint32_t>(
+            std::max<int64_t>(0, (deadline_ms_ - monotonic_ms() + 999) / 1000));
+      }
       snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
     } else if (agent_fd_ >= 0) {
       status.state = HDMI_LOS_STATE_AGENT_READY;
+      if (agent_continuous_) status.flags |= HDMI_LOS_FLAG_CONTINUOUS;
       snprintf(status.detail, sizeof(status.detail), "%s",
                diagnostic_only() ? "diagnostic build ready; use a root probe command" :
-                                   "chroot agent ready; Android owns display");
+               agent_continuous_ ? "continuous chroot agent ready; Android owns display" :
+                                   "bounded chroot agent ready; Android owns display");
     } else {
       status.state = HDMI_LOS_STATE_ANDROID;
       snprintf(status.detail, sizeof(status.detail), "Android owns display; chroot agent absent");
@@ -795,13 +834,20 @@ class Broker {
     }
 
     if (request.opcode == HDMI_LOS_OP_AGENT_REGISTER && root) {
-      if (active_ || probing_ || agent_fd_ >= 0) {
+      if (request.flags & ~HDMI_LOS_FLAG_CONTINUOUS) {
+        hdmi_los_message rejected = Status(request.request_id);
+        rejected.status = HDMI_LOS_ERR_PROTOCOL;
+        snprintf(rejected.detail, sizeof(rejected.detail), "unknown agent registration flag");
+        write_full(client, &rejected, sizeof(rejected));
+        close(client);
+      } else if (active_ || probing_ || agent_fd_ >= 0) {
         hdmi_los_message busy = Status(request.request_id);
         busy.status = HDMI_LOS_ERR_BUSY;
         write_full(client, &busy, sizeof(busy));
         close(client);
       } else {
         agent_fd_ = client;
+        agent_continuous_ = request.flags & HDMI_LOS_FLAG_CONTINUOUS;
         hdmi_los_message ready = Status(request.request_id);
         ready.status = HDMI_LOS_OK;
         ready.state = HDMI_LOS_STATE_AGENT_READY;
@@ -860,7 +906,10 @@ class Broker {
   int agent_fd_ = -1;
   bool active_ = false;
   bool probing_ = false;
+  bool agent_continuous_ = false;
+  bool session_continuous_ = false;
   int64_t deadline_ms_ = 0;
+  int64_t composer_heartbeat_ms_ = 0;
   VolumeGuard volumes_;
   std::string state_detail_ = "Android owns display";
 };

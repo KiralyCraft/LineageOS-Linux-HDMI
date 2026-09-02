@@ -19,8 +19,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_selects_atomic_tile_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.6-candidate.1")
-        self.assertEqual(release["version_code"], 20260907)
+        self.assertEqual(release["version"], "0.2.7-candidate.1")
+        self.assertEqual(release["version_code"], 20260908)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -34,6 +34,32 @@ class DiagnosticContractTests(unittest.TestCase):
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
         self.assertIn("CAPTURE=none", runner)
         self.assertIn("workstation-powered capture", runner)
+
+    def test_continuous_mode_is_explicit_and_renews_composer_watchdog(self):
+        protocol = (ROOT / "native/common/hdmi_los_protocol.h").read_text()
+        broker = (ROOT / "native/broker/main.cpp").read_text()
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        composer_patch = (
+            ROOT / "patches/qcom-display/v1/0009-composer-support-renewable-continuous-leases.patch"
+        ).read_text()
+
+        self.assertIn("#define HDMI_LOS_FLAG_CONTINUOUS 0x80000000u", protocol)
+        self.assertIn("constexpr int kSessionSeconds = 60;", broker)
+        self.assertIn("constexpr int kComposerHeartbeatSeconds = 20;", broker)
+        self.assertIn("active_ && deadline_ms_ > 0", broker)
+        self.assertIn("ComposerRequest(HDMI_LOS_OP_PING", broker)
+        self.assertIn("HDMI_LOS_FLAG_CONTINUOUS", broker)
+        self.assertIn('strcmp(argv[i], "--no-timeout") == 0', agent)
+        self.assertIn("registration.flags = g_no_timeout", agent)
+        self.assertIn("NO_TIMEOUT=0", runner)
+        self.assertIn("--no-timeout", runner)
+        self.assertIn("continuous_lease_", composer_patch)
+        self.assertIn(
+            "deadline_ms_ = BootTimeMs() + kComposerFailsafeSeconds * 1000",
+            composer_patch,
+        )
+        self.assertNotIn("explicit no-timeout lease", composer_patch)
 
     def test_lxde_uses_a_chroot_local_temp_directory(self):
         agent = (ROOT / "native/agent/main.cpp").read_text()

@@ -8,9 +8,10 @@ CAPTURE_PID=0
 AGENT_PID=0
 XORG_ACCEL=safe
 SESSION=lxde
+NO_TIMEOUT=0
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none] [--no-timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -30,6 +31,10 @@ while (($#)); do
             SESSION=$2
             shift 2
             ;;
+        --no-timeout)
+            NO_TIMEOUT=1
+            shift
+            ;;
         *)
             usage
             exit 2
@@ -42,7 +47,9 @@ done
 [[ $SESSION == lxde || $SESSION == none ]] || { usage; exit 2; }
 
 if ((EUID != 0)); then
-    exec sudo -n -- "$0" --capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" --session "$SESSION"
+    args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" --session "$SESSION")
+    ((NO_TIMEOUT)) && args+=(--no-timeout)
+    exec sudo -n -- "$0" "${args[@]}"
 fi
 
 for required in \
@@ -139,8 +146,14 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
     printf 'WARNING: KGSL/KMS scanout plus MIT-SHM presentation bridge is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
 fi
 
-"$BUNDLE/bin/hdmi-los-agent" --bundle "$BUNDLE" \
-    --xorg-accel "$XORG_ACCEL" --session "$SESSION" >>"$RUNTIME/agent.log" 2>&1 &
+if ((NO_TIMEOUT)); then
+    printf 'WARNING: automatic 60-second restore is disabled; keep the volume-key escape accessible\n' >&2
+    printf 'The composer watchdog will be renewed while the broker and agent remain healthy\n' >&2
+fi
+
+agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" --session "$SESSION")
+((NO_TIMEOUT)) && agent_args+=(--no-timeout)
+"$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!
 set +e
 wait "$AGENT_PID"

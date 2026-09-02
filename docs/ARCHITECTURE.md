@@ -49,7 +49,11 @@ member is never maintained in this source tree and remains false even while an
 external CRTC and primary plane are actively scanning out.
 
 The composer independently revokes after 65 seconds or when its broker
-disconnects. Unplug and secure-display entry also force release. SurfaceFlinger
+disconnects. In an explicitly registered continuous session, the broker omits
+its normal 60-second deadline and renews the composer's watchdog every 20
+seconds. The lease can therefore remain active while both processes are
+responsive, without losing the composer-side recovery path if the broker
+wedges. Unplug and secure-display entry also force release. SurfaceFlinger
 hotplug handling is deferred only from resource preparation through restoration.
 
 Lease bookkeeping lives in a private sidecar map in the DAL translation unit,
@@ -78,7 +82,9 @@ The chroot agent creates two stable uinput devices for Xorg and hot-grabs only
 the configured Bluetooth mouse and keyboard.  The Android broker separately
 grabs only the two physical volume-key devices.  Losing either volume device,
 holding both keys for three seconds, losing either control connection, or
-reaching 60 seconds stops Xorg before asking composer to resume Android.
+reaching 60 seconds in the default bounded mode stops Xorg before asking
+composer to resume Android. Continuous mode preserves every escape except that
+fixed broker deadline.
 
 No code in this repository writes a boot, init_boot, vendor, system, or vbmeta
 partition.
