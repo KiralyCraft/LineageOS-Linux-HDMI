@@ -1,6 +1,6 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.1` changes the Quick Settings tile from an immediate
+Release `0.2.8-candidate.2` changes the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at
 60 Hz. Arm with HDMI unplugged, then connect HDMI and accept Android's Mirror
 prompt. The broker starts Xorg only after the actual Android mode and lease

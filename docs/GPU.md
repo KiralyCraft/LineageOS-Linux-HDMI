@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; later testing exposed a false-ready 1080p `SETCRTC` failure, addressed but not yet hardware-validated in `0.2.8-candidate.1` |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; later testing exposed a false-ready 1080p `SETCRTC` failure, addressed but not yet hardware-validated in `0.2.8-candidate.2` |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -340,7 +340,7 @@ trigger the takeover separately from an Android root shell:
 /data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
-Release `0.2.8-candidate.1` makes the tile an arm/disarm control, defaults its
+Release `0.2.8-candidate.2` makes the tile an arm/disarm control, defaults its
 stored preset to 1080p60, waits for three stable composer mode samples, and uses
 the legacy scanout path with strict trace-plus-`GETCRTC` verification. The
 accelerated renewable session remains the no-argument launcher default.

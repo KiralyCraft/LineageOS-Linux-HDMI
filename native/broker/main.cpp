@@ -47,6 +47,12 @@ constexpr int kModePollMs = 250;
 constexpr int kModeStableSamples = 3;
 constexpr int kModeMismatchMs = 5000;
 
+enum class ComposerHotplug {
+  kInvalid,
+  kConnected,
+  kDisconnected,
+};
+
 std::atomic<bool> g_stop(false);
 uint32_t g_request_id = 1;
 
@@ -463,9 +469,13 @@ class Broker {
         composer_fd_ = -1;
         if (active_) Release("composer disconnected", false);
       } else if (composer_fd_ >= 0 && (fds[1].revents & POLLIN)) {
-        if (!HandleComposerReadable()) {
+        ComposerHotplug hotplug = HandleComposerReadable();
+        if (hotplug == ComposerHotplug::kInvalid) {
+          if (active_) Release("invalid composer hotplug event", true);
+          else if (armed_) Disarm("invalid composer hotplug event");
+        } else if (hotplug == ComposerHotplug::kDisconnected) {
           if (active_) Release("composer hotplug/disconnect event", true);
-          if (armed_) Disarm("external display disconnected");
+          else if (armed_) PreserveArmAcrossDisconnect();
         }
       }
       if (agent_fd_ >= 0 && (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
@@ -568,14 +578,14 @@ class Broker {
     if (status.flags & HDMI_LOS_FLAG_CONNECTED) composer_disconnect_pending_ = false;
   }
 
-  bool HandleComposerReadable() {
+  ComposerHotplug HandleComposerReadable() {
     hdmi_los_message event = {};
     int passed_fd = -1;
     if (!recv_with_fd(composer_fd_, &event, &passed_fd) ||
         !valid_composer_message(event) || event.opcode != HDMI_LOS_OP_HOTPLUG ||
         event.request_id != 0) {
       if (passed_fd >= 0) close(passed_fd);
-      return false;
+      return ComposerHotplug::kInvalid;
     }
     if (passed_fd >= 0) close(passed_fd);
     CacheComposerStatus(event);
@@ -583,7 +593,7 @@ class Broker {
     composer_disconnect_pending_ = !connected;
     log_transition(connected ? "composer reports external display connected" :
                                "composer reports external display disconnected");
-    return connected;
+    return connected ? ComposerHotplug::kConnected : ComposerHotplug::kDisconnected;
   }
 
   bool HandleAgentEvent(const hdmi_los_message &event) {
@@ -619,9 +629,12 @@ class Broker {
       if (result < 0 || (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))) return false;
       if (volumes_.Update(fds[1].revents, fds[2].revents)) return false;
       if (composer_fd_ >= 0 && (fds[3].revents & (POLLERR | POLLHUP | POLLNVAL))) return false;
-      if (composer_fd_ >= 0 && (fds[3].revents & POLLIN) && !HandleComposerReadable()) {
-        composer_disconnect_pending_ = true;
-        return false;
+      if (composer_fd_ >= 0 && (fds[3].revents & POLLIN)) {
+        ComposerHotplug hotplug = HandleComposerReadable();
+        if (hotplug != ComposerHotplug::kConnected) {
+          composer_disconnect_pending_ = true;
+          return false;
+        }
       }
       if (deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) return false;
       if (fds[0].revents & POLLIN) {
@@ -810,6 +823,17 @@ class Broker {
     composer_disconnect_pending_ = false;
     RecoverPreferredMode(reason);
     state_detail_ = reason;
+  }
+
+  void PreserveArmAcrossDisconnect() {
+    // A connected arm request deliberately waits for this unplug before it is
+    // allowed to change Android's preferred external mode.  The disconnect is
+    // therefore progress, not a reason to cancel the armed request.
+    composer_disconnect_pending_ = false;
+    replug_required_ = false;
+    stable_mode_samples_ = 0;
+    next_mode_poll_ms_ = 0;
+    state_detail_ = "armed; HDMI disconnected, applying preferred mode";
   }
 
   void AdvanceArmed() {
