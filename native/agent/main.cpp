@@ -13,10 +13,14 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
 
 #include <algorithm>
 #include <atomic>
@@ -30,6 +34,9 @@ namespace {
 
 constexpr const char *kRuntime = "/run/hdmi-los";
 constexpr const char *kDisplay = ":1";
+// The kernel UAPI stores drmModeConnection's DRM_MODE_CONNECTED value here
+// but intentionally does not publish libdrm's userspace enum.
+constexpr uint32_t kDrmModeConnected = 1;
 std::atomic<bool> g_stop(false);
 
 pid_t g_bridge = -1;
@@ -43,6 +50,10 @@ bool g_kgsl_glamor = false;
 bool g_kgsl_kms_bridge = false;
 bool g_start_lxde = true;
 bool g_no_timeout = false;
+std::string g_mouse;
+std::string g_keyboard;
+drm_mode_modeinfo g_android_mode = {};
+bool g_android_mode_valid = false;
 
 bool relay_trace_record(int timeout_ms);
 
@@ -395,8 +406,110 @@ bool read_input_paths(std::string *mouse, std::string *keyboard) {
          keyboard->rfind("/dev/input/event", 0) == 0;
 }
 
+bool same_mode_timing(const drm_mode_modeinfo &left, const drm_mode_modeinfo &right) {
+  return left.clock == right.clock &&
+         left.hdisplay == right.hdisplay && left.hsync_start == right.hsync_start &&
+         left.hsync_end == right.hsync_end && left.htotal == right.htotal &&
+         left.hskew == right.hskew && left.vdisplay == right.vdisplay &&
+         left.vsync_start == right.vsync_start && left.vsync_end == right.vsync_end &&
+         left.vtotal == right.vtotal && left.vscan == right.vscan &&
+         left.flags == right.flags;
+}
+
+bool read_connector_modes(int fd, uint32_t connector_id,
+                          drm_mode_get_connector *connector,
+                          std::vector<drm_mode_modeinfo> *modes) {
+  if (!connector || !modes) return false;
+  drm_mode_get_connector query = {};
+  query.connector_id = connector_id;
+  if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &query) != 0) return false;
+
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    std::vector<uint32_t> encoders(query.count_encoders);
+    std::vector<uint32_t> properties(query.count_props);
+    std::vector<uint64_t> property_values(query.count_props);
+    modes->resize(query.count_modes);
+
+    drm_mode_get_connector filled = query;
+    filled.encoders_ptr = reinterpret_cast<uint64_t>(encoders.data());
+    filled.modes_ptr = reinterpret_cast<uint64_t>(modes->data());
+    filled.props_ptr = reinterpret_cast<uint64_t>(properties.data());
+    filled.prop_values_ptr = reinterpret_cast<uint64_t>(property_values.data());
+    if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &filled) != 0) return false;
+    if (filled.count_encoders <= encoders.size() &&
+        filled.count_props <= properties.size() &&
+        filled.count_modes <= modes->size()) {
+      modes->resize(filled.count_modes);
+      *connector = filled;
+      return true;
+    }
+    query = filled;
+    query.encoders_ptr = 0;
+    query.modes_ptr = 0;
+    query.props_ptr = 0;
+    query.prop_values_ptr = 0;
+  }
+  return false;
+}
+
+bool read_android_mode(int lease_fd, uint32_t connector_id, uint32_t crtc_id,
+                       drm_mode_modeinfo *mode) {
+  if (lease_fd < 0 || connector_id == 0 || crtc_id == 0 || !mode) return false;
+
+  drm_mode_get_connector connector = {};
+  std::vector<drm_mode_modeinfo> modes;
+  if (!read_connector_modes(lease_fd, connector_id, &connector, &modes)) {
+    log_message("error", "cannot read the leased external connector");
+    return false;
+  }
+  bool connected = connector.connection == kDrmModeConnected;
+
+  drm_mode_crtc crtc = {};
+  crtc.crtc_id = crtc_id;
+  if (ioctl(lease_fd, DRM_IOCTL_MODE_GETCRTC, &crtc) != 0) {
+    log_message("error", "cannot read Android's leased external CRTC");
+    return false;
+  }
+
+  bool advertised = false;
+  if (crtc.mode_valid) {
+    for (const auto &advertised_mode : modes) {
+      if (same_mode_timing(crtc.mode, advertised_mode)) {
+        advertised = true;
+        break;
+      }
+    }
+  }
+  if (connected && crtc.mode_valid && crtc.mode.hdisplay > 0 &&
+      crtc.mode.vdisplay > 0 && advertised) {
+    *mode = crtc.mode;
+  }
+
+  if (!connected) log_message("error", "leased external connector is disconnected");
+  else if (!mode->hdisplay || !mode->vdisplay) {
+    log_message("error", "Android's active external mode is unavailable or no longer advertised");
+  }
+  return connected && mode->hdisplay > 0 && mode->vdisplay > 0;
+}
+
+std::string xorg_mode_flags(uint32_t flags) {
+  std::string result;
+  if (flags & DRM_MODE_FLAG_PHSYNC) result += " +HSync";
+  else if (flags & DRM_MODE_FLAG_NHSYNC) result += " -HSync";
+  if (flags & DRM_MODE_FLAG_PVSYNC) result += " +VSync";
+  else if (flags & DRM_MODE_FLAG_NVSYNC) result += " -VSync";
+  if (flags & DRM_MODE_FLAG_INTERLACE) result += " Interlace";
+  if (flags & DRM_MODE_FLAG_DBLSCAN) result += " DoubleScan";
+  if (flags & DRM_MODE_FLAG_CSYNC) result += " Composite";
+  if (flags & DRM_MODE_FLAG_PCSYNC) result += " +CSync";
+  else if (flags & DRM_MODE_FLAG_NCSYNC) result += " -CSync";
+  return result;
+}
+
 bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
-                       uint32_t probe_mode) {
+                       uint32_t probe_mode, const drm_mode_modeinfo &mode) {
+  constexpr const char *kModeName = "hdmi-los-android-current";
+  std::string mode_flags = xorg_mode_flags(mode.flags);
   std::string path = std::string(kRuntime) + "/xorg.conf";
   FILE *file = fopen(path.c_str(), "we");
   if (!file) return false;
@@ -427,7 +540,8 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "Section \"Monitor\"\n"
       "  Identifier \"HDMI Monitor\"\n"
       "  Option \"DPMS\" \"false\"\n"
-      "  Option \"PreferredMode\" \"1920x1080\"\n"
+      "  Modeline \"%s\" %.3f %u %u %u %u %u %u %u %u%s\n"
+      "  Option \"PreferredMode\" \"%s\"\n"
       "EndSection\n"
       "Section \"Device\"\n"
       "  Identifier \"HDMI Modesetting\"\n"
@@ -447,7 +561,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  DefaultDepth 24\n"
       "  SubSection \"Display\"\n"
       "    Depth 24\n"
-      "    Modes \"1920x1080\"\n"
+      "    Modes \"%s\"\n"
       "  EndSubSection\n"
       "EndSection\n"
       "Section \"ServerLayout\"\n"
@@ -455,11 +569,15 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Screen 0 \"HDMI Screen\"\n"
       "  InputDevice \"HDMI Mouse\" \"CorePointer\"\n"
       "  InputDevice \"HDMI Keyboard\" \"CoreKeyboard\"\n"
-      "EndSection\n", mouse.c_str(), keyboard.c_str(),
+      "EndSection\n", mouse.c_str(), keyboard.c_str(), kModeName,
+      static_cast<double>(mode.clock) / 1000.0,
+      mode.hdisplay, mode.hsync_start, mode.hsync_end, mode.htotal,
+      mode.vdisplay, mode.vsync_start, mode.vsync_end, mode.vtotal,
+      mode_flags.c_str(), kModeName,
       g_kgsl_glamor ? "glamor" : "none",
       g_kgsl_glamor ? "false" :
           (probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false"),
-      probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false");
+      probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false", kModeName);
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
   if (fclose(file) != 0) ok = false;
@@ -502,6 +620,10 @@ bool prepare_session(uint32_t probe_mode) {
   terminate_group(&g_session);
   terminate_group(&g_xorg);
   terminate_group(&g_bridge);
+  g_mouse.clear();
+  g_keyboard.clear();
+  g_android_mode = {};
+  g_android_mode_valid = false;
   passwd *user = getpwnam("kiraly");
   if (!user) return false;
   if ((mkdir(kRuntime, 0710) < 0 && errno != EEXIST) ||
@@ -521,15 +643,12 @@ bool prepare_session(uint32_t probe_mode) {
   if (g_bridge < 0) return false;
   setpgid(g_bridge, g_bridge);
 
-  std::string mouse;
-  std::string keyboard;
   int64_t end = monotonic_ms() + 4500;
   while (monotonic_ms() < end && process_alive(g_bridge)) {
-    if (read_input_paths(&mouse, &keyboard)) break;
+    if (read_input_paths(&g_mouse, &g_keyboard)) break;
     usleep(100000);
   }
-  if (mouse.empty() || keyboard.empty() ||
-      !write_xorg_config(mouse, keyboard, probe_mode)) return false;
+  if (g_mouse.empty() || g_keyboard.empty()) return false;
 
   FILE *lock = fopen("/tmp/.X1-lock", "re");
   if (lock) {
@@ -672,12 +791,27 @@ bool verify_xorg() {
     fclose(file);
     return found && !rejected;
   };
-  return contains(xrandr, "DP-1 connected", "DSI-") &&
+  char current_mode[64] = {};
+  snprintf(current_mode, sizeof(current_mode), "current %u x %u",
+           g_android_mode.hdisplay, g_android_mode.vdisplay);
+  return g_android_mode_valid &&
+         contains(xrandr, "DP-1 connected", "DSI-") &&
+         contains(xrandr, current_mode, nullptr) &&
          contains(xinput, "HDMI Mouse", nullptr) &&
          contains(xinput, "HDMI Keyboard", nullptr);
 }
 
-bool start_xorg(int lease_fd) {
+bool start_xorg(int lease_fd, uint32_t connector_id, uint32_t crtc_id) {
+  if (!read_android_mode(lease_fd, connector_id, crtc_id, &g_android_mode) ||
+      !write_xorg_config(g_mouse, g_keyboard, g_probe_mode, g_android_mode)) {
+    close(lease_fd);
+    return false;
+  }
+  g_android_mode_valid = true;
+  log_message("info", "inheriting Android external mode " +
+      std::to_string(g_android_mode.hdisplay) + "x" +
+      std::to_string(g_android_mode.vdisplay) + " (DRM mode " +
+      std::string(g_android_mode.name) + ")");
   g_xorg = spawn_xorg(lease_fd);
   close(lease_fd);
   if (g_xorg < 0) return false;
@@ -796,7 +930,7 @@ int run_agent() {
            request.flags == HDMI_LOS_PROBE_XORG_ATOMIC)) {
         int owned_lease_fd = lease_fd;
         lease_fd = -1;
-        ok = start_xorg(owned_lease_fd);
+        ok = start_xorg(owned_lease_fd, request.connector_id, request.crtc_id);
       }
       if (!ok) {
         cleanup_session();

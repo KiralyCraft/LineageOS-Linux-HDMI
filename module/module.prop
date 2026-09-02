@@ -1,6 +1,6 @@
 id=hdmi-los
 name=HDMI Xorg takeover for LineageOS pdx234
-version=0.2.7-candidate.2-current-install
-versionCode=20260909
+version=0.2.7-candidate.3-current-install
+versionCode=20260910
 author=KiralyCraft
-description=Atomic Xorg DRM-lease takeover with accelerated LXDE and renewable continuous sessions by default.
+description=Atomic Xorg DRM-lease takeover inheriting Android's display mode, with accelerated continuous LXDE by default.

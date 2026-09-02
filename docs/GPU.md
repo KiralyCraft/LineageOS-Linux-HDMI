@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works at 1920x1080; accelerated `glxgears` is visible at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works; the 1920x1080 validation produced visible accelerated `glxgears` at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -208,9 +208,9 @@ has consumed it. The agent also uses `FD_MESA_DEBUG=notile,noubwc` for bridge
 clients so this readback does not require detiling or UBWC decompression.
 
 This client presentation step is not zero-copy. It is narrower than ShadowFB:
-there is no continuous 1920x1080 screen copy, and non-GL desktop content stays
-on Xorg's GPU-backed root. Only an accelerated drawable is copied when that
-client swaps. The live result was:
+there is no continuous full-screen copy, and non-GL desktop content stays on
+Xorg's GPU-backed root. Only an accelerated drawable is copied when that
+client swaps. The initial live result was:
 
 ```text
 OpenGL vendor:   freedreno
@@ -222,6 +222,23 @@ glxgears:        55.233 and 57.364 FPS over two five-second samples
 Both the solid-color GL probe and the gears were visible in root-window XWD
 captures. Three bounded takeover runs restored Android normally, and the
 device did not reboot or crash.
+
+## External display mode
+
+The agent does not hard-code a Linux resolution. Once Android has paused the
+external display and passed the DRM lease, the agent reads the leased CRTC's
+active mode and verifies that the connector still advertises the same timing.
+It writes that exact timing to Xorg as `hdmi-los-android-current` and verifies
+the resulting RandR screen dimensions before declaring the session ready.
+
+This matters when the monitor and Android support more than one timing. If the
+Xorg `PreferredMode` and `Modes` entries force a different resolution while a
+Qualcomm connector topology property still describes Android's active mode,
+the downstream KMS driver can reject `MODE_SETCRTC` with `EINVAL`, leaving the
+external display black. Omitting both entries would avoid the hard-coded mode,
+but would let Xorg independently choose from EDID instead of reliably keeping
+Android's current resolution and refresh timing. Failure to read the exact
+active mode now aborts takeover and restores Android.
 
 ## Reproducing the checks
 
@@ -299,6 +316,7 @@ trigger the takeover separately from an Android root shell:
 /data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
-Release `0.2.7-candidate.2` enables the tile, selects the same atomic probe mode
+Release `0.2.7-candidate.3` enables the tile, selects the same atomic probe mode
 without requiring that separate root command, and makes the tested accelerated
-renewable session the no-argument launcher default.
+renewable session the no-argument launcher default. It also inherits Android's
+active external-display timing instead of forcing 1920x1080.

@@ -41,13 +41,19 @@ Two Xorg paths have been tested on the target device:
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (fallback) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible 1920x1080 LXDE and `glxgears` at about 55-57 FPS |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible LXDE and `glxgears`; the agent inherits Android's active external-display timing instead of forcing a resolution |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
 black image when it imports the same KGSL dma-buf in another context. It does
 not continuously copy the full screen. The exact investigation and tested
 environment are documented in [GPU acceleration](docs/GPU.md).
+
+At takeover time the agent reads the active mode from Android's leased CRTC
+and gives Xorg that exact timing. It does not impose 1080p or independently
+choose the monitor's EDID-preferred mode. If the active timing cannot be read
+and matched to the connected display, takeover fails closed and Android is
+restored.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer

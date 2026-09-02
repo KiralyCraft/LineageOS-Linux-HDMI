@@ -19,8 +19,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_selects_atomic_tile_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.7-candidate.2")
-        self.assertEqual(release["version_code"], 20260909)
+        self.assertEqual(release["version"], "0.2.7-candidate.3")
+        self.assertEqual(release["version_code"], 20260910)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -86,8 +86,14 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('/lib/mesa', agent)
         self.assertIn('g_kgsl_glamor ? "glamor" : "none"', agent)
         self.assertIn('g_kgsl_glamor ? "false"', agent)
-        self.assertIn('Option \\"PreferredMode\\" \\"1920x1080\\"', agent)
-        self.assertIn('Modes \\"1920x1080\\"', agent)
+        self.assertIn("DRM_IOCTL_MODE_GETCONNECTOR", agent)
+        self.assertIn("DRM_IOCTL_MODE_GETCRTC", agent)
+        self.assertIn("same_mode_timing(crtc.mode, advertised_mode)", agent)
+        self.assertIn('Modeline \\"%s\\" %.3f', agent)
+        self.assertIn('Option \\"PreferredMode\\" \\"%s\\"', agent)
+        self.assertIn('Modes \\"%s\\"', agent)
+        self.assertIn('"hdmi-los-android-current"', agent)
+        self.assertNotIn('PreferredMode\\" \\"1920x1080', agent)
         self.assertIn("XORG_ACCEL=kgsl-kms-bridge", runner)
         self.assertIn("SESSION=lxde", runner)
         self.assertIn("--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge", runner)

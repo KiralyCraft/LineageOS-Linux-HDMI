@@ -1,10 +1,12 @@
 # Atomic takeover candidate installation and test
 
-Release `0.2.7-candidate.2` enables the Quick Settings tile. The launcher now
+Release `0.2.7-candidate.3` enables the Quick Settings tile. The launcher now
 defaults to the tested accelerated LXDE path and renews the composer watchdog
 every 20 seconds so a healthy session can continue. `--timeout` restores the
 60-second broker deadline for bounded testing. The root-only diagnostic probes
-remain available, and the old protocol-v1 chroot agent is rejected.
+remain available, and the old protocol-v1 chroot agent is rejected. Xorg now
+inherits the exact external-display timing Android was using immediately before
+takeover rather than forcing 1920x1080.
 
 Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
 a probe after a freeze or reset until all available evidence has been copied.
@@ -69,7 +71,9 @@ diagnostic command is:
 
 Every DRM ioctl is synced to `/data/adb/hdmi-los/logs/broker.log` before it is
 issued. If LXDE appears, verify the internal Android display, mouse, and
-keyboard, then hold both volume buttons for three seconds to restore Android.
+keyboard. Confirm that `/run/hdmi-los/xrandr.txt` reports the same current
+dimensions Android used before takeover, then hold both volume buttons for
+three seconds to restore Android.
 
 If the phone resets, do not retry. In Lineage Recovery, capture evidence with:
 
