@@ -81,7 +81,8 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
                 build-support/build-tile.sh|build-support/write-build-info.py|\
                 build-support/reuse-composer.sh|\
                 build-support/verify-reused-composer.py|\
-                build-support/verify-reused-build.py)
+                build-support/verify-reused-build.py|\
+                third_party/mesa-for-android-container)
                     ;;
                 *)
                     printf 'Refusing composer reuse: composer-producing path changed: %s\n' \

@@ -245,6 +245,14 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('cp "$BUILD/native/chroot/lib/"* "$CHROOT/lib/"', package)
         self.assertIn("libhdmi-los-drmtrace.so", build)
 
+    def test_mesa_changes_can_reuse_only_the_composer(self):
+        remote_build = (ROOT / "scripts/remote-build.sh").read_text()
+        repackage, composer_reuse = remote_build.split(
+            "if [[ $MODE == repackage ]]", 1
+        )[1].split("else", 1)
+        self.assertNotIn("third_party/mesa-for-android-container", repackage)
+        self.assertIn("third_party/mesa-for-android-container", composer_reuse)
+
     def test_tracer_identifies_property_operations_and_values(self):
         tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
         self.assertIn('case DRM_IOCTL_MODE_GETPROPBLOB: return "MODE_GETPROPBLOB";', tracer)
