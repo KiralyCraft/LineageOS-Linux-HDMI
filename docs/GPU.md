@@ -116,7 +116,7 @@ not enter those DRI3 drawable and Present paths. The custom patch therefore
 cannot repair presentation in the present ShadowFB configuration.
 
 In the safe ShadowFB configuration the X server's 2D rendering remains
-software-based. The opt-in `kgsl-kms-bridge` configuration described below is
+software-based. The default `kgsl-kms-bridge` configuration described below is
 the verified native-Freedreno exception.
 
 ## Native KGSL glamor diagnostic
@@ -168,7 +168,7 @@ timeout restored Android.
 
 ## KGSL/KMS allocation and presentation bridge
 
-The opt-in bridge was implemented and tested live on 2026-09-02. The custom
+The bridge was implemented and tested live on 2026-09-02. The custom
 Mesa work is commit `89da2771` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
@@ -257,8 +257,8 @@ The current agent starts LXDE directly with `dbus-run-session`; it does not
 start an interactive login shell. `kgsl-kms-bridge` supplies the KGSL and
 presentation variables explicitly, so programs launched from that LXDE
 session inherit the working configuration. The direct glamor experiment still
-proves that merely enabling DRI3 is insufficient. Safe ShadowFB remains the
-default until the opt-in bridge has received broader application testing.
+proves that merely enabling DRI3 is insufficient. Safe ShadowFB remains
+available as an explicit fallback.
 
 ## Starting the takeover as `kiraly`
 
@@ -266,31 +266,30 @@ From a terminal inside the mounted chroot:
 
 ```sh
 cd /home/kiraly/Downloads/hdmi-los-runtime
-./run-agent.sh --capture none
+./run-agent.sh
 ```
 
 `run-agent.sh` automatically re-executes itself through passwordless
 `sudo -n`; it is expected to remain in the foreground. Leave that terminal
 open, then tap the `HDMI Xorg` Quick Settings tile on Android. Pressing
-`Ctrl-C` stops the waiting chroot agent. The tile, volume-button escape, and
-60/65-second deadlines restore Android in the default bounded mode.
+`Ctrl-C` stops the waiting chroot agent. The no-argument command defaults to
+no phone-side capture, `kgsl-kms-bridge`, LXDE, and a renewable continuous
+lease. The tile, volume-button escape, failed heartbeat, disconnect, and Xorg
+exit still restore Android.
 
-To start the tested accelerated mode instead, the runtime must contain the
-patched private `libgallium-*.so` below `lib/mesa/`, then run:
+The default requires the patched private `libgallium-*.so` below `lib/mesa/`.
+Its full equivalent command is:
 
 ```sh
 cd /home/kiraly/Downloads/hdmi-los-runtime
-./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge --session lxde
+./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge --session lxde --no-timeout
 ```
 
 The runner deliberately rejects this mode if the private Mesa library is
-missing. The no-argument form above continues to select safe ShadowFB.
-
-After bounded takeover testing succeeds, add `--no-timeout` to either command
-to keep the leased Xorg session running. The broker then renews the composer's
-65-second watchdog every 20 seconds instead of ending the session at 60
-seconds. The tile, volume chord, disconnect, Xorg failure, HDMI unplug, and
-watchdog-renewal failure still restore Android.
+missing. Use `--timeout` to restore the bounded 60-second session deadline.
+Use `--xorg-accel safe` for the software-rendered ShadowFB fallback; these can
+be combined as `./run-agent.sh --xorg-accel safe --timeout` during staged
+safety testing.
 
 The `0.2.5-diagnostic.1` module disables ordinary tile activation. With that
 older diagnostic package installed, start the foreground agent as above and
@@ -300,6 +299,6 @@ trigger the takeover separately from an Android root shell:
 /data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
-Release `0.2.7-candidate.1` enables the tile, selects the same atomic probe mode
-without requiring that separate root command, and supports the explicit
-renewable continuous-session option.
+Release `0.2.7-candidate.2` enables the tile, selects the same atomic probe mode
+without requiring that separate root command, and makes the tested accelerated
+renewable session the no-argument launcher default.

@@ -81,10 +81,10 @@ candidate package omits the marker and does not change that property.
 The chroot agent creates two stable uinput devices for Xorg and hot-grabs only
 the configured Bluetooth mouse and keyboard.  The Android broker separately
 grabs only the two physical volume-key devices.  Losing either volume device,
-holding both keys for three seconds, losing either control connection, or
-reaching 60 seconds in the default bounded mode stops Xorg before asking
-composer to resume Android. Continuous mode preserves every escape except that
-fixed broker deadline.
+holding both keys for three seconds or losing either control connection stops
+Xorg before asking composer to resume Android. The launcher defaults to a
+renewed continuous lease; `--timeout` restores the fixed 60-second broker
+deadline. Both modes preserve all other recovery paths.
 
 No code in this repository writes a boot, init_boot, vendor, system, or vbmeta
 partition.

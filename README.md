@@ -40,8 +40,8 @@ Two Xorg paths have been tested on the target device:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
-| `safe` (default) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
-| `kgsl-kms-bridge` (opt-in) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible 1920x1080 LXDE and `glxgears` at about 55-57 FPS |
+| `safe` (fallback) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible 1920x1080 LXDE and `glxgears` at about 55-57 FPS |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
@@ -160,41 +160,42 @@ ordinary-mirroring and unused-lease gates. In outline:
 2. Deploy the matching chroot bundle without mixing files from older builds.
 3. Start the foreground agent inside the mounted chroot.
 4. Add and tap the **HDMI Xorg** Quick Settings tile.
-5. End the session with the volume-key escape or wait for automatic restore.
+5. End the session with the volume-key escape or by tapping the tile again.
 
-Start the default safe session with:
+The tested accelerated LXDE session is now the launcher default:
 
 ```sh
 cd <hdmi-los-runtime>
-sudo -n ./run-agent.sh --capture none
+./run-agent.sh
 ```
 
-Start the tested accelerated session with:
+That is equivalent to:
 
 ```sh
 cd <hdmi-los-runtime>
-sudo -n ./run-agent.sh \
+./run-agent.sh \
   --capture none \
   --xorg-accel kgsl-kms-bridge \
-  --session lxde
+  --session lxde \
+  --no-timeout
 ```
 
 No takeover starts merely because the module or agent is present. The tile or
 an explicit root diagnostic command initiates it.
 
-After the bounded path has been validated, append `--no-timeout` to either
-agent command to allow the session to run continuously. This removes the
-broker's fixed 60-second session deadline, but it does not remove automatic
-recovery: the broker renews the composer's 65-second watchdog every 20 seconds.
-If renewal stops, the agent or broker disconnects, Xorg exits, HDMI is
-unplugged, or the volume escape is used, Android is restored.
+Continuous mode removes the broker's fixed 60-second session deadline, but it
+does not remove automatic recovery: the broker renews the composer's 65-second
+watchdog every 20 seconds. If renewal stops, the agent or broker disconnects,
+Xorg exits, HDMI is unplugged, or the volume escape is used, Android is
+restored. Use `--timeout` for a bounded 60-second session, and use
+`--xorg-accel safe` for the software-rendered ShadowFB fallback.
 
 ## Safety and recovery
 
 - Hold Volume Up and Volume Down together for three seconds to restore Android.
-- Bounded sessions restore after 60 seconds; the composer has an independent
+- `--timeout` sessions restore after 60 seconds; the composer has an independent
   65-second backstop.
-- `--no-timeout` sessions renew that composer backstop every 20 seconds and can
+- Default continuous sessions renew that composer backstop every 20 seconds and can
   run indefinitely only while the broker remains healthy.
 - Broker or agent disconnect, HDMI unplug, and secure-display entry also force
   lease release.

@@ -1,11 +1,10 @@
 # Atomic takeover candidate installation and test
 
-Release `0.2.7-candidate.1` enables the Quick Settings tile and selects the
-traced atomic+ShadowFB Xorg path. Bounded mode retains the 60/65-second
-automatic restore timers. An explicit `--no-timeout` agent instead renews the
-composer watchdog every 20 seconds so a healthy session can continue. The
-root-only diagnostic probes remain available, and the old protocol-v1 chroot
-agent is rejected.
+Release `0.2.7-candidate.2` enables the Quick Settings tile. The launcher now
+defaults to the tested accelerated LXDE path and renews the composer watchdog
+every 20 seconds so a healthy session can continue. `--timeout` restores the
+60-second broker deadline for bounded testing. The root-only diagnostic probes
+remain available, and the old protocol-v1 chroot agent is rejected.
 
 Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
 a probe after a freeze or reset until all available evidence has been copied.
@@ -58,7 +57,7 @@ Start the matching chroot bundle without phone-side capture:
 
 ```sh
 cd /home/kiraly/Downloads/hdmi-los-runtime
-sudo -n ./run-agent.sh --capture none
+./run-agent.sh --capture none --xorg-accel safe --session lxde --timeout
 ```
 
 Add the `HDMI Xorg` Quick Settings tile and tap it. The equivalent root-only
@@ -98,20 +97,20 @@ legacy modeset returns `EINVAL` and produces a black capture.
 ## Gate 5: renewable continuous session
 
 Do not test continuous mode until all bounded success criteria below pass.
-Stop the foreground agent, restart it with the explicit option, then use the
-tile normally:
+Stop the foreground agent, restart it with the no-argument operational default,
+then use the tile normally:
 
 ```sh
 cd /home/kiraly/Downloads/hdmi-los-runtime
-sudo -n ./run-agent.sh --capture none --no-timeout
+./run-agent.sh
 ```
 
-For the native KGSL bridge, add the already documented
-`--xorg-accel kgsl-kms-bridge --session lxde` options to that command. Verify
-that the broker status reports `continuous watchdog mode`, leave Xorg active
-for at least 90 seconds, and confirm it remains responsive beyond the former
-60/65-second limits. End the test with the volume chord, then repeat once and
-end it by tapping the tile. Android mirroring must recover both times.
+This is equivalent to `--capture none --xorg-accel kgsl-kms-bridge --session
+lxde --no-timeout`. Verify that the broker status reports `continuous watchdog
+mode`, leave Xorg active for at least 90 seconds, and confirm it remains
+responsive beyond the former 60/65-second limits. End the test with the volume
+chord, then repeat once and end it by tapping the tile. Android mirroring must
+recover both times.
 
 Continuous mode removes only the fixed broker deadline. It still requires both
 physical volume inputs and the suspend blocker. The broker renews the composer

@@ -6,12 +6,12 @@ CAPTURE=none
 RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
 AGENT_PID=0
-XORG_ACCEL=safe
+XORG_ACCEL=kgsl-kms-bridge
 SESSION=lxde
-NO_TIMEOUT=0
+NO_TIMEOUT=1
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none] [--no-timeout]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -35,6 +35,10 @@ while (($#)); do
             NO_TIMEOUT=1
             shift
             ;;
+        --timeout)
+            NO_TIMEOUT=0
+            shift
+            ;;
         *)
             usage
             exit 2
@@ -48,7 +52,11 @@ done
 
 if ((EUID != 0)); then
     args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" --session "$SESSION")
-    ((NO_TIMEOUT)) && args+=(--no-timeout)
+    if ((NO_TIMEOUT)); then
+        args+=(--no-timeout)
+    else
+        args+=(--timeout)
+    fi
     exec sudo -n -- "$0" "${args[@]}"
 fi
 
@@ -136,14 +144,14 @@ if [[ $CAPTURE != none ]]; then
 fi
 
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
-    printf 'WARNING: KGSL glamor is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
+    printf 'WARNING: KGSL glamor is an isolated diagnostic; prefer kgsl-kms-bridge or safe ShadowFB\n' >&2
 elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
     compgen -G "$BUNDLE/lib/mesa/libgallium-*.so" >/dev/null || {
         printf 'Required private Mesa library is missing below: %s\n' \
             "$BUNDLE/lib/mesa" >&2
         exit 1
     }
-    printf 'WARNING: KGSL/KMS scanout plus MIT-SHM presentation bridge is an isolated diagnostic; safe ShadowFB remains the default\n' >&2
+    printf 'Using KGSL/KMS scanout plus the MIT-SHM presentation bridge\n' >&2
 fi
 
 if ((NO_TIMEOUT)); then

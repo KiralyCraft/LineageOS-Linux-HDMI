@@ -19,8 +19,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_selects_atomic_tile_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.7-candidate.1")
-        self.assertEqual(release["version_code"], 20260908)
+        self.assertEqual(release["version"], "0.2.7-candidate.2")
+        self.assertEqual(release["version_code"], 20260909)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -35,7 +35,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("CAPTURE=none", runner)
         self.assertIn("workstation-powered capture", runner)
 
-    def test_continuous_mode_is_explicit_and_renews_composer_watchdog(self):
+    def test_continuous_mode_is_default_and_renews_composer_watchdog(self):
         protocol = (ROOT / "native/common/hdmi_los_protocol.h").read_text()
         broker = (ROOT / "native/broker/main.cpp").read_text()
         agent = (ROOT / "native/agent/main.cpp").read_text()
@@ -52,8 +52,9 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("HDMI_LOS_FLAG_CONTINUOUS", broker)
         self.assertIn('strcmp(argv[i], "--no-timeout") == 0', agent)
         self.assertIn("registration.flags = g_no_timeout", agent)
-        self.assertIn("NO_TIMEOUT=0", runner)
+        self.assertIn("NO_TIMEOUT=1", runner)
         self.assertIn("--no-timeout", runner)
+        self.assertIn("--timeout", runner)
         self.assertIn("continuous_lease_", composer_patch)
         self.assertIn(
             "deadline_ms_ = BootTimeMs() + kComposerFailsafeSeconds * 1000",
@@ -67,7 +68,7 @@ class DiagnosticContractTests(unittest.TestCase):
         spawn = spawn.split("bool xorg_ready()", 1)[0]
         self.assertIn('setenv("TMPDIR", "/tmp", 1);', spawn)
 
-    def test_kgsl_glamor_is_explicit_and_safe_mode_remains_default(self):
+    def test_kgsl_bridge_is_default_and_safe_mode_remains_available(self):
         agent = (ROOT / "native/agent/main.cpp").read_text()
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
         self.assertIn("bool g_kgsl_glamor = false;", agent)
@@ -87,7 +88,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('g_kgsl_glamor ? "false"', agent)
         self.assertIn('Option \\"PreferredMode\\" \\"1920x1080\\"', agent)
         self.assertIn('Modes \\"1920x1080\\"', agent)
-        self.assertIn("XORG_ACCEL=safe", runner)
+        self.assertIn("XORG_ACCEL=kgsl-kms-bridge", runner)
         self.assertIn("SESSION=lxde", runner)
         self.assertIn("--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge", runner)
         self.assertIn("--session lxde|none", runner)

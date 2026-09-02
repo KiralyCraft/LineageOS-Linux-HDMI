@@ -3,10 +3,11 @@
 ## While Xorg owns HDMI
 
 Hold both volume buttons for three seconds.  The broker stops the X session and
-input bridge before composer revokes the lease. Agent/composer disconnects and
-the default 60/65-second timers provide independent release paths. With
-`--no-timeout`, the 60-second deadline is absent but the broker must renew the
-composer watchdog every 20 seconds; failed renewal still restores Android.
+input bridge before composer revokes the lease. Agent/composer disconnects
+remain independent release paths. The default continuous launcher omits the
+60-second deadline but must renew the composer watchdog every 20 seconds;
+failed renewal still restores Android. Passing `--timeout` restores the fixed
+60/65-second deadlines.
 
 The diagnostic build also supports an unused three-second lease hold. It
 always closes the lease and asks composer to restore Android before returning.
