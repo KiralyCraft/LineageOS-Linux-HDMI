@@ -34,6 +34,12 @@ and closes it three seconds later without starting the chroot agent.
 production tile arms the legacy path because the installed Sony kernel
 intentionally rejects Xorg's atomic-client opt-in.
 
+The tile APK does not invoke `su`. It connects as its ordinary Android UID to
+the broker's abstract `hdmi-los-broker-v1` Unix stream socket. The broker reads
+the peer credentials from the accepted socket and permits only root or the UID
+that Android currently assigns to `dev.kiraly.hdmilos`; the SELinux policy
+grants that app domain only the narrow socket connection needed for this path.
+
 When armed, the broker atomically journals Android's prior global preferred
 display mode under `/data/adb/hdmi-los`, applies the selected preset through
 `cmd display`, and polls composer at 250 ms. It requires three stable samples

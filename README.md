@@ -106,6 +106,12 @@ ioctls are traced before execution. The internal display is never included in
 the lease. See
 [Architecture and invariants](docs/ARCHITECTURE.md) for the full design.
 
+The tile and diagnostics activity are deliberately ordinary, unprivileged
+Android components. They do not execute `su`, so no Magisk permission prompt is
+expected. They connect to the root broker's private local socket, and the
+broker accepts commands only when the kernel-reported peer UID matches the
+installed `dev.kiraly.hdmilos` package UID (or is root).
+
 ## Requirements
 
 - Sony Xperia 1 V `XQ-DQ72` / `pdx234` with the exact supported LineageOS build
