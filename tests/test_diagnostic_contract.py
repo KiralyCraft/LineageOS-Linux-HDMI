@@ -23,11 +23,13 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("char detail[92];", protocol)
         tile = (ROOT / "android/tile/app/src/main/java/dev/kiraly/hdmilos/BrokerClient.java").read_text()
         self.assertIn("private static final short VERSION = 3", tile)
+        connect = "socket.connect(new LocalSocketAddress(SOCKET, LocalSocketAddress.Namespace.ABSTRACT))"
+        self.assertLess(tile.index(connect), tile.index("socket.setSoTimeout(40000)"))
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.4")
-        self.assertEqual(release["version_code"], 20260914)
+        self.assertEqual(release["version"], "0.2.8-candidate.5")
+        self.assertEqual(release["version_code"], 20260915)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]

@@ -62,10 +62,12 @@ final class BrokerClient {
 
     private static Status request(short opcode, int width, int height, int refreshMilliHz) {
         try (LocalSocket socket = new LocalSocket(LocalSocket.SOCKET_STREAM)) {
+            socket.connect(new LocalSocketAddress(SOCKET, LocalSocketAddress.Namespace.ABSTRACT));
             // Preparation, composer hand-off, and Xorg validation are all
             // bounded but can legitimately take up to roughly 30 seconds.
+            // LocalSocket creates its fd lazily in connect(), so socket
+            // options must be configured only after the connection exists.
             socket.setSoTimeout(40000);
-            socket.connect(new LocalSocketAddress(SOCKET, LocalSocketAddress.Namespace.ABSTRACT));
             ByteBuffer outgoing = ByteBuffer.allocate(MESSAGE_SIZE).order(ByteOrder.LITTLE_ENDIAN);
             outgoing.putInt(MAGIC);
             outgoing.putShort(VERSION);
