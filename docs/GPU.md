@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; candidate 3 proved mode-safe acquisition and exposed a lease-release HWC state mismatch, addressed but not yet hardware-validated in `0.2.8-candidate.4` |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; `0.2.8-candidate.4` displayed LXDE continuously beyond the 65-second composer watchdog and restored Android after HDMI was unplugged while Xorg owned the lease |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports

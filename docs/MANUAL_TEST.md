@@ -14,6 +14,31 @@ transition after resetting the lease so Qualcomm's power state and fences match
 the hardware before SurfaceFlinger resumes. A failed start still restores
 Android automatically.
 
+## Candidate-4 validation record
+
+Live testing on the XQ-DQ72/pdx234 on 2026-09-02 established these results:
+
+- Three consecutive unused three-second lease cycles restored Android
+  mirroring and left SurfaceFlinger responsive.
+- A bounded `safe` LXDE takeover displayed correctly at Android's negotiated
+  1280x720 at 60 Hz mode. Its mandatory 60-second timeout stopped Xorg,
+  performed the tracked HWC Off-to-On transition, and restored mirroring
+  without a reboot or SurfaceFlinger stall.
+- A default `kgsl-kms-bridge` session displayed LXDE and remained leased beyond
+  the composer's 65-second watchdog, confirming continuous renewal.
+- Unplugging HDMI while that accelerated X session was displayed caused the
+  broker to begin recovery immediately and complete it in about 2.1 seconds.
+  The phone stayed up, SurfaceFlinger remained responsive, Xorg exited, and
+  the continuous agent returned to its ready state.
+- The 1080p60 preference did not change the MacroSilicon sink's active Android
+  mode from 1280x720 at 60 Hz. The broker correctly rejected the mismatch;
+  selecting `native` while unplugged allowed the exact negotiated mode to be
+  leased instead.
+
+These results validate the candidate-4 release fix and unplug recovery, but do
+not replace the remaining repetition, volume-chord, tile-stop, and evidence
+checks in the success criteria below.
+
 Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
 a probe after a freeze or reset until all available evidence has been copied.
 

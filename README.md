@@ -43,8 +43,8 @@ Two Xorg paths have been tested on the target device:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
-| `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | Previously produced visible LXDE in bounded probes |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; release `0.2.8-candidate.4` keeps Android's last framebuffer active for acquisition and synchronizes Qualcomm's HWC power state during release, but the release fix still requires target-device validation |
+| `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; `0.2.8-candidate.4` also survived continuous operation beyond the 65-second composer watchdog and restored Android after HDMI was unplugged while Xorg owned the display |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
@@ -60,6 +60,11 @@ mismatch, missing lease readiness, failed Xorg `SETCRTC`, or CRTC framebuffer
 mismatch fails closed and restores Android's previous global preference.
 If HDMI is already connected when armed, the broker waits for an unplug before
 applying the preference; it never changes a live external mode while arming.
+On the MacroSilicon capture path used for candidate-4 validation, Android still
+negotiated 1280x720 at 60 Hz after the 1080p60 preset had been selected. The
+broker correctly refused that mismatch. Selecting `native` while unplugged
+allowed the next connection to inherit and lease Android's exact 1280x720
+timing.
 
 Earlier live testing showed that 3840x2160 can work but starts more slowly and
 is noticeably less responsive. A later 1920x1080 run exposed a downstream SDE
