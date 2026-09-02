@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; `0.2.8-candidate.4` displayed LXDE continuously beyond the 65-second composer watchdog and restored Android after HDMI was unplugged while Xorg owned the lease |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Visible LXDE and `glxgears`; uncapped 300x300 `glxgears` runs at GPU speed while the newest completed image is independently paced to the display |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -98,7 +98,7 @@ Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
 The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `2788d8df` on the
+submodule at commit `3ce48e02` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -107,14 +107,17 @@ branch. Its relevant custom commits are:
 a3eb373e dri3: bridge native render fences to Present
 89da2771 freedreno/kgsl: bridge KMS scanout and X11 presentation
 2788d8df dri3: pipeline the KGSL X11 SHM bridge
+4c72c7a4 dri3: decouple KGSL rendering from SHM presentation
+3ce48e02 dri3: wait on KGSL bridge events without polling
 ```
 
-The latter patch exports a native Freedreno render fence and attaches it as an
-X Present wait fence through Mesa's DRI3 loader and GLX/EGL DRI3 paths. That is
-the appropriate synchronization fix once Xorg exposes a working DRI3 screen,
-but the stable takeover currently initializes GLX with `DRISWRAST` and does
-not enter those DRI3 drawable and Present paths. The custom patch therefore
-cannot repair presentation in the present ShadowFB configuration.
+The separate `fix/kgsl-present-wait-fence` line exports a native Freedreno
+render fence and attaches it as an X Present wait fence through Mesa's DRI3
+loader and GLX/EGL paths. Termux:X11 commit `fc534e514d7a` fixes the matching
+server-side Present callback lifetime. The leased-screen SHM bridge does not
+give a native wait fence to Xorg: its worker waits the KGSL fence before it
+maps the selected client image and submits an already-complete SHM pixmap.
+That server-side wait-fence bug is therefore not on this bridge's hot path.
 
 In the safe ShadowFB configuration the X server's 2D rendering remains
 software-based. The default `kgsl-kms-bridge` configuration described below is
@@ -169,8 +172,8 @@ timeout restored Android.
 
 ## KGSL/KMS allocation and presentation bridge
 
-The bridge was implemented and tested live on 2026-09-02. The custom
-Mesa work now ends at commit `2788d8df` on
+The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. The
+custom Mesa work now ends at commit `3ce48e02` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
 that base and intentionally does not contain the KMS/X11 bridge.
@@ -201,16 +204,22 @@ cross-context KGSL dma-buf consumption on this downstream stack, not rendering,
 mode setting, or the Present completion fence.
 
 For that boundary, Mesa provides the opt-in
-`MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application. On
-swap, Mesa waits for the completed image, maps that one drawable, and submits
-it to the X drawable with MIT-SHM. Commit `2788d8df` replaces the checked
-per-frame X request with a three-slot staging ring on a private XCB connection.
-MIT-SHM completion events release slots, so up to three interval-zero swaps can
-remain outstanding without a request/reply stall. Nonzero intervals use Present
-MSC notifications for pacing. EGL damage rectangles are conservatively
-coalesced; GLX swaps copy the full drawable. Set
-`MESA_KGSL_X11_BRIDGE_STATS=1` for periodic frame/copy/wait statistics. The
-agent also uses `FD_MESA_DEBUG=notile,noubwc` for bridge clients.
+`MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application.
+Commit `4c72c7a4` moves readback and X submission to a persistent worker. Each
+producer swap exports the native KGSL fence, then an interval-zero producer
+drops superseded frames before mapping them. The worker waits the selected
+fence, copies only that completed image into one of three shared pixmaps, and
+submits it with X Present. Present Complete and Idle events release each slot;
+there is no sleep, polling timer, or guessed buffer lifetime. Synchronized
+swaps wait for their actual presentation sequence, while uncapped rendering
+rotates through four KGSL back buffers and keeps running independently of the
+display refresh.
+
+EGL damage rectangles are currently treated conservatively and GLX swaps copy
+the full drawable. Set `MESA_KGSL_X11_BRIDGE_STATS=1` for periodic
+produced/presented/dropped/copy statistics. The agent uses
+`FD_MESA_DEBUG=noubwc`: UBWC must remain disabled for reliable CPU-visible
+readback, but ordinary Freedreno tiling remains enabled.
 
 This client presentation step is not zero-copy. It is narrower than ShadowFB:
 there is no continuous full-screen copy, and non-GL desktop content stays on
@@ -227,6 +236,37 @@ glxgears:        55.233 and 57.364 FPS over two five-second samples
 Both the solid-color GL probe and the gears were visible in root-window XWD
 captures. Three bounded takeover runs restored Android normally, and the
 device did not reboot or crash.
+
+The asynchronous worker changes what the `glxgears` number means. A 300x300
+swap-interval-zero client no longer blocks at about 60 FPS: live samples ranged
+from roughly 1.1k to 2.0k FPS depending on device state, versus roughly 1.4k to
+2.4k FPS on Termux:X11 in the corresponding runs. The remaining bridge cost on
+this microbenchmark was about 17-22%. The external screen still receives only
+the newest completed image at its real refresh rate. Experiments that omitted
+the per-swap native fence, used an unexported internal fence, or deferred the
+flush reduced throughput or let the KGSL queue run far ahead; the explicit
+exported-fence lifecycle is retained.
+
+### Private Mesa ABI set
+
+`struct loader_dri3_drawable` is allocated by the GLX/EGL frontend and used by
+the DRI target. The bridge adds fields to that structure, so copying only a new
+`libgallium` beside the system `libGLX_mesa` is not safe. That mixed deployment
+caused intermittent startup crashes in `driQueryOptionb`—up to 7 crashes in 40
+short launches—because the newer DRI code wrote beyond the older frontend's
+allocation. Two matched-build stress runs each completed 80 of 80 launches
+without a crash.
+
+The runtime therefore requires this complete set from one Mesa build:
+
+```text
+lib/mesa/libgallium-<matching-version>.so
+lib/mesa/libGLX_mesa.so.0
+lib/mesa/libEGL_mesa.so.0
+```
+
+All three carry `HDMI_LOS_MESA_BRIDGE_ABI=3`. `run-agent.sh` checks every file
+before starting accelerated mode and refuses a missing, stale, or mixed set.
 
 ## External display mode
 
@@ -328,7 +368,8 @@ no phone-side capture, `kgsl-kms-bridge`, LXDE, and a renewable continuous
 lease. The tile, volume-button escape, failed heartbeat, disconnect, and Xorg
 exit still restore Android.
 
-The default requires the patched private `libgallium-*.so` below `lib/mesa/`.
+The default requires the matched private `libgallium-*.so`,
+`libGLX_mesa.so.0`, and `libEGL_mesa.so.0` below `lib/mesa/`.
 Its full equivalent command is:
 
 ```sh
@@ -336,8 +377,9 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 ./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge --session lxde --no-timeout
 ```
 
-The runner deliberately rejects this mode if the private Mesa library is
-missing. Use `--timeout` to restore the bounded 60-second session deadline.
+The runner deliberately rejects this mode if any private Mesa library is
+missing or carries the wrong bridge ABI. Use `--timeout` to restore the bounded
+60-second session deadline.
 Use `--xorg-accel safe` for the software-rendered ShadowFB fallback; these can
 be combined as `./run-agent.sh --xorg-accel safe --timeout` during staged
 safety testing.

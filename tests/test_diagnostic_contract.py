@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.5")
-        self.assertEqual(release["version_code"], 20260915)
+        self.assertEqual(release["version"], "0.2.8-candidate.6")
+        self.assertEqual(release["version_code"], 20260916)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -125,19 +125,43 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("int resume_result", added)
         self.assertIn("ToggleScreenUpdates(true)", added)
 
-    def test_mesa_bridge_uses_a_completion_driven_three_slot_ring(self):
+    def test_mesa_bridge_uses_a_fenced_completion_driven_worker(self):
         mesa = ROOT / "third_party/mesa-for-android-container"
         header = (mesa / "src/gallium/frontends/dri/loader_dri3_helper.h").read_text()
         source = (mesa / "src/gallium/frontends/dri/loader_dri3_helper.c").read_text()
         self.assertIn("LOADER_DRI3_SHM_BRIDGE_SLOTS 3", header)
-        self.assertIn("xcb_wait_for_event(draw->shm_bridge_conn)", source)
-        self.assertIn("XCB_SHM_COMPLETION", source)
-        self.assertIn("xcb_present_notify_msc", source)
+        self.assertIn("thrd_create(&state->thread", source)
+        self.assertIn("xcb_poll_for_special_event", source)
+        self.assertIn("XCB_PRESENT_EVENT_MASK_COMPLETE_NOTIFY", source)
+        self.assertIn("XCB_PRESENT_EVENT_MASK_IDLE_NOTIFY", source)
+        self.assertIn("xcb_present_pixmap", source)
+        self.assertIn("sync_wait(fence_fd, -1)", source)
+        self.assertIn("poll(fds, ARRAY_SIZE(fds), -1)", source)
+        self.assertIn("flush_drawable_with_fence_fd", source)
+        self.assertIn("draw->swap_interval == 0 ? 4 : 3", source)
         self.assertIn("MESA_KGSL_X11_BRIDGE_STATS", source)
-        bridge = source.split("dri3_shm_bridge_present", 1)[1].split(
+        self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", source)
+        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=3', header)
+        self.assertNotIn("nanosleep(", source)
+        self.assertNotIn("usleep(", source)
+        bridge = source.split("static bool\ndri3_shm_bridge_present(", 1)[1].split(
             "struct loader_dri3_present_sync", 1
         )[0]
         self.assertNotIn("xcb_request_check", bridge)
+
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=3", runner)
+        self.assertIn("grep -aFq", runner)
+        self.assertIn("stale or incompatible", runner)
+        self.assertIn("libGLX_mesa.so.0", runner)
+        self.assertIn("libEGL_mesa.so.0", runner)
+
+        glx = (mesa / "src/glx/dri3_glx.c").read_text()
+        egl = (
+            mesa / "src/egl/drivers/dri2/platform_x11_dri3.c"
+        ).read_text()
+        self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", glx)
+        self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", egl)
 
     def test_phone_side_capture_is_opt_in(self):
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
@@ -190,7 +214,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);', agent)
         self.assertIn('setenv("FD_KGSL_KMS_DEVICE", "/dev/dri/card0", 1);', agent)
         self.assertIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
-        self.assertIn('setenv("FD_MESA_DEBUG", "notile,noubwc", 1);', agent)
+        self.assertIn('setenv("FD_MESA_DEBUG", "noubwc", 1);', agent)
         self.assertIn('setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);', agent)
         self.assertIn('/lib/mesa', agent)
         self.assertIn('g_kgsl_glamor ? "glamor" : "none"', agent)

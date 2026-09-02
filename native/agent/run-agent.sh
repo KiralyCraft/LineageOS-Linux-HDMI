@@ -146,12 +146,34 @@ fi
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
     printf 'WARNING: KGSL glamor is an isolated diagnostic; prefer kgsl-kms-bridge or safe ShadowFB\n' >&2
 elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
-    compgen -G "$BUNDLE/lib/mesa/libgallium-*.so" >/dev/null || {
-        printf 'Required private Mesa library is missing below: %s\n' \
+    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=3'
+    shopt -s nullglob
+    gallium_libraries=("$BUNDLE"/lib/mesa/libgallium-*.so)
+    shopt -u nullglob
+    ((${#gallium_libraries[@]} == 1)) || {
+        printf 'Expected exactly one private libgallium below: %s\n' \
             "$BUNDLE/lib/mesa" >&2
         exit 1
     }
-    printf 'Using KGSL/KMS scanout plus the MIT-SHM presentation bridge\n' >&2
+    mesa_libraries=(
+        "${gallium_libraries[0]}"
+        "$BUNDLE/lib/mesa/libGLX_mesa.so.0"
+        "$BUNDLE/lib/mesa/libEGL_mesa.so.0"
+    )
+    for mesa_library in "${mesa_libraries[@]}"; do
+        [[ -f $mesa_library ]] || {
+            printf 'Required private Mesa library is missing: %s\n' \
+                "$mesa_library" >&2
+            exit 1
+        }
+        LC_ALL=C grep -aFq -- "$mesa_bridge_abi" "$mesa_library" || {
+            printf 'Private Mesa library is stale or incompatible: %s\n' \
+                "$mesa_library" >&2
+            printf 'Expected embedded bridge contract: %s\n' "$mesa_bridge_abi" >&2
+            exit 1
+        }
+    done
+    printf 'Using matched private Mesa GLX/EGL/DRI libraries with the KGSL/KMS MIT-SHM bridge\n' >&2
 fi
 
 if ((NO_TIMEOUT)); then

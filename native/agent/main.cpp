@@ -645,7 +645,7 @@ void configure_gpu_environment(bool kms_scanout_server) {
       // downstream stack.  Keep native KGSL rendering, then copy each
       // completed drawable through Mesa's persistent MIT-SHM bridge.
       setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);
-      setenv("FD_MESA_DEBUG", "notile,noubwc", 1);
+      setenv("FD_MESA_DEBUG", "noubwc", 1);
     }
   }
 }
@@ -1116,7 +1116,7 @@ int main(int argc, char **argv) {
     struct stat mesa = {};
     std::string mesa_path = g_bundle + "/lib/mesa";
     if (stat(mesa_path.c_str(), &mesa) != 0 || !S_ISDIR(mesa.st_mode)) {
-      fprintf(stderr, "kgsl-kms-bridge requires a private libgallium in %s\n",
+      fprintf(stderr, "kgsl-kms-bridge requires a matched private Mesa set in %s\n",
               mesa_path.c_str());
       return 1;
     }

@@ -29,9 +29,9 @@ Android desktop-mode application.
    composer leases only the external connector, CRTC, and plane to the chroot
    agent. Android continues using the phone's internal display.
 5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
-   LXDE. The default accelerated path uses a private patched Mesa library for
-   Freedreno/KGSL rendering and the Qualcomm-compatible presentation bridge;
-   a separate preloaded tracer validates Xorg's DRM operations.
+   LXDE. The default accelerated path uses a matched private Mesa GLX/EGL/DRI
+   set for Freedreno/KGSL rendering and the Qualcomm-compatible presentation
+   bridge; a separate preloaded tracer validates Xorg's DRM operations.
 6. Tapping the tile again, unplugging HDMI, stopping the agent, an Xorg or
    watchdog failure, or holding both volume buttons stops Xorg and returns the
    external display to Android.
@@ -66,13 +66,17 @@ Two Xorg paths have been tested on the target device:
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; `0.2.8-candidate.4` also survived continuous operation beyond the 65-second composer watchdog and restored Android after HDMI was unplugged while Xorg owned the display |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and an asynchronous MIT-SHM copy of the newest completed accelerated drawable | Visible LXDE and `glxgears` are verified. Uncapped `glxgears` now remains GPU-speed instead of being limited to the display refresh rate; continuous operation and unplug recovery were also validated on the device |
 
-The accelerated path still needs a copy for each GL window swap because this
+The accelerated path still needs a copy for each GL image delivered to Xorg because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
 black image when it imports the same KGSL dma-buf in another context. It does
-not continuously copy the full screen. The exact investigation and tested
-environment are documented in [GPU acceleration](docs/GPU.md).
+not continuously copy the full screen. The bridge drops superseded uncapped
+frames before readback, waits native KGSL fences in a worker, and uses X Present
+completion/idle events rather than a timer. On the 300x300 test workload this
+kept application-side throughput within roughly 17-22% of Termux:X11 while the
+physical display remained paced by its refresh rate. The exact investigation
+and tested environment are documented in [GPU acceleration](docs/GPU.md).
 
 Before HDMI is connected, the broker asks Android to prefer the configured
 external mode. The default is 1920x1080 at 60 Hz; native/automatic and 4K60 are
@@ -167,12 +171,16 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`2788d8df`](https://github.com/KiralyCraft/mesa-for-android-container/commit/2788d8df63e43bd4d2c3fdb6bcb1010c863ccff0).
+[`3ce48e02`](https://github.com/KiralyCraft/mesa-for-android-container/commit/3ce48e027e1a84c3b1ad527dda35fbc5c11d87ae).
 That branch alone contains the leased-screen KMS/SHM bridge; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The HDMI build does not compile the submodule automatically. The resulting
-private `libgallium-*.so` must be placed below `lib/mesa/` in the chroot runtime
-bundle before the accelerated agent mode will start.
+private `libgallium-*.so`, `libGLX_mesa.so.0`, and `libEGL_mesa.so.0` must all
+come from the same completed Mesa build and be placed below `lib/mesa/` in the
+chroot runtime bundle before the accelerated agent mode will start. Do not
+replace only `libgallium`: GLX and EGL embed the bridge drawable structure and
+a mixed set can corrupt memory. The launcher checks the ABI marker in all three
+files and fails closed.
 
 ## Build and verify
 
