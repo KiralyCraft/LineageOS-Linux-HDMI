@@ -14,6 +14,28 @@ Android desktop-mode application.
 > the Android properties or original composer file hashes do not match that
 > build. Do not install an old release or bypass the compatibility checks.
 
+## TL;DR: how it works
+
+1. The Magisk module starts a root broker during Android boot. The ordinary
+   Quick Settings APK talks to that broker through a private local socket; the
+   APK does not request `su` or control the display directly.
+2. You start `./run-agent.sh` inside the Linux chroot. The agent registers with
+   the broker and waits; starting it alone does not launch Xorg or take over
+   HDMI.
+3. Before connecting HDMI, select the desired mode and tap the **HDMI Xorg**
+   tile to arm the broker. Then connect HDMI and accept Android's **Mirror**
+   prompt.
+4. Once Android has established a stable external mode, the patched Qualcomm
+   composer leases only the external connector, CRTC, and plane to the chroot
+   agent. Android continues using the phone's internal display.
+5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
+   LXDE. The default accelerated path uses a private patched Mesa library for
+   Freedreno/KGSL rendering and the Qualcomm-compatible presentation bridge;
+   a separate preloaded tracer validates Xorg's DRM operations.
+6. Tapping the tile again, unplugging HDMI, stopping the agent, an Xorg or
+   watchdog failure, or holding both volume buttons stops Xorg and returns the
+   external display to Android.
+
 ## What it does
 
 During a takeover, Android keeps rendering the internal DSI panel while the
