@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works; the 1920x1080 validation produced visible accelerated `glxgears` at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works at Android-selected 1920x1080 and 3840x2160; the 1080p validation produced visible accelerated `glxgears` at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -239,6 +239,15 @@ external display black. Omitting both entries would avoid the hard-coded mode,
 but would let Xorg independently choose from EDID instead of reliably keeping
 Android's current resolution and refresh timing. Failure to read the exact
 active mode now aborts takeover and restores Android.
+
+The first live test of this behavior inherited the Dell P2723QE's Android mode
+of 3840x2160 at 60 Hz. Xorg generated a 533.250 MHz Modeline, RandR reported
+3840x2160 as current, and the traced `MODE_SETCRTC` returned success. The
+physical display initially showed mostly the blue desktop background with only
+part of the session apparent, then the complete LXDE desktop became visible.
+An XWD root capture during the run contained the full 3840x2160 wallpaper,
+icons, and panel. This confirms correct mode inheritance while leaving 4K
+first-paint latency and accelerated performance to be measured separately.
 
 ## Reproducing the checks
 

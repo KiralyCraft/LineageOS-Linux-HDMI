@@ -41,7 +41,7 @@ Two Xorg paths have been tested on the target device:
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (fallback) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible LXDE and `glxgears`; the agent inherits Android's active external-display timing instead of forcing a resolution |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible LXDE and `glxgears`; takeover has been validated while inheriting Android modes at 1920x1080 and 3840x2160 |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
@@ -54,6 +54,10 @@ and gives Xorg that exact timing. It does not impose 1080p or independently
 choose the monitor's EDID-preferred mode. If the active timing cannot be read
 and matched to the connected display, takeover fails closed and Android is
 restored.
+
+The first live 3840x2160 run completed its KMS modeset promptly, but LXDE took
+longer to become fully visible than it did at 1920x1080. The desktop eventually
+rendered correctly; 4K startup latency and performance remain areas to measure.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
