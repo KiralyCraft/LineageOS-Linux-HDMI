@@ -1,11 +1,15 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.2` changes the Quick Settings tile from an immediate
+Release `0.2.8-candidate.3` changes the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at
 60 Hz. Arm with HDMI unplugged, then connect HDMI and accept Android's Mirror
 prompt. The broker starts Xorg only after the actual Android mode and lease
 readiness remain stable for three samples. Protocol-v1 and protocol-v2 chroot
 agents are rejected.
+
+During acquisition, composer pauses Android updates without powering the
+external pipeline off, so the exact same-mode handoff can page-flip from the
+last Android framebuffer. A failed start still restores Android automatically.
 
 Do not use release 0.1, 0.2, 0.2.3, or any earlier takeover ZIP. Do not repeat
 a probe after a freeze or reset until all available evidence has been copied.

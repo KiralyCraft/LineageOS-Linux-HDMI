@@ -8,3 +8,4 @@
 0008-sdm-lease-the-CRTC-fixed-primary-plane.patch
 0009-composer-support-renewable-continuous-leases.patch
 0010-composer-report-mode-and-defer-unplug-cleanup.patch
+0011-composer-keep-last-frame-active-for-lease.patch

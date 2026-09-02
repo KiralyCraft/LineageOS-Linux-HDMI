@@ -26,8 +26,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.2")
-        self.assertEqual(release["version_code"], 20260912)
+        self.assertEqual(release["version"], "0.2.8-candidate.3")
+        self.assertEqual(release["version_code"], 20260913)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -89,6 +89,19 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("BootTimeMs() + 5000", added)
         self.assertIn("status->active_refresh_millihz", added)
         self.assertNotIn('ReleaseHdmiLease("external display unplugged")', added)
+
+    def test_composer_keeps_the_last_frame_active_during_acquire(self):
+        patch = (
+            ROOT / "patches/qcom-display/v1/0011-composer-keep-last-frame-active-for-lease.patch"
+        ).read_text()
+        added = "\n".join(
+            line[1:] for line in patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        self.assertIn("ToggleScreenUpdates(false)", added)
+        self.assertIn("ToggleScreenUpdates(true)", added)
+        self.assertNotIn("SetDisplayStatus(HWCDisplay::kDisplayStatusPause)", added)
+        self.assertIn("last frame remains active", added)
 
     def test_mesa_bridge_uses_a_completion_driven_three_slot_ring(self):
         mesa = ROOT / "third_party/mesa-for-android-container"

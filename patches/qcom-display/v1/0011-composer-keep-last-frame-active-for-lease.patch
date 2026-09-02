@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000011 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Wed, 2 Sep 2026 17:20:00 +0300
+Subject: [PATCH] composer: keep last external frame active for lease
+
+SetDisplayStatus(Pause) powers the pluggable display off before creating the
+DRM lease.  On the single-pipeline 1080p topology that leaves the CRTC with a
+valid mode but no active framebuffer.  The leased Xorg process cannot use the
+same-mode page-flip path from that state, while a redundant legacy SETCRTC is
+rejected by the downstream SDE driver.
+
+Use the existing pluggable-display update pause instead.  Its Validate and
+Present paths stop submitting Android frames while the last committed frame
+continues to scan out.  Abort paths only re-enable updates.  A completed lease
+still uses the existing revoke, reset, and power-on sequence because Xorg may
+have replaced the scanout framebuffer.
+---
+ composer/hwc_session.cpp | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/composer/hwc_session.cpp b/composer/hwc_session.cpp
+--- a/composer/hwc_session.cpp
++++ b/composer/hwc_session.cpp
+@@ -544,7 +544,7 @@ int HWCSession::AcquireHdmiLease(uint32_t phase, hdmi_los_message *status,
+       if (display) {
+         display->AbortExternalDisplayLeasePreparation();
+         if (hdmi_lease_phase_ == HDMI_LOS_ACQUIRE_PAUSE) {
+-          display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
++          display->ToggleScreenUpdates(true);
+           refresh_primary = true;
+         }
+       }
+@@ -553,14 +553,14 @@ int HWCSession::AcquireHdmiLease(uint32_t phase, hdmi_los_message *status,
+       result = HDMI_LOS_ERR_UNAVAILABLE;
+     } else if (phase == HDMI_LOS_ACQUIRE_PAUSE) {
+       DLOGI("hdmi-los: acquire phase=pause begin display=%d", selected);
+-      if (display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause) != 0) {
++      if (display->ToggleScreenUpdates(false) != 0) {
+         display->AbortExternalDisplayLeasePreparation();
+-        display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
+-        hdmi_lease_detail_ = "Android could not pause the external display";
++        display->ToggleScreenUpdates(true);
++        hdmi_lease_detail_ = "Android could not quiesce external display updates";
+         reset_transition();
+       } else {
+         hdmi_lease_phase_ = HDMI_LOS_ACQUIRE_PAUSE;
+-        hdmi_lease_detail_ = "Android external display paused";
++        hdmi_lease_detail_ = "Android external updates quiesced; last frame remains active";
+         DLOGI("hdmi-los: acquire phase=pause complete display=%d", selected);
+         result = HDMI_LOS_OK;
+       }
+@@ -570,7 +570,7 @@ int HWCSession::AcquireHdmiLease(uint32_t phase, hdmi_los_message *status,
+       DisplayLeaseInfo lease = hdmi_lease_info_;
+       if (display->CreateExternalDisplayLease(&lease) != 0 || lease.lease_fd < 0) {
+         display->AbortExternalDisplayLeasePreparation();
+-        display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
++        display->ToggleScreenUpdates(true);
+         hdmi_lease_detail_ = "DRM lease creation failed; Android was resumed";
+         reset_transition();
+         refresh_primary = true;
+@@ -623,7 +623,9 @@ int HWCSession::ReleaseHdmiLease(const char *reason) {
+       if (display->AbortExternalDisplayLeasePreparation() != 0) result = HDMI_LOS_ERR_IO;
+     }
+     if (phase >= HDMI_LOS_ACQUIRE_PAUSE && connected &&
+-        display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) != 0) {
++        (phase == HDMI_LOS_ACQUIRE_CREATE ?
++             display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) :
++             display->ToggleScreenUpdates(true)) != 0) {
+       result = HDMI_LOS_ERR_IO;
+     }
+   }
+-- 
+2.53.0

@@ -130,6 +130,14 @@ identical. It then issues a legacy page flip to Xorg's requested framebuffer
 and polls `GETCRTC` for that framebuffer. All mismatches and page-flip failures
 preserve failure behavior.
 
+A mode-safe 1080p validation then proved that `SetDisplayStatus(Pause)` was
+too strong for this handoff: it powered the external pipeline off, leaving a
+mode-valid CRTC with `fb_id=0`. The exact-match fallback consequently had no
+active framebuffer from which it could page-flip. Composer now uses its
+existing screen-update pause for acquisition, which stops pluggable Validate
+and Present commits while retaining the last Android scanout. The full power
+reset remains part of post-lease restoration.
+
 The agent independently correlates the before/detail/after records for Xorg's
 first enabling commit, retains a duplicate lease fd, and verifies the same
 framebuffer and timing with `GETCRTC` before running LXDE. This fixes the prior

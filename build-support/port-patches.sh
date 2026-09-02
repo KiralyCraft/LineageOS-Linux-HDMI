@@ -75,6 +75,16 @@ grep -q 'must not retain this global lock and deadlock a driver callback' "$comp
     printf 'patch-port check failed: composer hotplug-lock boundary is missing\n' >&2
     exit 1
 }
+acquire_source=$(sed -n '/int HWCSession::AcquireHdmiLease/,/int HWCSession::ReleaseHdmiLease/p' \
+    "$composer_source")
+grep -q 'ToggleScreenUpdates(false)' <<<"$acquire_source" || {
+    printf 'patch-port check failed: lease acquisition does not retain the last scanout\n' >&2
+    exit 1
+}
+if grep -q 'SetDisplayStatus(HWCDisplay::kDisplayStatusPause)' <<<"$acquire_source"; then
+    printf 'patch-port check failed: lease acquisition still powers the display off\n' >&2
+    exit 1
+fi
 test "$(git -C "$DISPLAY" rev-parse "$revision")" = "$revision"
 printf '%s\n' "$revision" > "$BUILD/qcom-display.base"
 git -C "$DISPLAY" rev-parse HEAD > "$BUILD/qcom-display.patched"
