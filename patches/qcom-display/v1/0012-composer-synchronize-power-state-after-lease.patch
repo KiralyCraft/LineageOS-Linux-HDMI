@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000012 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Wed, 2 Sep 2026 20:20:00 +0300
+Subject: [PATCH] composer: synchronize power state after lease
+
+The lease reset performs a synchronous raw DRM commit that disables the
+external CRTC and powers off its connector.  Since acquisition now quiesces
+HWC updates without changing DisplayBase::state_, the subsequent legacy
+Resume request still sees the display as On and SetDisplayState returns early.
+SurfaceFlinger can then submit a frame to an inactive pipeline and retain a
+fence which never signals, wedging composition on every display.
+
+After a completed lease, explicitly drive the pluggable display through the
+normal HWC Pause and Resume transitions.  Pause synchronizes Qualcomm's cached
+power state and releases the old Android buffers; Resume must consequently
+execute the real PowerOn path before SurfaceFlinger is refreshed.  Attempt
+Resume even when Pause reports an error so the failure path does not
+deliberately leave a connected display quiesced.
+---
+ composer/hwc_session.cpp | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/composer/hwc_session.cpp b/composer/hwc_session.cpp
+--- a/composer/hwc_session.cpp
++++ b/composer/hwc_session.cpp
+@@ -625,10 +625,20 @@ int HWCSession::ReleaseHdmiLease(const char *reason) {
+       connected = display->IsExternalDisplayLeaseConnected();
+       if (display->AbortExternalDisplayLeasePreparation() != 0) result = HDMI_LOS_ERR_IO;
+     }
+-    if (phase >= HDMI_LOS_ACQUIRE_PAUSE && connected &&
+-        (phase == HDMI_LOS_ACQUIRE_CREATE ?
+-             display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume) :
+-             display->ToggleScreenUpdates(true)) != 0) {
+-      result = HDMI_LOS_ERR_IO;
++    if (phase >= HDMI_LOS_ACQUIRE_PAUSE && connected) {
++      if (phase == HDMI_LOS_ACQUIRE_CREATE) {
++        // ResetExternalDisplayLease disabled the CRTC with a raw DRM commit,
++        // but update-only acquisition left DisplayBase::state_ at On.  Drive
++        // the public power state through Off so Resume cannot be elided as a
++        // same-state transition and its fences describe the real pipeline.
++        DLOGI("hdmi-los: synchronizing external HWC power state after lease");
++        int pause_result = display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause);
++        int resume_result = display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume);
++        if (pause_result != 0 || resume_result != 0) {
++          result = HDMI_LOS_ERR_IO;
++        }
++      } else if (display->ToggleScreenUpdates(true) != 0) {
++        result = HDMI_LOS_ERR_IO;
++      }
+     }
+   }

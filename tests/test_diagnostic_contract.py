@@ -26,8 +26,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.3")
-        self.assertEqual(release["version_code"], 20260913)
+        self.assertEqual(release["version"], "0.2.8-candidate.4")
+        self.assertEqual(release["version_code"], 20260914)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -102,6 +102,23 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("ToggleScreenUpdates(true)", added)
         self.assertNotIn("SetDisplayStatus(HWCDisplay::kDisplayStatusPause)", added)
         self.assertIn("last frame remains active", added)
+
+    def test_composer_synchronizes_hwc_power_state_during_release(self):
+        patch = (
+            ROOT / "patches/qcom-display/v1/0012-composer-synchronize-power-state-after-lease.patch"
+        ).read_text()
+        added = "\n".join(
+            line[1:] for line in patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        pause = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause)"
+        resume = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume)"
+        self.assertIn(pause, added)
+        self.assertIn(resume, added)
+        self.assertLess(added.index(pause), added.index(resume))
+        self.assertIn("int pause_result", added)
+        self.assertIn("int resume_result", added)
+        self.assertIn("ToggleScreenUpdates(true)", added)
 
     def test_mesa_bridge_uses_a_completion_driven_three_slot_ring(self):
         mesa = ROOT / "third_party/mesa-for-android-container"

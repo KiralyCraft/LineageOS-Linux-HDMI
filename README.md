@@ -44,7 +44,7 @@ Two Xorg paths have been tested on the target device:
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | Previously produced visible LXDE in bounded probes |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; release `0.2.8-candidate.3` adds strict mode/scanout gates, preserves arming across the required unplug, and keeps Android's last framebuffer active for the same-mode handoff, but still requires target-device validation |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; release `0.2.8-candidate.4` keeps Android's last framebuffer active for acquisition and synchronizes Qualcomm's HWC power state during release, but the release fix still requires target-device validation |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
