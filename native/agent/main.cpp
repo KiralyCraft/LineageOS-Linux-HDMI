@@ -44,6 +44,7 @@ pid_t g_xorg = -1;
 pid_t g_session = -1;
 int g_broker = -1;
 int g_trace = -1;
+int g_verify_lease = -1;
 uint32_t g_probe_mode = HDMI_LOS_PROBE_NONE;
 std::string g_bundle;
 bool g_kgsl_glamor = false;
@@ -54,6 +55,14 @@ std::string g_mouse;
 std::string g_keyboard;
 drm_mode_modeinfo g_android_mode = {};
 bool g_android_mode_valid = false;
+uint32_t g_expected_connector = 0;
+uint32_t g_expected_crtc = 0;
+uint32_t g_scanout_sequence = 0;
+uint32_t g_scanout_fb = 0;
+bool g_scanout_connector_seen = false;
+bool g_scanout_confirmed = false;
+bool g_scanout_failed = false;
+std::string g_scanout_failure;
 
 bool relay_trace_record(int timeout_ms);
 
@@ -154,7 +163,35 @@ bool valid_trace_record(const hdmi_los_trace_record &record) {
          record.phase >= HDMI_LOS_TRACE_LOADED && record.phase <= HDMI_LOS_TRACE_AFTER;
 }
 
+void observe_scanout_record(const hdmi_los_trace_record &record) {
+  if (!g_expected_crtc || record.request != DRM_IOCTL_MODE_SETCRTC) return;
+  if (record.phase == HDMI_LOS_TRACE_BEFORE && record.argument[0] == g_expected_crtc &&
+      record.argument[1] != 0 && record.argument[3] != 0 &&
+      (!g_scanout_sequence || g_scanout_confirmed)) {
+    g_scanout_sequence = record.sequence;
+    g_scanout_fb = static_cast<uint32_t>(record.argument[1]);
+    g_scanout_connector_seen = false;
+    return;
+  }
+  if (record.sequence != g_scanout_sequence) return;
+  if (record.phase == HDMI_LOS_TRACE_DETAIL &&
+      strncmp(record.name, "SETCRTC_CONNECTOR", sizeof(record.name)) == 0 &&
+      record.argument[2] == g_expected_connector) {
+    g_scanout_connector_seen = true;
+  } else if (record.phase == HDMI_LOS_TRACE_AFTER) {
+    if (record.result == 0 && g_scanout_connector_seen) {
+      g_scanout_confirmed = true;
+    } else {
+      g_scanout_failed = true;
+      g_scanout_failure = record.result == 0 ?
+          "Xorg enabled the expected CRTC without the leased connector" :
+          "Xorg's first external scanout commit failed errno=" + std::to_string(record.error);
+    }
+  }
+}
+
 bool forward_trace_record(const hdmi_los_trace_record &record) {
+  observe_scanout_record(record);
   char name[sizeof(record.name) + 1] = {};
   char detail[sizeof(record.detail) + 1] = {};
   memcpy(name, record.name, sizeof(record.name));
@@ -168,13 +205,13 @@ bool forward_trace_record(const hdmi_los_trace_record &record) {
   progress.flags = record.sequence;
   if (record.phase == HDMI_LOS_TRACE_AFTER) {
     snprintf(progress.detail, sizeof(progress.detail),
-             "drm A #%u r=%lld e=%d %.60s", record.sequence,
+             "drm A #%u r=%lld e=%d %.44s", record.sequence,
              (long long)record.result, record.error, detail);
   } else {
     char phase = record.phase == HDMI_LOS_TRACE_LOADED ? 'L' :
                  record.phase == HDMI_LOS_TRACE_DETAIL ? 'D' : 'B';
     snprintf(progress.detail, sizeof(progress.detail),
-             "drm %c #%u %.24s %.64s", phase, record.sequence, name, detail);
+             "drm %c #%u %.20s %.48s", phase, record.sequence, name, detail);
   }
   if (!write_full(g_broker, &progress, sizeof(progress))) return false;
   hdmi_los_message acknowledgement = {};
@@ -575,8 +612,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       mode.vdisplay, mode.vsync_start, mode.vsync_end, mode.vtotal,
       mode_flags.c_str(), kModeName,
       g_kgsl_glamor ? "glamor" : "none",
-      g_kgsl_glamor ? "false" :
-          (probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false"),
+      g_kgsl_glamor ? "false" : "true",
       probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false", kModeName);
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
@@ -624,6 +660,14 @@ bool prepare_session(uint32_t probe_mode) {
   g_keyboard.clear();
   g_android_mode = {};
   g_android_mode_valid = false;
+  g_expected_connector = 0;
+  g_expected_crtc = 0;
+  g_scanout_sequence = 0;
+  g_scanout_fb = 0;
+  g_scanout_connector_seen = false;
+  g_scanout_confirmed = false;
+  g_scanout_failed = false;
+  g_scanout_failure.clear();
   passwd *user = getpwnam("kiraly");
   if (!user) return false;
   if ((mkdir(kRuntime, 0710) < 0 && errno != EEXIST) ||
@@ -705,8 +749,12 @@ pid_t spawn_xorg(int lease_fd) {
   if (flags < 0 || fcntl(sockets[1], F_SETFD, flags & ~FD_CLOEXEC) < 0) _exit(126);
   char fd_text[32];
   char trace_fd_text[32];
+  char connector_text[32];
+  char crtc_text[32];
   snprintf(fd_text, sizeof(fd_text), "%d", lease_fd);
   snprintf(trace_fd_text, sizeof(trace_fd_text), "%d", sockets[1]);
+  snprintf(connector_text, sizeof(connector_text), "%u", g_expected_connector);
+  snprintf(crtc_text, sizeof(crtc_text), "%u", g_expected_crtc);
   std::string config = std::string(kRuntime) + "/xorg.conf";
   std::string config_dir = std::string(kRuntime) + "/xorg.conf.d";
   std::string auth = std::string(kRuntime) + "/Xauthority";
@@ -717,6 +765,9 @@ pid_t spawn_xorg(int lease_fd) {
   setenv("HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS", "1", 1);
   setenv("HDMI_LOS_IGNORE_XORG_BITMASK_PROPERTIES", "1", 1);
   setenv("HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES", "1", 1);
+  setenv("HDMI_LOS_SAME_MODE_PAGEFLIP_FALLBACK", "1", 1);
+  setenv("HDMI_LOS_EXPECTED_CONNECTOR", connector_text, 1);
+  setenv("HDMI_LOS_EXPECTED_CRTC", crtc_text, 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
   configure_gpu_environment(true);
   execl("/usr/lib/Xorg", "/usr/lib/Xorg", kDisplay, "-masterfd", fd_text,
@@ -801,6 +852,29 @@ bool verify_xorg() {
          contains(xinput, "HDMI Keyboard", nullptr);
 }
 
+bool verify_scanout() {
+  if (!g_scanout_confirmed || g_scanout_failed || g_verify_lease < 0 ||
+      !g_scanout_fb || !g_android_mode_valid) {
+    if (g_scanout_failed) log_message("error", g_scanout_failure);
+    else log_message("error", "Xorg has not completed a verified external scanout commit");
+    return false;
+  }
+  drm_mode_crtc current = {};
+  current.crtc_id = g_expected_crtc;
+  if (ioctl(g_verify_lease, DRM_IOCTL_MODE_GETCRTC, &current) != 0) {
+    log_message("error", "cannot verify the leased CRTC after Xorg startup");
+    return false;
+  }
+  if (!current.mode_valid || current.fb_id != g_scanout_fb ||
+      !same_mode_timing(current.mode, g_android_mode)) {
+    log_message("error", "leased CRTC does not scan out Xorg's framebuffer at Android's timing");
+    return false;
+  }
+  log_message("info", "verified Xorg framebuffer " + std::to_string(g_scanout_fb) +
+      " on leased CRTC " + std::to_string(g_expected_crtc));
+  return true;
+}
+
 bool start_xorg(int lease_fd, uint32_t connector_id, uint32_t crtc_id) {
   if (!read_android_mode(lease_fd, connector_id, crtc_id, &g_android_mode) ||
       !write_xorg_config(g_mouse, g_keyboard, g_probe_mode, g_android_mode)) {
@@ -808,10 +882,24 @@ bool start_xorg(int lease_fd, uint32_t connector_id, uint32_t crtc_id) {
     return false;
   }
   g_android_mode_valid = true;
+  g_expected_connector = connector_id;
+  g_expected_crtc = crtc_id;
+  g_scanout_sequence = 0;
+  g_scanout_fb = 0;
+  g_scanout_connector_seen = false;
+  g_scanout_confirmed = false;
+  g_scanout_failed = false;
+  g_scanout_failure.clear();
   log_message("info", "inheriting Android external mode " +
       std::to_string(g_android_mode.hdisplay) + "x" +
       std::to_string(g_android_mode.vdisplay) + " (DRM mode " +
       std::string(g_android_mode.name) + ")");
+  g_verify_lease = dup(lease_fd);
+  if (g_verify_lease < 0) {
+    close(lease_fd);
+    return false;
+  }
+  fcntl(g_verify_lease, F_SETFD, FD_CLOEXEC);
   g_xorg = spawn_xorg(lease_fd);
   close(lease_fd);
   if (g_xorg < 0) return false;
@@ -819,7 +907,12 @@ bool start_xorg(int lease_fd, uint32_t connector_id, uint32_t crtc_id) {
   while (monotonic_ms() < end && process_alive(g_xorg)) {
     if (!relay_trace_record(100)) return false;
     if (xorg_ready()) {
-      if (!verify_xorg()) return false;
+      if (g_scanout_failed) return false;
+      if (!g_scanout_confirmed) {
+        usleep(100000);
+        continue;
+      }
+      if (!verify_scanout() || !verify_xorg()) return false;
       if (!g_start_lxde) return true;
       g_session = spawn_lxde();
       return g_session > 0;
@@ -834,6 +927,8 @@ void cleanup_session() {
   terminate_group(&g_xorg);
   if (g_trace >= 0) close(g_trace);
   g_trace = -1;
+  if (g_verify_lease >= 0) close(g_verify_lease);
+  g_verify_lease = -1;
   terminate_group(&g_bridge);
   unlink((std::string(kRuntime) + "/input.env").c_str());
 }
@@ -908,6 +1003,14 @@ int run_agent() {
                                               "DRM tracer relay failed closed");
       write_full(g_broker, &failed, sizeof(failed));
     }
+    if (g_xorg > 0 && g_scanout_failed) {
+      std::string reason = g_scanout_failure.empty() ?
+          "a later external scanout commit failed" : g_scanout_failure;
+      cleanup_session();
+      hdmi_los_message failed = response_for(registration, HDMI_LOS_OP_AGENT_FAILED,
+                                              HDMI_LOS_ERR_AGENT, reason.c_str());
+      write_full(g_broker, &failed, sizeof(failed));
+    }
 
     if (!(fds[0].revents & POLLIN)) continue;
     hdmi_los_message request = {};
@@ -935,11 +1038,13 @@ int run_agent() {
       if (!ok) {
         cleanup_session();
       }
+      const char *failure_detail = g_scanout_failure.empty() ?
+          "Xorg startup verification failed" : g_scanout_failure.c_str();
       reply = response_for(request, ok ? HDMI_LOS_OP_AGENT_READY : HDMI_LOS_OP_AGENT_FAILED,
                            ok ? HDMI_LOS_OK : HDMI_LOS_ERR_AGENT,
                            ok ? (g_start_lxde ? "Xorg and LXDE ready on DP-1" :
                                                    "Xorg ready on DP-1; session disabled") :
-                                "Xorg startup verification failed");
+                                failure_detail);
       write_full(g_broker, &reply, sizeof(reply));
     } else if (request.opcode == HDMI_LOS_OP_AGENT_STOP) {
       if (lease_fd >= 0) close(lease_fd);

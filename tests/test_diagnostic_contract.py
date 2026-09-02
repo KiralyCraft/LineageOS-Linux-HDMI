@@ -7,28 +7,90 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DiagnosticContractTests(unittest.TestCase):
-    def test_protocol_v2_and_probe_opcodes_are_pinned(self):
+    def test_protocol_v3_mode_arming_and_composer_v2_are_pinned(self):
         protocol = (ROOT / "native/common/hdmi_los_protocol.h").read_text()
-        self.assertIn("#define HDMI_LOS_VERSION 1u", protocol)
-        self.assertIn("#define HDMI_LOS_BROKER_VERSION 2u", protocol)
+        self.assertIn("#define HDMI_LOS_VERSION 2u", protocol)
+        self.assertIn("#define HDMI_LOS_BROKER_VERSION 3u", protocol)
         self.assertIn("HDMI_LOS_OP_PROBE = 6", protocol)
+        self.assertIn("HDMI_LOS_OP_SET_MODE = 7", protocol)
+        self.assertIn("HDMI_LOS_OP_ARM = 8", protocol)
+        self.assertIn("HDMI_LOS_OP_DISARM = 9", protocol)
+        self.assertIn("HDMI_LOS_OP_HOTPLUG = 10", protocol)
         self.assertIn("HDMI_LOS_OP_AGENT_PROGRESS = 22", protocol)
         self.assertIn("HDMI_LOS_OP_AGENT_PROGRESS_ACK = 23", protocol)
+        self.assertIn("uint32_t requested_refresh_millihz;", protocol)
+        self.assertIn("uint32_t active_refresh_millihz;", protocol)
+        self.assertIn("char detail[92];", protocol)
         tile = (ROOT / "android/tile/app/src/main/java/dev/kiraly/hdmilos/BrokerClient.java").read_text()
-        self.assertIn("private static final short VERSION = 2", tile)
+        self.assertIn("private static final short VERSION = 3", tile)
 
-    def test_candidate_release_selects_atomic_tile_takeover(self):
+    def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.7-candidate.3")
-        self.assertEqual(release["version_code"], 20260910)
+        self.assertEqual(release["version"], "0.2.8-candidate.1")
+        self.assertEqual(release["version_code"], 20260911)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
-        toggle = toggle.split("} else if (request.opcode == HDMI_LOS_OP_PROBE)", 1)[0]
-        self.assertIn("Start(HDMI_LOS_PROBE_XORG_ATOMIC", toggle)
-        self.assertNotIn("Start(HDMI_LOS_PROBE_XORG_LEGACY", toggle)
+        toggle = toggle.split("} else if (request.opcode == HDMI_LOS_OP_SET_MODE)", 1)[0]
+        self.assertIn("Arm(request, &detail)", toggle)
+        self.assertNotIn("Start(HDMI_LOS_PROBE_XORG_ATOMIC", toggle)
+        self.assertIn("Start(HDMI_LOS_PROBE_XORG_LEGACY", broker)
         post_fs = (ROOT / "module/post-fs-data.sh").read_text()
         self.assertIn("resetprop -n vendor.display.disable_hw_recovery_dump 0", post_fs)
+
+    def test_arming_journals_and_restores_android_preferred_mode(self):
+        broker = (ROOT / "native/broker/main.cpp").read_text()
+        self.assertIn("/data/adb/hdmi-los/preferred-mode.journal", broker)
+        self.assertIn('"get-user-preferred-display-mode"', broker)
+        self.assertIn('"set-user-preferred-display-mode"', broker)
+        self.assertIn('"clear-user-preferred-display-mode"', broker)
+        self.assertIn("write_atomic_text(kModeJournal", broker)
+        self.assertIn('RecoverPreferredMode("broker startup")', broker)
+        self.assertIn("preference_applied_", broker)
+        self.assertIn("unplug HDMI so the preferred mode can be set safely", broker)
+        self.assertIn("kModeStableSamples = 3", broker)
+        self.assertIn("kModeMismatchMs = 5000", broker)
+
+    def test_agent_requires_a_real_scanout_commit(self):
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        self.assertIn("observe_scanout_record", agent)
+        self.assertIn("g_scanout_connector_seen", agent)
+        self.assertIn("verify_scanout()", agent)
+        self.assertIn("current.fb_id != g_scanout_fb", agent)
+        self.assertIn("same_mode_timing(current.mode, g_android_mode)", agent)
+        self.assertIn('setenv("HDMI_LOS_SAME_MODE_PAGEFLIP_FALLBACK", "1", 1);', agent)
+        self.assertIn("try_same_mode_pageflip", tracer)
+        self.assertIn("DRM_IOCTL_MODE_PAGE_FLIP", tracer)
+        self.assertIn('"SETCRTC_PAGEFLIP_FALLBACK"', tracer)
+        self.assertIn("saved_errno == EINVAL", tracer)
+
+    def test_composer_unplug_is_not_torn_down_on_the_uevent_thread(self):
+        patch = (
+            ROOT / "patches/qcom-display/v1/0010-composer-report-mode-and-defer-unplug-cleanup.patch"
+        ).read_text()
+        added = "\n".join(
+            line[1:] for line in patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        self.assertIn("NotifyHotplug", added)
+        self.assertIn("BootTimeMs() + 5000", added)
+        self.assertIn("status->active_refresh_millihz", added)
+        self.assertNotIn('ReleaseHdmiLease("external display unplugged")', added)
+
+    def test_mesa_bridge_uses_a_completion_driven_three_slot_ring(self):
+        mesa = ROOT / "third_party/mesa-for-android-container"
+        header = (mesa / "src/gallium/frontends/dri/loader_dri3_helper.h").read_text()
+        source = (mesa / "src/gallium/frontends/dri/loader_dri3_helper.c").read_text()
+        self.assertIn("LOADER_DRI3_SHM_BRIDGE_SLOTS 3", header)
+        self.assertIn("xcb_wait_for_event(draw->shm_bridge_conn)", source)
+        self.assertIn("XCB_SHM_COMPLETION", source)
+        self.assertIn("xcb_present_notify_msc", source)
+        self.assertIn("MESA_KGSL_X11_BRIDGE_STATS", source)
+        bridge = source.split("dri3_shm_bridge_present", 1)[1].split(
+            "struct loader_dri3_present_sync", 1
+        )[0]
+        self.assertNotIn("xcb_request_check", bridge)
 
     def test_phone_side_capture_is_opt_in(self):
         runner = (ROOT / "native/agent/run-agent.sh").read_text()

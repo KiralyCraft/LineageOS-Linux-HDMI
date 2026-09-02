@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
 #endif
@@ -23,7 +24,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <string>
+#include <vector>
 
 #include "hdmi_los_protocol.h"
 
@@ -38,6 +41,11 @@ constexpr int kAgentStopMs = 2000;
 constexpr int kComposerRequestSeconds = 10;
 constexpr int kLeaseHoldMs = 3000;
 constexpr const char *kModuleDir = "/data/adb/modules/hdmi-los";
+constexpr const char *kModeConfig = "/data/adb/hdmi-los/preferred-mode.conf";
+constexpr const char *kModeJournal = "/data/adb/hdmi-los/preferred-mode.journal";
+constexpr int kModePollMs = 250;
+constexpr int kModeStableSamples = 3;
+constexpr int kModeMismatchMs = 5000;
 
 std::atomic<bool> g_stop(false);
 uint32_t g_request_id = 1;
@@ -255,6 +263,89 @@ bool set_wake_lock(bool acquire) {
   return ok;
 }
 
+bool run_display_command(const std::vector<std::string> &arguments, std::string *output) {
+  int pipe_fds[2] = {-1, -1};
+  if (pipe2(pipe_fds, O_CLOEXEC) != 0) return false;
+  pid_t child = fork();
+  if (child == 0) {
+    dup2(pipe_fds[1], STDOUT_FILENO);
+    dup2(pipe_fds[1], STDERR_FILENO);
+    close(pipe_fds[0]);
+    close(pipe_fds[1]);
+    std::vector<char *> argv;
+    argv.push_back(const_cast<char *>("/system/bin/cmd"));
+    argv.push_back(const_cast<char *>("display"));
+    for (const auto &argument : arguments) {
+      argv.push_back(const_cast<char *>(argument.c_str()));
+    }
+    argv.push_back(nullptr);
+    execv(argv[0], argv.data());
+    _exit(127);
+  }
+  close(pipe_fds[1]);
+  if (child < 0) {
+    close(pipe_fds[0]);
+    return false;
+  }
+  std::string captured;
+  char buffer[512];
+  ssize_t count;
+  while ((count = read(pipe_fds[0], buffer, sizeof(buffer))) > 0) {
+    if (captured.size() < 4096) captured.append(buffer, static_cast<size_t>(count));
+  }
+  close(pipe_fds[0]);
+  int status = 0;
+  while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+  if (output) *output = captured;
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+bool write_atomic_text(const char *path, const std::string &text) {
+  std::string temporary(path);
+  temporary += ".tmp";
+  int fd = open(temporary.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  if (fd < 0) return false;
+  bool ok = write(fd, text.data(), text.size()) == static_cast<ssize_t>(text.size()) &&
+            fsync(fd) == 0;
+  if (close(fd) != 0) ok = false;
+  if (ok && rename(temporary.c_str(), path) != 0) ok = false;
+  if (!ok) unlink(temporary.c_str());
+  return ok;
+}
+
+bool read_text(const char *path, std::string *text) {
+  FILE *file = fopen(path, "re");
+  if (!file) return false;
+  char buffer[512];
+  text->clear();
+  while (fgets(buffer, sizeof(buffer), file) && text->size() < 4096) *text += buffer;
+  bool ok = !ferror(file);
+  fclose(file);
+  return ok;
+}
+
+bool parse_saved_mode(const std::string &text, uint32_t *width, uint32_t *height,
+                      uint32_t *refresh_millihz) {
+  unsigned int parsed_width = 0;
+  unsigned int parsed_height = 0;
+  float parsed_refresh = 0.0f;
+  const char *value = strchr(text.c_str(), ':');
+  value = value ? value + 1 : text.c_str();
+  if (strstr(value, "null")) {
+    *width = *height = *refresh_millihz = 0;
+    return true;
+  }
+  if (sscanf(value, " %u %u %f", &parsed_width, &parsed_height, &parsed_refresh) != 3 &&
+      sscanf(value, " %ux%u@%f", &parsed_width, &parsed_height, &parsed_refresh) != 3) {
+    return false;
+  }
+  if (!parsed_width || !parsed_height || parsed_refresh < 1.0f) return false;
+  *width = parsed_width;
+  *height = parsed_height;
+  *refresh_millihz = static_cast<uint32_t>(lroundf(parsed_refresh * 1000.0f));
+  return true;
+}
+
 bool input_has_key(int fd, int key) {
   unsigned long bits[(KEY_MAX + 8 * sizeof(unsigned long)) / (8 * sizeof(unsigned long))] = {};
   if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(bits)), bits) < 0) return false;
@@ -347,6 +438,8 @@ struct VolumeGuard {
 class Broker {
  public:
   int Run() {
+    LoadConfiguredMode();
+    RecoverPreferredMode("broker startup");
     listen_fd_ = listen_abstract(HDMI_LOS_BROKER_SOCKET);
     if (listen_fd_ < 0) {
       log_errno("cannot bind broker socket");
@@ -356,12 +449,12 @@ class Broker {
     while (!g_stop) {
       pollfd fds[5] = {
           {listen_fd_, POLLIN, 0},
-          {composer_fd_, static_cast<short>(POLLERR | POLLHUP), 0},
+          {composer_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
           {agent_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
           {volumes_.down, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
           {volumes_.up, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
       };
-      int result = poll(fds, 5, active_ ? 100 : 1000);
+      int result = poll(fds, 5, (active_ || armed_) ? 100 : 1000);
       if (result < 0 && errno == EINTR) continue;
       if (result < 0) break;
       if (fds[0].revents & POLLIN) AcceptClient();
@@ -369,6 +462,11 @@ class Broker {
         close(composer_fd_);
         composer_fd_ = -1;
         if (active_) Release("composer disconnected", false);
+      } else if (composer_fd_ >= 0 && (fds[1].revents & POLLIN)) {
+        if (!HandleComposerReadable()) {
+          if (active_) Release("composer hotplug/disconnect event", true);
+          if (armed_) Disarm("external display disconnected");
+        }
       }
       if (agent_fd_ >= 0 && (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
         close(agent_fd_);
@@ -401,8 +499,10 @@ class Broker {
       if (active_ && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) {
         Release("mandatory 60 second timeout", true);
       }
+      if (armed_ && !active_) AdvanceArmed();
     }
     Release("broker stopping", true);
+    if (armed_) Disarm("broker stopping");
     if (agent_fd_ >= 0) close(agent_fd_);
     if (composer_fd_ >= 0) close(composer_fd_);
     if (listen_fd_ >= 0) close(listen_fd_);
@@ -427,15 +527,63 @@ class Broker {
     hdmi_los_message request = make_message(opcode);
     request.version = HDMI_LOS_VERSION;
     request.flags = flags;
-    if (!send_with_fd(composer_fd_, request, -1) ||
-        !recv_with_fd(composer_fd_, response, lease_fd) ||
-        !valid_composer_message(*response) ||
-        response->request_id != request.request_id) {
+    if (!send_with_fd(composer_fd_, request, -1)) {
       close(composer_fd_);
       composer_fd_ = -1;
       return false;
     }
-    return true;
+    for (;;) {
+      int received_fd = -1;
+      if (!recv_with_fd(composer_fd_, response, &received_fd) ||
+          !valid_composer_message(*response)) {
+        if (received_fd >= 0) close(received_fd);
+        close(composer_fd_);
+        composer_fd_ = -1;
+        return false;
+      }
+      if (response->opcode == HDMI_LOS_OP_HOTPLUG && response->request_id == 0) {
+        if (received_fd >= 0) close(received_fd);
+        CacheComposerStatus(*response);
+        composer_disconnect_pending_ = !(response->flags & HDMI_LOS_FLAG_CONNECTED);
+        continue;
+      }
+      if (response->request_id != request.request_id) {
+        if (received_fd >= 0) close(received_fd);
+        close(composer_fd_);
+        composer_fd_ = -1;
+        return false;
+      }
+      if (lease_fd) *lease_fd = received_fd;
+      else if (received_fd >= 0) close(received_fd);
+      CacheComposerStatus(*response);
+      return !composer_disconnect_pending_;
+    }
+  }
+
+  void CacheComposerStatus(const hdmi_los_message &status) {
+    composer_flags_ = status.flags;
+    active_width_ = status.active_width;
+    active_height_ = status.active_height;
+    active_refresh_millihz_ = status.active_refresh_millihz;
+    if (status.flags & HDMI_LOS_FLAG_CONNECTED) composer_disconnect_pending_ = false;
+  }
+
+  bool HandleComposerReadable() {
+    hdmi_los_message event = {};
+    int passed_fd = -1;
+    if (!recv_with_fd(composer_fd_, &event, &passed_fd) ||
+        !valid_composer_message(event) || event.opcode != HDMI_LOS_OP_HOTPLUG ||
+        event.request_id != 0) {
+      if (passed_fd >= 0) close(passed_fd);
+      return false;
+    }
+    if (passed_fd >= 0) close(passed_fd);
+    CacheComposerStatus(event);
+    bool connected = event.flags & HDMI_LOS_FLAG_CONNECTED;
+    composer_disconnect_pending_ = !connected;
+    log_transition(connected ? "composer reports external display connected" :
+                               "composer reports external display disconnected");
+    return connected;
   }
 
   bool HandleAgentEvent(const hdmi_los_message &event) {
@@ -455,20 +603,26 @@ class Broker {
   bool WaitAgent(uint16_t wanted, int timeout_ms, hdmi_los_message *response) {
     int64_t end = monotonic_ms() + timeout_ms;
     while (monotonic_ms() < end) {
-      pollfd fds[3] = {
+      pollfd fds[4] = {
           {agent_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
           {volumes_.down, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
           {volumes_.up, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+          {composer_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
       };
       int64_t remaining_ms = std::min<int64_t>(100, end - monotonic_ms());
       if (deadline_ms_ > 0) {
         remaining_ms = std::min<int64_t>(remaining_ms, deadline_ms_ - monotonic_ms());
       }
       if (remaining_ms <= 0) return false;
-      int result = poll(fds, 3, static_cast<int>(remaining_ms));
+      int result = poll(fds, 4, static_cast<int>(remaining_ms));
       if (result < 0 && errno == EINTR) continue;
       if (result < 0 || (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))) return false;
       if (volumes_.Update(fds[1].revents, fds[2].revents)) return false;
+      if (composer_fd_ >= 0 && (fds[3].revents & (POLLERR | POLLHUP | POLLNVAL))) return false;
+      if (composer_fd_ >= 0 && (fds[3].revents & POLLIN) && !HandleComposerReadable()) {
+        composer_disconnect_pending_ = true;
+        return false;
+      }
       if (deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) return false;
       if (fds[0].revents & POLLIN) {
         if (!read_full(agent_fd_, response, sizeof(*response)) || !valid_message(*response)) {
@@ -484,6 +638,241 @@ class Broker {
       }
     }
     return false;
+  }
+
+  void LoadConfiguredMode() {
+    std::string text;
+    uint32_t width = 0, height = 0, refresh = 0;
+    if (read_text(kModeConfig, &text) &&
+        sscanf(text.c_str(), "%u %u %u", &width, &height, &refresh) == 3 &&
+        ((!width && !height && !refresh) ||
+         (width >= 640 && height >= 480 && refresh >= 10000 && refresh <= 240000))) {
+      requested_width_ = width;
+      requested_height_ = height;
+      requested_refresh_millihz_ = refresh;
+    }
+  }
+
+  bool SaveConfiguredMode() {
+    char text[96];
+    snprintf(text, sizeof(text), "%u %u %u\n", requested_width_, requested_height_,
+             requested_refresh_millihz_);
+    return write_atomic_text(kModeConfig, text);
+  }
+
+  bool ApplyPreferredMode(std::string *detail) {
+    std::string previous;
+    uint32_t old_width = 0, old_height = 0, old_refresh = 0;
+    if (!run_display_command({"get-user-preferred-display-mode"}, &previous) ||
+        !parse_saved_mode(previous, &old_width, &old_height, &old_refresh)) {
+      *detail = "cannot snapshot Android's global preferred display mode";
+      return false;
+    }
+    char journal[96];
+    snprintf(journal, sizeof(journal), "%u %u %u\n", old_width, old_height, old_refresh);
+    if (!write_atomic_text(kModeJournal, journal)) {
+      *detail = "cannot create the preferred-mode recovery journal";
+      return false;
+    }
+
+    char width[24], height[24], refresh[32];
+    snprintf(width, sizeof(width), "%u", requested_width_);
+    snprintf(height, sizeof(height), "%u", requested_height_);
+    snprintf(refresh, sizeof(refresh), "%.3f",
+             static_cast<double>(requested_refresh_millihz_) / 1000.0);
+    std::string output;
+    bool applied = requested_width_ == 0 && requested_height_ == 0 &&
+                   requested_refresh_millihz_ == 0 ?
+        run_display_command({"clear-user-preferred-display-mode"}, &output) :
+        run_display_command({"set-user-preferred-display-mode", width, height, refresh},
+                            &output);
+    if (!applied) {
+      *detail = "Android rejected the preferred external display mode: " + output;
+      RecoverPreferredMode("preferred-mode apply failure");
+      return false;
+    }
+    return true;
+  }
+
+  bool RecoverPreferredMode(const char *reason) {
+    std::string journal;
+    if (!read_text(kModeJournal, &journal)) return true;
+    uint32_t width = 0, height = 0, refresh = 0;
+    if (sscanf(journal.c_str(), "%u %u %u", &width, &height, &refresh) != 3) {
+      log_line("error", "preferred-mode recovery journal is invalid; preserving it");
+      return false;
+    }
+    std::string output;
+    bool ok;
+    if (!width && !height && !refresh) {
+      ok = run_display_command({"clear-user-preferred-display-mode"}, &output);
+    } else {
+      char width_text[24], height_text[24], refresh_text[32];
+      snprintf(width_text, sizeof(width_text), "%u", width);
+      snprintf(height_text, sizeof(height_text), "%u", height);
+      snprintf(refresh_text, sizeof(refresh_text), "%.3f",
+               static_cast<double>(refresh) / 1000.0);
+      ok = run_display_command({"set-user-preferred-display-mode", width_text, height_text,
+                                refresh_text}, &output);
+    }
+    if (ok) {
+      unlink(kModeJournal);
+      std::string message = "restored Android preferred display mode: ";
+      message += reason;
+      log_line("info", message.c_str());
+    } else {
+      log_line("error", "could not restore Android preferred display mode; journal retained");
+    }
+    return ok;
+  }
+
+  bool RequestedModeMatches() const {
+    if (!(composer_flags_ & HDMI_LOS_FLAG_CONNECTED) ||
+        !(composer_flags_ & HDMI_LOS_FLAG_ACTIVE_MODE)) return false;
+    if (!requested_width_ && !requested_height_ && !requested_refresh_millihz_) return true;
+    int64_t refresh_delta = static_cast<int64_t>(active_refresh_millihz_) -
+                            static_cast<int64_t>(requested_refresh_millihz_);
+    return active_width_ == requested_width_ && active_height_ == requested_height_ &&
+           std::llabs(refresh_delta) <= 100;
+  }
+
+  int SetMode(const hdmi_los_message &request, std::string *detail) {
+    if (active_ || armed_ || probing_) {
+      *detail = "stop or disarm HDMI Xorg before changing its preferred mode";
+      return HDMI_LOS_ERR_BUSY;
+    }
+    bool native = !request.requested_width && !request.requested_height &&
+                  !request.requested_refresh_millihz;
+    if (!native && (request.requested_width < 640 || request.requested_height < 480 ||
+        request.requested_refresh_millihz < 10000 ||
+        request.requested_refresh_millihz > 240000)) {
+      *detail = "invalid preferred mode";
+      return HDMI_LOS_ERR_PROTOCOL;
+    }
+    requested_width_ = request.requested_width;
+    requested_height_ = request.requested_height;
+    requested_refresh_millihz_ = request.requested_refresh_millihz;
+    if (!SaveConfiguredMode()) {
+      *detail = "could not persist preferred mode";
+      return HDMI_LOS_ERR_IO;
+    }
+    *detail = "preferred mode saved; arm before connecting HDMI";
+    return HDMI_LOS_OK;
+  }
+
+  int Arm(const hdmi_los_message &request, std::string *detail) {
+    if (active_ || probing_) return HDMI_LOS_ERR_BUSY;
+    if (armed_) {
+      *detail = state_detail_;
+      return HDMI_LOS_OK;
+    }
+    if (request.requested_width || request.requested_height ||
+        request.requested_refresh_millihz) {
+      int mode_status = SetMode(request, detail);
+      if (mode_status != HDMI_LOS_OK) return mode_status;
+    }
+    if (!compatible() || !diagnostic_dump_ready()) {
+      *detail = "module compatibility gate is closed";
+      return HDMI_LOS_ERR_INCOMPATIBLE;
+    }
+    armed_ = true;
+    preference_applied_ = false;
+    stable_mode_samples_ = 0;
+    armed_since_ms_ = monotonic_ms();
+    next_mode_poll_ms_ = 0;
+    composer_disconnect_pending_ = false;
+    hdmi_los_message status = {};
+    if (!ComposerRequest(HDMI_LOS_OP_STATUS, &status)) {
+      replug_required_ = true;
+      state_detail_ = "armed; waiting for composer to confirm HDMI is disconnected";
+    } else if (composer_flags_ & HDMI_LOS_FLAG_CONNECTED) {
+      replug_required_ = true;
+      state_detail_ = "armed; unplug HDMI so the preferred mode can be set safely";
+    } else {
+      replug_required_ = false;
+      if (!ApplyPreferredMode(detail)) {
+        armed_ = false;
+        return HDMI_LOS_ERR_IO;
+      }
+      preference_applied_ = true;
+      state_detail_ = "armed; connect HDMI, accept Mirror, and start the chroot agent";
+    }
+    *detail = state_detail_;
+    return HDMI_LOS_OK;
+  }
+
+  void Disarm(const char *reason) {
+    armed_ = false;
+    preference_applied_ = false;
+    replug_required_ = false;
+    stable_mode_samples_ = 0;
+    next_mode_poll_ms_ = 0;
+    composer_disconnect_pending_ = false;
+    RecoverPreferredMode(reason);
+    state_detail_ = reason;
+  }
+
+  void AdvanceArmed() {
+    int64_t now = monotonic_ms();
+    if (now < next_mode_poll_ms_) return;
+    next_mode_poll_ms_ = now + kModePollMs;
+    hdmi_los_message status = {};
+    if (!ComposerRequest(HDMI_LOS_OP_STATUS, &status)) {
+      stable_mode_samples_ = 0;
+      state_detail_ = "armed; waiting for the patched composer service";
+      return;
+    }
+    bool connected = composer_flags_ & HDMI_LOS_FLAG_CONNECTED;
+    if (!connected) {
+      stable_mode_samples_ = 0;
+      if (!preference_applied_) {
+        std::string detail;
+        if (!ApplyPreferredMode(&detail)) {
+          std::string failure = detail.empty() ?
+              "could not set the preferred mode while HDMI was disconnected" : detail;
+          Disarm(failure.c_str());
+          state_detail_ = failure;
+          return;
+        }
+        preference_applied_ = true;
+      }
+      replug_required_ = false;
+      state_detail_ = "armed; connect HDMI and accept Mirror";
+      return;
+    }
+    if (replug_required_ || !preference_applied_) {
+      state_detail_ = "armed; unplug HDMI so the preferred mode can be set safely";
+      return;
+    }
+    if (!RequestedModeMatches()) {
+      stable_mode_samples_ = 0;
+      if (now - armed_since_ms_ >= kModeMismatchMs) {
+        state_detail_ = "armed; connected HDMI mode does not match the configured preset";
+      } else {
+        state_detail_ = "armed; waiting for Android to settle on the configured mode";
+      }
+      return;
+    }
+    if (!(composer_flags_ & HDMI_LOS_FLAG_LEASE_READY)) {
+      stable_mode_samples_ = 0;
+      state_detail_ = "armed; Mirror is connected but the display is not lease-ready yet";
+      return;
+    }
+    if (agent_fd_ < 0) {
+      stable_mode_samples_ = 0;
+      state_detail_ = "armed; matching HDMI is ready, start the chroot run-agent";
+      return;
+    }
+    stable_mode_samples_++;
+    state_detail_ = "armed; matching mode is stable, starting Xorg";
+    if (stable_mode_samples_ < kModeStableSamples) return;
+    std::string detail;
+    int status_code = Start(HDMI_LOS_PROBE_XORG_LEGACY, &detail);
+    if (status_code != HDMI_LOS_OK) {
+      std::string failure = detail.empty() ? "automatic Xorg startup failed" : detail;
+      Disarm(failure.c_str());
+      state_detail_ = failure;
+    }
   }
 
   int Start(uint32_t probe_mode, std::string *detail) {
@@ -608,8 +997,10 @@ class Broker {
       write_full(agent_fd_, &stop, sizeof(stop));
       ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
       CleanupGuards();
-      *detail = "Xorg did not become ready within 15 seconds";
-      return HDMI_LOS_ERR_TIMEOUT;
+      *detail = response.opcode == HDMI_LOS_OP_AGENT_FAILED && response.detail[0] ?
+          response.detail : "Xorg did not complete verified scanout within 15 seconds";
+      return response.opcode == HDMI_LOS_OP_AGENT_FAILED ? HDMI_LOS_ERR_AGENT :
+                                                          HDMI_LOS_ERR_TIMEOUT;
     }
     log_transition("takeover agent-start complete");
 
@@ -761,6 +1152,13 @@ class Broker {
     }
     active_ = false;
     CleanupGuards();
+    if (armed_) {
+      armed_ = false;
+      preference_applied_ = false;
+      replug_required_ = false;
+      stable_mode_samples_ = 0;
+      RecoverPreferredMode(reason);
+    }
     state_detail_ = reason;
     log_transition("restore complete");
   }
@@ -770,6 +1168,17 @@ class Broker {
     status.request_id = request_id;
     status.status = compatible() && diagnostic_dump_ready() ?
         HDMI_LOS_OK : HDMI_LOS_ERR_INCOMPATIBLE;
+    status.requested_width = requested_width_;
+    status.requested_height = requested_height_;
+    status.requested_refresh_millihz = requested_refresh_millihz_;
+    status.active_width = active_width_;
+    status.active_height = active_height_;
+    status.active_refresh_millihz = active_refresh_millihz_;
+    status.flags |= composer_flags_ & (HDMI_LOS_FLAG_CONNECTED |
+                                      HDMI_LOS_FLAG_LEASE_READY |
+                                      HDMI_LOS_FLAG_ACTIVE_MODE);
+    if (armed_) status.flags |= HDMI_LOS_FLAG_ARMED;
+    if (replug_required_) status.flags |= HDMI_LOS_FLAG_REPLUG_REQUIRED;
     if (!compatible()) {
       status.state = HDMI_LOS_STATE_UNAVAILABLE;
       snprintf(status.detail, sizeof(status.detail), "incompatible or unverified Lineage build");
@@ -789,6 +1198,9 @@ class Broker {
         status.remaining_seconds = static_cast<uint32_t>(
             std::max<int64_t>(0, (deadline_ms_ - monotonic_ms() + 999) / 1000));
       }
+      snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
+    } else if (armed_) {
+      status.state = RequestedModeMatches() ? HDMI_LOS_STATE_ARMED : HDMI_LOS_STATE_WAITING;
       snprintf(status.detail, sizeof(status.detail), "%s", state_detail_.c_str());
     } else if (agent_fd_ >= 0) {
       status.state = HDMI_LOS_STATE_AGENT_READY;
@@ -857,10 +1269,15 @@ class Broker {
       return;
     }
 
+    hdmi_los_message composer_status = {};
+    (void)ComposerRequest(HDMI_LOS_OP_STATUS, &composer_status);
     hdmi_los_message response = Status(request.request_id);
     if (request.opcode == HDMI_LOS_OP_TOGGLE) {
       if (active_) {
         Release("Quick Settings tile requested restore", true);
+        response = Status(request.request_id);
+      } else if (armed_) {
+        Disarm("HDMI Xorg disarmed; Android preferred mode restored");
         response = Status(request.request_id);
       } else if (diagnostic_only()) {
         response.status = HDMI_LOS_ERR_STATE;
@@ -868,11 +1285,27 @@ class Broker {
                  "diagnostic build: use a root probe command");
       } else {
         std::string detail;
-        int start_status = Start(HDMI_LOS_PROBE_XORG_ATOMIC, &detail);
+        int start_status = Arm(request, &detail);
         response = Status(request.request_id);
         response.status = start_status;
         if (!detail.empty()) snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());
       }
+    } else if (request.opcode == HDMI_LOS_OP_SET_MODE) {
+      std::string detail;
+      int mode_status = SetMode(request, &detail);
+      response = Status(request.request_id);
+      response.status = mode_status;
+      snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());
+    } else if (request.opcode == HDMI_LOS_OP_ARM) {
+      std::string detail;
+      int arm_status = Arm(request, &detail);
+      response = Status(request.request_id);
+      response.status = arm_status;
+      snprintf(response.detail, sizeof(response.detail), "%s", detail.c_str());
+    } else if (request.opcode == HDMI_LOS_OP_DISARM) {
+      if (active_) Release("HDMI Xorg stopped and disarmed", true);
+      else Disarm("HDMI Xorg disarmed; Android preferred mode restored");
+      response = Status(request.request_id);
     } else if (request.opcode == HDMI_LOS_OP_PROBE) {
       if (!root) {
         response.status = HDMI_LOS_ERR_PERMISSION;
@@ -908,6 +1341,20 @@ class Broker {
   bool probing_ = false;
   bool agent_continuous_ = false;
   bool session_continuous_ = false;
+  bool armed_ = false;
+  bool preference_applied_ = false;
+  bool replug_required_ = false;
+  bool composer_disconnect_pending_ = false;
+  uint32_t requested_width_ = 1920;
+  uint32_t requested_height_ = 1080;
+  uint32_t requested_refresh_millihz_ = 60000;
+  uint32_t active_width_ = 0;
+  uint32_t active_height_ = 0;
+  uint32_t active_refresh_millihz_ = 0;
+  uint32_t composer_flags_ = 0;
+  int stable_mode_samples_ = 0;
+  int64_t armed_since_ms_ = 0;
+  int64_t next_mode_poll_ms_ = 0;
   int64_t deadline_ms_ = 0;
   int64_t composer_heartbeat_ms_ = 0;
   VolumeGuard volumes_;
@@ -916,16 +1363,45 @@ class Broker {
 
 void print_usage() {
   fprintf(stderr,
-          "usage: hdmi-losd [daemon|status|toggle|probe lease-hold|probe xorg-legacy|probe xorg-atomic]\n");
+          "usage: hdmi-losd [daemon|status|toggle|arm|disarm|mode native|mode 1080p60|"
+          "mode 2160p60|mode WIDTHxHEIGHT@HZ|probe lease-hold|probe xorg-legacy|"
+          "probe xorg-atomic]\n");
 }
 
 int client_main(int argc, char **argv) {
   uint16_t opcode = HDMI_LOS_OP_STATUS;
   uint32_t flags = HDMI_LOS_PROBE_NONE;
+  uint32_t requested_width = 0;
+  uint32_t requested_height = 0;
+  uint32_t requested_refresh_millihz = 0;
   if (argc == 1 && strcmp(argv[0], "toggle") == 0) {
     opcode = HDMI_LOS_OP_TOGGLE;
+  } else if (argc == 1 && strcmp(argv[0], "arm") == 0) {
+    opcode = HDMI_LOS_OP_ARM;
+  } else if (argc == 1 && strcmp(argv[0], "disarm") == 0) {
+    opcode = HDMI_LOS_OP_DISARM;
   } else if (argc == 1 && strcmp(argv[0], "status") == 0) {
     opcode = HDMI_LOS_OP_STATUS;
+  } else if (argc == 2 && strcmp(argv[0], "mode") == 0) {
+    opcode = HDMI_LOS_OP_SET_MODE;
+    float refresh = 0.0f;
+    if (strcmp(argv[1], "native") == 0) {
+      requested_width = requested_height = requested_refresh_millihz = 0;
+    } else if (strcmp(argv[1], "1080p60") == 0) {
+      requested_width = 1920;
+      requested_height = 1080;
+      requested_refresh_millihz = 60000;
+    } else if (strcmp(argv[1], "2160p60") == 0) {
+      requested_width = 3840;
+      requested_height = 2160;
+      requested_refresh_millihz = 60000;
+    } else if (sscanf(argv[1], "%ux%u@%f", &requested_width, &requested_height,
+                      &refresh) == 3) {
+      requested_refresh_millihz = static_cast<uint32_t>(lroundf(refresh * 1000.0f));
+    } else {
+      print_usage();
+      return 2;
+    }
   } else if (argc == 2 && strcmp(argv[0], "probe") == 0) {
     opcode = HDMI_LOS_OP_PROBE;
     if (strcmp(argv[1], "lease-hold") == 0) flags = HDMI_LOS_PROBE_LEASE_HOLD;
@@ -946,12 +1422,19 @@ int client_main(int argc, char **argv) {
   }
   hdmi_los_message request = make_message(opcode);
   request.flags = flags;
+  request.requested_width = requested_width;
+  request.requested_height = requested_height;
+  request.requested_refresh_millihz = requested_refresh_millihz;
   hdmi_los_message response = {};
   bool ok = write_full(fd, &request, sizeof(request)) && read_full(fd, &response, sizeof(response));
   close(fd);
   if (!ok || !valid_message(response)) return 1;
-  printf("state=%u status=%d remaining=%u detail=%s\n", response.state, response.status,
-         response.remaining_seconds, response.detail);
+  printf("state=%u status=%d remaining=%u flags=0x%x requested=%ux%u@%.3f "
+         "active=%ux%u@%.3f detail=%s\n", response.state, response.status,
+         response.remaining_seconds, response.flags, response.requested_width,
+         response.requested_height, response.requested_refresh_millihz / 1000.0,
+         response.active_width, response.active_height,
+         response.active_refresh_millihz / 1000.0, response.detail);
   return response.status == HDMI_LOS_OK ? 0 : 1;
 }
 

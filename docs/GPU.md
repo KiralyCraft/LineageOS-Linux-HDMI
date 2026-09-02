@@ -43,7 +43,7 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Works at Android-selected 1920x1080 and 3840x2160; the 1080p validation produced visible accelerated `glxgears` at approximately 55-57 FPS through the per-drawable MIT-SHM bridge |
+| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Earlier runs produced visible LXDE and 55-57 FPS `glxgears`; later testing exposed a false-ready 1080p `SETCRTC` failure, addressed but not yet hardware-validated in `0.2.8-candidate.1` |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -96,9 +96,9 @@ Mesa reports that DRI3 is required for presentation and then fails to create a
 swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black.
 Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
-The installed Mesa is pinned by the optional
+The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `89da2771` on the
+submodule at commit `2788d8df` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -106,6 +106,7 @@ branch. Its relevant custom commits are:
 91f7e8c6 freedreno/kgsl: retain merged submits through GPU command ioctl
 a3eb373e dri3: bridge native render fences to Present
 89da2771 freedreno/kgsl: bridge KMS scanout and X11 presentation
+2788d8df dri3: pipeline the KGSL X11 SHM bridge
 ```
 
 The latter patch exports a native Freedreno render fence and attaches it as an
@@ -169,7 +170,7 @@ timeout restored Android.
 ## KGSL/KMS allocation and presentation bridge
 
 The bridge was implemented and tested live on 2026-09-02. The custom
-Mesa work is commit `89da2771` on
+Mesa work now ends at commit `2788d8df` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
 that base and intentionally does not contain the KMS/X11 bridge.
@@ -201,11 +202,15 @@ mode setting, or the Present completion fence.
 
 For that boundary, Mesa provides the opt-in
 `MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application. On
-swap, Mesa waits for the completed image, maps that one drawable, copies it to
-a persistent memfd, and submits it to the X drawable with MIT-SHM. A checked
-local request prevents the client from reusing the shared storage before Xorg
-has consumed it. The agent also uses `FD_MESA_DEBUG=notile,noubwc` for bridge
-clients so this readback does not require detiling or UBWC decompression.
+swap, Mesa waits for the completed image, maps that one drawable, and submits
+it to the X drawable with MIT-SHM. Commit `2788d8df` replaces the checked
+per-frame X request with a three-slot staging ring on a private XCB connection.
+MIT-SHM completion events release slots, so up to three interval-zero swaps can
+remain outstanding without a request/reply stall. Nonzero intervals use Present
+MSC notifications for pacing. EGL damage rectangles are conservatively
+coalesced; GLX swaps copy the full drawable. Set
+`MESA_KGSL_X11_BRIDGE_STATS=1` for periodic frame/copy/wait statistics. The
+agent also uses `FD_MESA_DEBUG=notile,noubwc` for bridge clients.
 
 This client presentation step is not zero-copy. It is narrower than ShadowFB:
 there is no continuous full-screen copy, and non-GL desktop content stays on
@@ -225,11 +230,12 @@ device did not reboot or crash.
 
 ## External display mode
 
-The agent does not hard-code a Linux resolution. Once Android has paused the
-external display and passed the DRM lease, the agent reads the leased CRTC's
-active mode and verifies that the connector still advertises the same timing.
-It writes that exact timing to Xorg as `hdmi-los-android-current` and verifies
-the resulting RandR screen dimensions before declaring the session ready.
+The broker selects a mode before HDMI connection; 1080p60 is the default, with
+native/automatic and 4K60 as experimental choices. It journals the prior
+Android preference and applies the choice through `cmd display`. Once Android
+has connected and stabilized at that mode, the agent reads the leased CRTC's
+active timing and verifies that the connector still advertises it. It writes
+that exact timing to Xorg as `hdmi-los-android-current`.
 
 This matters when the monitor and Android support more than one timing. If the
 Xorg `PreferredMode` and `Modes` entries force a different resolution while a
@@ -239,6 +245,15 @@ external display black. Omitting both entries would avoid the hard-coded mode,
 but would let Xorg independently choose from EDID instead of reliably keeping
 Android's current resolution and refresh timing. Failure to read the exact
 active mode now aborts takeover and restores Android.
+
+RandR dimensions alone are no longer accepted as readiness. The agent
+correlates the traced enabling `SETCRTC`, keeps a duplicate lease fd, and uses
+`GETCRTC` to prove that the expected CRTC scans out Xorg's framebuffer at the
+same full timing. The installed Sony kernel rejects Xorg's atomic-client
+capability, so the operational path is legacy. If an exact same-mode legacy
+`SETCRTC` alone returns `EINVAL`, the tracer may substitute a page flip, but
+only after matching connector, CRTC, coordinates, and every timing field; the
+same `GETCRTC` proof still applies.
 
 The first live test of this behavior inherited the Dell P2723QE's Android mode
 of 3840x2160 at 60 Hz. Xorg generated a 533.250 MHz Modeline, RandR reported
@@ -325,7 +340,7 @@ trigger the takeover separately from an Android root shell:
 /data/adb/modules/hdmi-los/bin/hdmi-losd probe xorg-atomic
 ```
 
-Release `0.2.7-candidate.3` enables the tile, selects the same atomic probe mode
-without requiring that separate root command, and makes the tested accelerated
-renewable session the no-argument launcher default. It also inherits Android's
-active external-display timing instead of forcing 1920x1080.
+Release `0.2.8-candidate.1` makes the tile an arm/disarm control, defaults its
+stored preset to 1080p60, waits for three stable composer mode samples, and uses
+the legacy scanout path with strict trace-plus-`GETCRTC` verification. The
+accelerated renewable session remains the no-argument launcher default.

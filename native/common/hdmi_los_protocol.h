@@ -4,16 +4,20 @@
 #include <stdint.h>
 
 #define HDMI_LOS_MAGIC 0x48444d49u
-// The patched composer in the verified v0.2.4 base build speaks version 1.
-// Broker clients and the chroot agent use version 2 for diagnostic probes and
-// synchronous DRM trace progress records. Keep these versions separate so a
-// composer-only reuse build cannot silently create a wire incompatibility.
-#define HDMI_LOS_VERSION 1u
-#define HDMI_LOS_BROKER_VERSION 2u
+// Composer and broker clients deliberately use separate versions.  Composer
+// v2 adds physical-link/mode reporting and asynchronous hotplug events.  The
+// broker/agent/APK v3 protocol additionally owns preferred-mode arming.
+#define HDMI_LOS_VERSION 2u
+#define HDMI_LOS_BROKER_VERSION 3u
 #define HDMI_LOS_MESSAGE_SIZE 160u
 #define HDMI_LOS_COMPOSER_SOCKET "hdmi-los-composer-v1"
 #define HDMI_LOS_BROKER_SOCKET "hdmi-los-broker-v1"
 #define HDMI_LOS_ACQUIRE_PHASE_MASK 0xffu
+#define HDMI_LOS_FLAG_CONNECTED 0x00000100u
+#define HDMI_LOS_FLAG_LEASE_READY 0x00000200u
+#define HDMI_LOS_FLAG_ARMED 0x00000400u
+#define HDMI_LOS_FLAG_REPLUG_REQUIRED 0x00000800u
+#define HDMI_LOS_FLAG_ACTIVE_MODE 0x00001000u
 #define HDMI_LOS_FLAG_CONTINUOUS 0x80000000u
 
 enum hdmi_los_opcode {
@@ -23,6 +27,10 @@ enum hdmi_los_opcode {
   HDMI_LOS_OP_PING = 4,
   HDMI_LOS_OP_TOGGLE = 5,
   HDMI_LOS_OP_PROBE = 6,
+  HDMI_LOS_OP_SET_MODE = 7,
+  HDMI_LOS_OP_ARM = 8,
+  HDMI_LOS_OP_DISARM = 9,
+  HDMI_LOS_OP_HOTPLUG = 10,
   HDMI_LOS_OP_AGENT_REGISTER = 16,
   HDMI_LOS_OP_AGENT_PREPARE = 17,
   HDMI_LOS_OP_AGENT_START = 18,
@@ -57,7 +65,9 @@ enum hdmi_los_state {
   HDMI_LOS_STATE_ERROR = 5,
   HDMI_LOS_STATE_AGENT_READY = 6,
   HDMI_LOS_STATE_STARTING_X = 7,
-  HDMI_LOS_STATE_PROBING = 8
+  HDMI_LOS_STATE_PROBING = 8,
+  HDMI_LOS_STATE_ARMED = 9,
+  HDMI_LOS_STATE_WAITING = 10
 };
 
 enum hdmi_los_status {
@@ -86,7 +96,13 @@ struct hdmi_los_message {
   uint32_t plane_id;
   uint32_t lessee_id;
   uint32_t flags;
-  char detail[116];
+  uint32_t requested_width;
+  uint32_t requested_height;
+  uint32_t requested_refresh_millihz;
+  uint32_t active_width;
+  uint32_t active_height;
+  uint32_t active_refresh_millihz;
+  char detail[92];
 };
 
 #if defined(__cplusplus)

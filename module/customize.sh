@@ -27,4 +27,4 @@ set_perm "$MODPATH/uninstall.sh" 0 0 0755
 
 ui_print "- Exact Lineage version accepted"
 ui_print "- Original vendor hashes will be checked again on every boot"
-ui_print "- No display takeover occurs until the chroot agent is running and the tile is tapped"
+ui_print "- With HDMI unplugged, tap the tile to arm; connect and accept Mirror to start Xorg"

@@ -107,6 +107,36 @@ now root:`kiraly` mode `0710`, readiness failures are retained in
 `xdpyinfo.txt`, and input verification uses inherited `DISPLAY` plus the
 configured Xorg device names.
 
+## Same-mode `SETCRTC` rejection and scanout proof
+
+A later 1920x1080 run exposed a different failure after framebuffer creation:
+`MODE_ADDFB2` succeeded, but the first enabling legacy `MODE_SETCRTC` for the
+leased CRTC, connector, and new framebuffer returned `EINVAL`. Android's active
+CRTC already used the identical 1920x1080 timing. The 4K success had used an SDE
+topology reported as `sde_dualpipeline`; the 1080p failure reported
+`sde_singlepipe`, so a redundant full modeset is not uniformly accepted across
+these downstream topology paths.
+
+The Sony kernel also deliberately rejects `DRM_CLIENT_CAP_ATOMIC=1` for a
+process whose command begins with `X`, returning `EOPNOTSUPP` in
+[`drm_setclientcap`](https://github.com/LineageOS/android_kernel_sony_sm8550/blob/d00ba216ccda5d4fcc0d864729ae69d5b63d860c/drivers/gpu/drm/drm_ioctl.c).
+Operational Xorg therefore stays on legacy KMS rather than bypassing that
+device policy.
+
+The preload tracer now permits one narrower substitution: only after the
+original legacy `SETCRTC` returns `EINVAL`, it re-reads the current CRTC and
+requires the requested CRTC, connector, x/y, and every mode timing field to be
+identical. It then issues a legacy page flip to Xorg's requested framebuffer
+and polls `GETCRTC` for that framebuffer. All mismatches and page-flip failures
+preserve failure behavior.
+
+The agent independently correlates the before/detail/after records for Xorg's
+first enabling commit, retains a duplicate lease fd, and verifies the same
+framebuffer and timing with `GETCRTC` before running LXDE. This fixes the prior
+false-ready condition in which `xdpyinfo`, RandR dimensions, and input devices
+were valid even though the physical display had never switched to Xorg's
+framebuffer.
+
 ## Write-only retire-fence property
 
 The fixed-plane probe also showed Xorg replaying Qualcomm's `RETIRE_FENCE`

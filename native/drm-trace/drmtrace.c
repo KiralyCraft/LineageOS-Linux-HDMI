@@ -4,6 +4,7 @@
 #include <drm/drm_mode.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <limits.h>
 #include <poll.h>
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -47,7 +48,30 @@ static atomic_flag g_connector_properties_lock = ATOMIC_FLAG_INIT;
 static int g_suppress_connector_property_noops;
 static int g_ignore_xorg_bitmask_properties;
 static int g_ignore_xorg_pointer_properties;
+static int g_same_mode_pageflip_fallback;
+static uint32_t g_expected_connector;
+static uint32_t g_expected_crtc;
 static __thread int g_in_trace;
+
+static int same_mode_timing(const struct drm_mode_modeinfo *left,
+                            const struct drm_mode_modeinfo *right) {
+  return left->clock == right->clock && left->hdisplay == right->hdisplay &&
+         left->hsync_start == right->hsync_start && left->hsync_end == right->hsync_end &&
+         left->htotal == right->htotal && left->hskew == right->hskew &&
+         left->vdisplay == right->vdisplay && left->vsync_start == right->vsync_start &&
+         left->vsync_end == right->vsync_end && left->vtotal == right->vtotal &&
+         left->vscan == right->vscan && left->flags == right->flags;
+}
+
+static uint32_t parse_u32_environment(const char *name) {
+  const char *text = getenv(name);
+  if (!text || !*text) return 0;
+  char *end = NULL;
+  errno = 0;
+  unsigned long value = strtoul(text, &end, 10);
+  return errno == 0 && end && *end == '\0' && value <= UINT32_MAX ?
+      (uint32_t)value : 0;
+}
 
 typedef struct hdmi_los_drm_mode_property *(*drm_mode_get_property_fn)(int, uint32_t);
 typedef void (*drm_mode_free_property_fn)(struct hdmi_los_drm_mode_property *);
@@ -484,6 +508,47 @@ static void emit_object_property_details(uint32_t sequence, int fd,
   }
 }
 
+static int try_same_mode_pageflip(int fd, const void *argument, uint32_t sequence) {
+  if (!g_same_mode_pageflip_fallback || !g_expected_crtc || !g_expected_connector) return 0;
+  struct drm_mode_crtc requested;
+  if (!safe_copy(&requested, (uint64_t)(uintptr_t)argument, sizeof(requested)) ||
+      requested.crtc_id != g_expected_crtc || requested.fb_id == 0 ||
+      requested.count_connectors != 1 || !requested.mode_valid) return 0;
+  uint32_t connector = 0;
+  if (!safe_copy(&connector, requested.set_connectors_ptr, sizeof(connector)) ||
+      connector != g_expected_connector) return 0;
+
+  struct drm_mode_crtc current = {0};
+  current.crtc_id = requested.crtc_id;
+  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_GETCRTC, &current) != 0 ||
+      !current.mode_valid || current.fb_id == 0 || current.x != requested.x ||
+      current.y != requested.y || !same_mode_timing(&current.mode, &requested.mode)) return 0;
+
+  struct drm_mode_crtc_page_flip flip = {0};
+  flip.crtc_id = requested.crtc_id;
+  flip.fb_id = requested.fb_id;
+  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip) != 0) return 0;
+
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    struct drm_mode_crtc verified = {0};
+    verified.crtc_id = requested.crtc_id;
+    if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_GETCRTC, &verified) == 0 &&
+        verified.fb_id == requested.fb_id && verified.mode_valid &&
+        same_mode_timing(&verified.mode, &requested.mode)) {
+      char detail[64];
+      snprintf(detail, sizeof(detail), "crtc=%u old_fb=%u new_fb=%u", requested.crtc_id,
+               current.fb_id, requested.fb_id);
+      emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_PAGEFLIP_FALLBACK",
+                  requested.crtc_id, current.fb_id, requested.fb_id,
+                  g_expected_connector, detail);
+      return 1;
+    }
+    usleep(25000);
+  }
+  errno = EIO;
+  return -1;
+}
+
 __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   const char *descriptor = getenv("HDMI_LOS_TRACE_FD");
   if (!descriptor || !*descriptor) return;
@@ -499,6 +564,10 @@ __attribute__((constructor)) static void hdmi_los_trace_initialize(void) {
   const char *ignore_pointers = getenv("HDMI_LOS_IGNORE_XORG_POINTER_PROPERTIES");
   g_ignore_xorg_pointer_properties =
       ignore_pointers && strcmp(ignore_pointers, "1") == 0;
+  const char *fallback = getenv("HDMI_LOS_SAME_MODE_PAGEFLIP_FALLBACK");
+  g_same_mode_pageflip_fallback = fallback && strcmp(fallback, "1") == 0;
+  g_expected_connector = parse_u32_environment("HDMI_LOS_EXPECTED_CONNECTOR");
+  g_expected_crtc = parse_u32_environment("HDMI_LOS_EXPECTED_CRTC");
   g_real_drm_mode_get_property =
       (drm_mode_get_property_fn)dlsym(RTLD_NEXT, "drmModeGetProperty");
   g_real_drm_mode_free_property =
@@ -604,6 +673,15 @@ int ioctl(int fd, unsigned long request, ...) {
   errno = 0;
   long result = syscall(SYS_ioctl, fd, request, argument);
   int saved_errno = errno;
+  if (result < 0 && saved_errno == EINVAL && request == DRM_IOCTL_MODE_SETCRTC) {
+    int fallback = try_same_mode_pageflip(fd, argument, sequence);
+    if (fallback > 0) {
+      result = 0;
+      saved_errno = 0;
+    } else if (fallback < 0) {
+      saved_errno = errno;
+    }
+  }
 
   struct hdmi_los_trace_record after;
   initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,

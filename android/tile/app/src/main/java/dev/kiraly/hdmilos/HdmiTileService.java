@@ -39,7 +39,8 @@ public final class HdmiTileService extends TileService {
         switch (status.state()) {
             case BrokerClient.STATE_LEASED -> {
                 tile.setState(Tile.STATE_ACTIVE);
-                subtitle = "Xorg · " + status.remaining() + "s";
+                subtitle = (status.flags() & BrokerClient.FLAG_CONTINUOUS) != 0
+                        ? "Xorg · continuous" : "Xorg · " + status.remaining() + "s";
             }
             case BrokerClient.STATE_DRAINING, BrokerClient.STATE_STARTING_X -> {
                 tile.setState(Tile.STATE_ACTIVE);
@@ -55,11 +56,20 @@ public final class HdmiTileService extends TileService {
             }
             case BrokerClient.STATE_AGENT_READY -> {
                 tile.setState(Tile.STATE_INACTIVE);
-                subtitle = "Ready";
+                subtitle = "Tap to arm";
+            }
+            case BrokerClient.STATE_ARMED -> {
+                tile.setState(Tile.STATE_ACTIVE);
+                subtitle = "Armed · starting soon";
+            }
+            case BrokerClient.STATE_WAITING -> {
+                tile.setState(Tile.STATE_ACTIVE);
+                subtitle = (status.flags() & BrokerClient.FLAG_REPLUG_REQUIRED) != 0
+                        ? "Armed · replug HDMI" : "Armed · waiting";
             }
             case BrokerClient.STATE_ANDROID -> {
                 tile.setState(Tile.STATE_INACTIVE);
-                subtitle = "Android";
+                subtitle = "Android · tap to arm";
             }
             default -> {
                 tile.setState(Tile.STATE_UNAVAILABLE);

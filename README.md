@@ -32,7 +32,10 @@ The project consists of:
 
 It does not replace Android, flash a Linux kernel, write a boot or vendor
 partition, or start Xorg automatically at boot. The Magisk ZIP and matching
-chroot bundle are separate artifacts and must come from the same build.
+chroot bundle are separate artifacts and must come from the same build. The
+operator explicitly arms the feature before connecting HDMI; Xorg starts only
+after Android has connected the display, Mirror was accepted, the requested
+mode is stable, and the foreground chroot agent is ready.
 
 ## Current status
 
@@ -40,8 +43,8 @@ Two Xorg paths have been tested on the target device:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
-| `safe` (fallback) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible LXDE and `glxgears`; takeover has been validated while inheriting Android modes at 1920x1080 and 3840x2160 |
+| `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | Previously produced visible LXDE in bounded probes |
+| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and a pipelined MIT-SHM copy per swapped accelerated drawable | The allocation/presentation bridge produced visible LXDE and `glxgears`; release `0.2.8-candidate.1` adds stricter mode and scanout gates and still requires target-device validation |
 
 The accelerated path still needs a copy for each GL window swap because this
 downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
@@ -49,15 +52,20 @@ black image when it imports the same KGSL dma-buf in another context. It does
 not continuously copy the full screen. The exact investigation and tested
 environment are documented in [GPU acceleration](docs/GPU.md).
 
-At takeover time the agent reads the active mode from Android's leased CRTC
-and gives Xorg that exact timing. It does not impose 1080p or independently
-choose the monitor's EDID-preferred mode. If the active timing cannot be read
-and matched to the connected display, takeover fails closed and Android is
-restored.
+Before HDMI is connected, the broker asks Android to prefer the configured
+external mode. The default is 1920x1080 at 60 Hz; native/automatic and 4K60 are
+available as experimental choices by long-pressing the tile. The agent then
+reads the actual leased CRTC timing and gives Xorg that exact timing. A mode
+mismatch, missing lease readiness, failed Xorg `SETCRTC`, or CRTC framebuffer
+mismatch fails closed and restores Android's previous global preference.
+If HDMI is already connected when armed, the broker waits for an unplug before
+applying the preference; it never changes a live external mode while arming.
 
-The first live 3840x2160 run completed its KMS modeset promptly, but LXDE took
-longer to become fully visible than it did at 1920x1080. The desktop eventually
-rendered correctly; 4K startup latency and performance remain areas to measure.
+Earlier live testing showed that 3840x2160 can work but starts more slowly and
+is noticeably less responsive. A later 1920x1080 run exposed a downstream SDE
+quirk: an otherwise identical legacy `SETCRTC` returned `EINVAL`. The current
+tracer permits only an exact same-timing page flip as a narrow fallback and
+verifies the resulting framebuffer before LXDE is declared ready.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
@@ -66,7 +74,10 @@ combination is safe.
 ## How the takeover works
 
 ```text
-Android owns internal + external displays
+operator selects a mode and arms HDMI Xorg before cable insertion
+                  |
+                  v
+Android connects external display at that mode; operator accepts Mirror
                   |
                   v
 patched composer pauses only the external HWC display
@@ -84,9 +95,10 @@ session ends, times out, disconnects, or receives the volume-key escape
 composer revokes the lease, repairs cached state, and resumes Android
 ```
 
-The Android composer remains the DRM master. The broker records each takeover
-boundary durably, and Xorg's DRM ioctls are traced before execution. The
-internal display is never included in the lease. See
+The Android composer remains the DRM master. The broker journals Android's old
+preferred-mode setting, records each takeover boundary durably, and Xorg's DRM
+ioctls are traced before execution. The internal display is never included in
+the lease. See
 [Architecture and invariants](docs/ARCHITECTURE.md) for the full design.
 
 ## Requirements
@@ -121,8 +133,10 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 ```
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
-repository to tested commit
-[`89da2771`](https://github.com/KiralyCraft/mesa-for-android-container/commit/89da27716279aed04c09884b79c86f15db72427d).
+repository to commit
+[`2788d8df`](https://github.com/KiralyCraft/mesa-for-android-container/commit/2788d8df63e43bd4d2c3fdb6bcb1010c863ccff0).
+That branch alone contains the leased-screen KMS/SHM bridge; the separate
+`fix/kgsl-present-wait-fence` pull-request branch does not.
 The HDMI build does not compile the submodule automatically. The resulting
 private `libgallium-*.so` must be placed below `lib/mesa/` in the chroot runtime
 bundle before the accelerated agent mode will start.
@@ -168,9 +182,12 @@ ordinary-mirroring and unused-lease gates. In outline:
 
 1. Install the matching Magisk ZIP and reboot.
 2. Deploy the matching chroot bundle without mixing files from older builds.
-3. Start the foreground agent inside the mounted chroot.
-4. Add and tap the **HDMI Xorg** Quick Settings tile.
-5. End the session with the volume-key escape or by tapping the tile again.
+3. With HDMI unplugged, long-press **HDMI Xorg** to select a mode (1080p60 is
+   the default), then tap the tile to arm it.
+4. Start the foreground agent inside the mounted chroot.
+5. Connect HDMI and accept Android's **Mirror** prompt. The broker starts Xorg
+   automatically after three matching mode samples.
+6. End the session with the volume-key escape or by tapping the tile again.
 
 The tested accelerated LXDE session is now the launcher default:
 
@@ -190,8 +207,16 @@ cd <hdmi-los-runtime>
   --no-timeout
 ```
 
-No takeover starts merely because the module or agent is present. The tile or
-an explicit root diagnostic command initiates it.
+No takeover starts merely because the module or agent is present. Tapping the
+idle tile arms the requested mode; tapping while armed disarms it, and tapping
+while leased stops Xorg and disarms it. The equivalent root commands are:
+
+```sh
+/data/adb/modules/hdmi-los/bin/hdmi-losd mode 1080p60
+/data/adb/modules/hdmi-los/bin/hdmi-losd arm
+/data/adb/modules/hdmi-los/bin/hdmi-losd status
+/data/adb/modules/hdmi-los/bin/hdmi-losd disarm
+```
 
 Continuous mode removes the broker's fixed 60-second session deadline, but it
 does not remove automatic recovery: the broker renews the composer's 65-second
@@ -208,7 +233,10 @@ restored. Use `--timeout` for a bounded 60-second session, and use
 - Default continuous sessions renew that composer backstop every 20 seconds and can
   run indefinitely only while the broker remains healthy.
 - Broker or agent disconnect, HDMI unplug, and secure-display entry also force
-  lease release.
+  lease release. Unplug is queued out of the HWC uevent thread so the broker
+  can stop Xorg first; composer retains a five-second forced-release backstop.
+- The preferred-mode recovery journal is replayed on broker startup, so a
+  broker restart does not leave Android's global display preference changed.
 - Disable or uninstall the Magisk module and reboot to restore the original
   vendor files.
 - Magisk safe mode (hold Volume Down during boot) disables all modules.

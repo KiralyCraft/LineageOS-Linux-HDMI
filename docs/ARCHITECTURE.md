@@ -25,14 +25,22 @@ Composer rolls back a prepared or paused partial transition when the broker
 disconnects or a phase fails; its independent 65-second deadline begins with
 the first preparation phase.
 
-Broker protocol version 2 adds root-only diagnostic probes. The independently
-versioned composer socket remains at version 1 so the exact verified 0.2.4
-composer can be reused. `lease-hold` stops after receiving the lease and closes
-it three seconds later without starting the chroot agent. `xorg-legacy` and
-`xorg-atomic` pass the same leased objects to Xorg with explicit legacy/atomic
-configuration. The candidate tile selects the atomic configuration; root-only
-probes retain both variants for comparison. The version-2 broker rejects the
-older untraced agent.
+Broker protocol version 3 adds persistent mode selection and explicit arm,
+disarm, and waiting states. Composer protocol version 2 reports physical
+connection, lease readiness, and active width/height/refresh while keeping the
+wire packet fixed at 160 bytes. `lease-hold` stops after receiving the lease
+and closes it three seconds later without starting the chroot agent.
+`xorg-legacy` and `xorg-atomic` remain root-only comparison probes. The
+production tile arms the legacy path because the installed Sony kernel
+intentionally rejects Xorg's atomic-client opt-in.
+
+When armed, the broker atomically journals Android's prior global preferred
+display mode under `/data/adb/hdmi-los`, applies the selected preset through
+`cmd display`, and polls composer at 250 ms. It requires three stable samples
+of the requested mode, physical connection, lease readiness, and agent
+presence. If HDMI was already connected at the wrong timing it requests a
+replug instead of changing the live display. Disarm, release, failure, and
+broker startup all replay the recovery journal.
 
 Diagnostic Xorg loads `libhdmi-los-drmtrace.so`. Before every DRM ioctl, the
 library sends a structured record through the agent to the Android broker.
@@ -41,7 +49,16 @@ the ioctl is not issued without that acknowledgement. Atomic object/property
 tuples and legacy CRTC connector ids are recorded separately. Xorg is first
 executed with `-version` and the same preload before composer is paused, so a
 setuid or suppressed-preload configuration fails closed without touching the
-external display.
+external display. The agent does not accept RandR dimensions as proof of
+scanout: it correlates the first enabling `SETCRTC` for the leased objects,
+keeps a duplicate lease fd, and requires `GETCRTC` to report Xorg's framebuffer
+at Android's exact timing before starting LXDE. Any later qualifying commit
+failure terminates the session.
+
+The tracer's only modeset compatibility substitution is an exact same-mode
+fallback. After a legacy `SETCRTC` returns `EINVAL`, and only when connector,
+CRTC, coordinates, and full timing equal the currently active mode, it submits
+a page flip to the requested framebuffer and verifies it with `GETCRTC`.
 
 Lease readiness is gated by the composer-owned `HWCDisplay` power and pause
 state.  It deliberately does not use `HWDeviceDRM::active_`: that legacy DAL
@@ -53,8 +70,11 @@ disconnects. In an explicitly registered continuous session, the broker omits
 its normal 60-second deadline and renews the composer's watchdog every 20
 seconds. The lease can therefore remain active while both processes are
 responsive, without losing the composer-side recovery path if the broker
-wedges. Unplug and secure-display entry also force release. SurfaceFlinger
-hotplug handling is deferred only from resource preparation through restoration.
+wedges. A leased-display unplug is queued to the composer server rather than
+running DRM teardown on the HWC uevent thread. The broker stops Xorg first;
+composer forces release after five seconds if that cleanup does not arrive.
+Secure-display entry still revokes immediately. SurfaceFlinger hotplug handling
+is deferred only from resource preparation through restoration.
 
 Lease bookkeeping lives in a private sidecar map in the DAL translation unit,
 not in `HWDeviceDRM`.  Its state is erased on reset and DAL teardown.  This keeps
