@@ -1,0 +1,5 @@
+[submodule "third_party/mesa-for-android-container"]
+	path = third_party/mesa-for-android-container
+	url = https://github.com/KiralyCraft/mesa-for-android-container.git
+	branch = fix/kgsl-leased-screen
+	shallow = true

@@ -96,8 +96,10 @@ Mesa reports that DRI3 is required for presentation and then fails to create a
 swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black.
 Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
-The installed Mesa comes from the custom
-[`fix/kgsl-present-wait-fence`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-present-wait-fence)
+The installed Mesa is pinned by the optional
+[`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
+submodule at commit `89da2771` on the
+[`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
 ```text
@@ -167,9 +169,10 @@ timeout restored Android.
 ## KGSL/KMS allocation and presentation bridge
 
 The opt-in bridge was implemented and tested live on 2026-09-02. The custom
-Mesa work is commit `89da2771` on the same
-[`fix/kgsl-present-wait-fence`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-present-wait-fence)
-branch.
+Mesa work is commit `89da2771` on
+[`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
+directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
+that base and intentionally does not contain the KMS/X11 bridge.
 
 The KMS capability probe in `native/probes/kms-kgsl-zero-copy.c` established
 this supported allocation chain:

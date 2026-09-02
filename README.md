@@ -1,150 +1,210 @@
-# hdmi-los
+# LineageOS Linux HDMI
 
-`hdmi-los` is an experimental, version-locked Magisk module for the Xperia 1 V
-(`XQ-DQ72`, LineageOS device `pdx234`). It cooperates with Qualcomm's hardware
-composer to pause Android's external display, lease only that display's DRM
-connector/CRTC/primary plane to Xorg, and then restore Android without touching
-the internal DSI panel.
+Run a Linux/Xorg desktop on the external USB-C/HDMI display of a Sony Xperia
+1 V while Android continues to use the phone's internal display.
 
-The initial profile is **only** for
-`22.2-20250608-NIGHTLY-pdx234`. The module checks both Android properties and
-the SHA-256 hashes of the original composer artifacts before its verified
-early-boot bind mounts. Any mismatch fails closed; the module deliberately has
-`skip_mount`, so a Lineage update cannot receive an unconditional old `/vendor`
-overlay.
+This project patches the Qualcomm display composer used by LineageOS so it can
+temporarily hand only the external display to Xorg through a DRM lease. It is
+an experimental, device- and ROM-specific implementation, not a general
+Android desktop-mode application.
 
-## Safety status
+> **Warning:** the current profile supports only the Xperia 1 V (`XQ-DQ72`,
+> LineageOS device `pdx234`) running
+> `22.2-20250608-NIGHTLY-pdx234`. The Magisk module refuses to activate when
+> the Android properties or original composer file hashes do not match that
+> build. Do not install an old release or bypass the compatibility checks.
 
-This repository was created after two unsafe out-of-band experiments: one Xorg
-lease attempt was followed by a hard reset, and a direct DP CRTC release left an
-Android graphics fence unsignaled and froze SystemUI. This implementation does
-not duplicate or manipulate the composer's DRM state from another process.
-Lease creation, cache invalidation, and display resume happen inside the
-composer/DAL that owns the state.
+## What it does
 
-It is still experimental. `make zip` performs build-time checks only. It never
-installs the module, reboots Android, starts Xorg, or performs a live takeover.
+During a takeover, Android keeps rendering the internal DSI panel while the
+external connector, CRTC, and primary plane are leased to an X server running
+inside a Linux chroot. LXDE, a mouse, and a keyboard can then use the connected
+monitor. Stopping the session returns the same display to Android mirroring.
 
-The initial 0.1 package caused a pre-animation boot failure because new virtual
-methods shifted Qualcomm derived-class vtable slots used by proprietary Sony
-display code. Magisk safe mode recovered the phone. Release 0.2 replaces those
-hooks with a non-virtual bridge and adds an exact vtable-slot build gate. The
-[incident record](docs/BOOT_FAILURE_2026-09-01.md) contains the evidence. The
-first 0.2 package also failed before animation: its custom bind mounts bypassed
-Magisk's executable module mirror and inherited `nosuid` from `/data`. Release
-0.2.1 binds from Magisk's read-only, cleared-`nosuid` mirror instead. Neither
-the 0.1 nor the 0.2 ZIP should be installed. Release 0.2.2 also fixes deferred
-tile installation by preventing Package Manager from inheriting a log file
-descriptor that `system_server` cannot write under SELinux.
+The project consists of:
 
-Release 0.2.3 reached the first real lease transition, but its composer path
-held Qualcomm's global pluggable-display handler lock while synchronously
-powering off the external display and creating the DRM lease. The first live
-activation ended in a full-device reset and cut OTG dock power; no retained
-crash dump identified the exact internal phase. Do not install 0.2.3. Release
-0.2.4 limits that global lock to display selection,
-performs prepare, pause, and lease creation as separately acknowledged phases,
-refreshes SurfaceFlinger after pause as the stock display-status path does, and
-durably records every boundary before entering composer or Xorg code.
+- a narrowly patched Qualcomm composer and SDM stack;
+- a root broker that coordinates the lease and automatic restoration;
+- a chroot agent, Xorg DRM tracer, and input bridge;
+- a signed Quick Settings tile used to request a takeover;
+- exact ROM profiles, build gates, diagnostic probes, and recovery tooling;
+- an optional patched Mesa build for native Freedreno/KGSL acceleration.
 
-The first 0.2.4 Xorg start still reset the whole phone after the lease was
-successfully delivered. Its Xorg log and lock file remained zero-length, and
-the OTG dock lost power with the phone. Release `0.2.5-diagnostic.1` therefore
-isolated every DRM ioctl behind a durable trace and disabled tile activation.
-Those probes identified unsafe Qualcomm connector-property replays, an Xorg
-bitmask-property crash, and an intermittently wrong leased primary plane.
+It does not replace Android, flash a Linux kernel, write a boot or vendor
+partition, or start Xorg automatically at boot. The Magisk ZIP and matching
+chroot bundle are separate artifacts and must come from the same build.
 
-Release `0.2.6-candidate.1` filters the write-only `RETIRE_FENCE` property,
-leases the CRTC's fixed primary plane, and selects Xorg's atomic+ShadowFB path.
-That exact path produced a visible LXDE desktop on the workstation capture and
-the 60-second failsafe restored Android mirroring. The Quick Settings tile is
-enabled again; forensic root probes remain available. The capture card must be
-powered by the workstation, not the phone. The investigation is recorded in
-[`docs/QUALCOMM_DRM_RESEARCH.md`](docs/QUALCOMM_DRM_RESEARCH.md). Live GPU
-results for native Freedreno, llvmpipe, and Zink over Turnip are recorded in
-[`docs/GPU.md`](docs/GPU.md).
+## Current status
 
-Runtime escape paths are:
+Two Xorg paths have been tested on the target device:
 
-- Hold Volume Up and Volume Down together for three seconds.
-- A session is forcibly restored after 60 seconds; composer has its own
-  65-second backstop.
-- Disable/uninstall the Magisk module and reboot to return to the original
-  vendor files.
-- Magisk safe mode (hold Volume Down during boot) disables all modules.
+| Mode | Rendering and presentation | Status |
+| --- | --- | --- |
+| `safe` (default) | Atomic KMS, a dumb scanout buffer, ShadowFB, and software GL | Visible LXDE; bounded takeovers restore Android |
+| `kgsl-kms-bridge` (opt-in) | Native Freedreno/KGSL, zero-copy Xorg scanout, and one MIT-SHM copy per swapped accelerated drawable | Visible 1920x1080 LXDE and `glxgears` at about 55-57 FPS |
 
-There is deliberately no proximity-sensor escape.
+The accelerated path still needs a copy for each GL window swap because this
+downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
+black image when it imports the same KGSL dma-buf in another context. It does
+not continuously copy the full screen. The exact investigation and tested
+environment are documented in [GPU acceleration](docs/GPU.md).
 
-## Build
+This remains research-quality software. A successful source build does not
+prove that another phone, ROM build, dock, display, or proprietary composer
+combination is safe.
 
-All compilation and ZIP assembly happen on `root@192.168.104.201`:
+## How the takeover works
+
+```text
+Android owns internal + external displays
+                  |
+                  v
+patched composer pauses only the external HWC display
+                  |
+                  v
+composer creates a DRM lease for connector + CRTC + primary plane
+                  |
+                  v
+root broker passes the lease to the chroot agent and Xorg :1
+                  |
+                  v
+session ends, times out, disconnects, or receives the volume-key escape
+                  |
+                  v
+composer revokes the lease, repairs cached state, and resumes Android
+```
+
+The Android composer remains the DRM master. The broker records each takeover
+boundary durably, and Xorg's DRM ioctls are traced before execution. The
+internal display is never included in the lease. See
+[Architecture and invariants](docs/ARCHITECTURE.md) for the full design.
+
+## Requirements
+
+- Sony Xperia 1 V `XQ-DQ72` / `pdx234` with the exact supported LineageOS build
+- Magisk/root access and working `su`
+- a USB-C DisplayPort/HDMI dock and an external display
+- an ext4 Linux chroot containing Xorg and LXDE
+- a Linux build host with enough space for the captured LineageOS source tree
+- access to the exact proprietary Sony inputs recorded by the selected profile
+
+A USB HDMI capture device is useful for development but is not required for a
+normal monitor. During testing, power the capture device from the workstation,
+not from the phone's OTG dock.
+
+## Source and patched Mesa
+
+Clone the main repository normally for the safe path:
 
 ```sh
-make server-preflight
-make zip
+git clone https://github.com/KiralyCraft/LineageOS-Linux-HDMI.git
+cd LineageOS-Linux-HDMI
+```
+
+The optional submodule at
+`third_party/mesa-for-android-container` documents and pins the Mesa source
+used by `kgsl-kms-bridge`. Initialize it when reproducing or changing the
+accelerated path:
+
+```sh
+git submodule update --init --depth 1 third_party/mesa-for-android-container
+```
+
+It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
+repository to tested commit
+[`89da2771`](https://github.com/KiralyCraft/mesa-for-android-container/commit/89da27716279aed04c09884b79c86f15db72427d).
+The HDMI build does not compile the submodule automatically. The resulting
+private `libgallium-*.so` must be placed below `lib/mesa/` in the chroot runtime
+bundle before the accelerated agent mode will start.
+
+## Build and verify
+
+Run the source-level tests locally:
+
+```sh
+make test
+```
+
+The build automation performs compilation and ZIP assembly on a separate
+Linux host. Override the repository's development-server default when using
+your own machine:
+
+```sh
+make server-preflight SERVER=root@build-host
+make zip SERVER=root@build-host
 make verify
 ```
 
-For a module-script or documentation-only correction, reuse an already
-verified binary build without running the Android/native toolchains:
+Artifacts are returned to `dist/`:
+
+- `hdmi-los-<profile>-magisk.zip`
+- `hdmi-los-<profile>-chroot.tar.gz`
+- signed-APK certificate information
+- a provenance manifest and `SHA256SUMS`
+
+The build materializes the exact captured LineageOS manifest and proprietary
+Sony revisions. It first builds an unmodified baseline, then refuses packaging
+if the patch changes incompatible exports, dependencies, object sizes, or
+existing C++ vtable slots. A profile or source mismatch fails closed.
+
+For a packaging-only change, or for an agent diagnostic that reuses a verified
+composer, use the bounded reuse targets described by `make help`. They require
+the full commit ID of the verified binary source.
+
+## Install and run
+
+Follow the staged [manual test checklist](docs/MANUAL_TEST.md); do not skip its
+ordinary-mirroring and unused-lease gates. In outline:
+
+1. Install the matching Magisk ZIP and reboot.
+2. Deploy the matching chroot bundle without mixing files from older builds.
+3. Start the foreground agent inside the mounted chroot.
+4. Add and tap the **HDMI Xorg** Quick Settings tile.
+5. End the session with the volume-key escape or wait for automatic restore.
+
+Start the default safe session with:
 
 ```sh
-make repackage BASE_COMMIT=<full-verified-build-commit>
-make verify BASE_COMMIT=<full-verified-build-commit>
+cd <hdmi-los-runtime>
+sudo -n ./run-agent.sh --capture none
 ```
 
-The repackage command refuses changes outside an explicit packaging/deployment
-allowlist and records separate package-source and binary-source commits.
-
-For native/agent diagnostics, reuse only a verified composer while rebuilding
-the broker, tracer, chroot tools, and signed tile:
+Start the tested accelerated session with:
 
 ```sh
-make reuse-composer BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
-make verify BASE_COMMIT=8a9e97430b062ed695f11801a5b251636ba3971a
+cd <hdmi-los-runtime>
+sudo -n ./run-agent.sh \
+  --capture none \
+  --xorg-accel kgsl-kms-bridge \
+  --session lxde
 ```
 
-This mode refuses any change to the profile, Qualcomm patch series, or
-composer build inputs. Build-info schema 3 records the repository commit of
-every individual artifact.
+No takeover starts merely because the module or agent is present. The tile or
+an explicit root diagnostic command initiates it.
 
-Artifacts are copied into `dist/`. The local machine only stores source,
-patches, profiles, signing material, and returned artifacts.
+## Safety and recovery
 
-The output consists of the Magisk ZIP, a chroot agent/tracer bundle, signed-APK
-certificate details, a provenance manifest, and `SHA256SUMS`. No boot or vendor
-partition image is built or flashed.
+- Hold Volume Up and Volume Down together for three seconds to restore Android.
+- The agent forces restoration after 60 seconds; the composer has an
+  independent 65-second backstop.
+- Broker or agent disconnect, HDMI unplug, and secure-display entry also force
+  lease release.
+- Disable or uninstall the Magisk module and reboot to restore the original
+  vendor files.
+- Magisk safe mode (hold Volume Down during boot) disables all modules.
+- If the phone resets, stop testing and collect recovery evidence before
+  another attempt.
 
-Future builds use `make profile PROFILE=<name>` followed by
-`make port PROFILE=<name>`. The captured build manifest pins every source
-revision, while package-time rendering changes the installer/version/hash gate
-to that profile. Source synchronization fetches those object IDs directly and
-has no branch-history fallback. A missing revision, patch conflict, or compile
-failure refuses to produce an installable ZIP.
+The early releases documented in
+[the boot-failure record](docs/BOOT_FAILURE_2026-09-01.md) are unsafe and must
+not be installed. The current release metadata and exact compatibility profile
+in this repository are authoritative.
 
-`make profile` also records the installed `libsdmextension.so` checksum, but a
-build manifest cannot reveal the proprietary repository commits. Before
-`make zip PROFILE=<name>`, add the two reviewed, exact TheMuppets revisions to
-that profile's `source.proprietary_projects`; the build checks the extracted
-library hash and fails closed if those commits do not match the installed ROM.
+## Documentation
 
-The composer build follows the supported Lineage/AOSP shape: it materializes
-the complete captured manifest, adds exact proprietary Sony projects, selects
-the real `lineage_pdx234` product, and asks `m` for only the composer service and
-two SDM libraries. It does not use a reduced synthetic product or suppress
-missing dependencies. The current proprietary pins correspond to Sony base
-`67.2.A.3.16`; the critical `libsdmextension.so` input is also hash-checked
-against the running phone before compilation.
-
-Before applying the patch series, the same exact tree builds an unmodified
-composer/SDM baseline. Packaging fails if a patched ELF changes its ELF class,
-machine, SONAME, dependency set, drops a baseline dynamic export, changes an
-existing exported object's size, or changes the size or relocation identity of
-any existing exported C++ vtable slot. This covers both class-layout adjustment
-thunks and the derived-vtable shifting that caused the 0.1 boot failure.
-
-## Manual activation outline
-
-The exact staged checklist is in `docs/MANUAL_TEST.md`. Install the matching
-ZIP and chroot bundle, start the agent, and use the Quick Settings tile for the
-traced atomic takeover. No takeover starts at boot.
+- [Manual installation and test gates](docs/MANUAL_TEST.md)
+- [Architecture and safety invariants](docs/ARCHITECTURE.md)
+- [GPU acceleration and the Mesa bridge](docs/GPU.md)
+- [Qualcomm DRM investigation](docs/QUALCOMM_DRM_RESEARCH.md)
+- [Rollback procedure](docs/ROLLBACK.md)
+- [Historical boot failure](docs/BOOT_FAILURE_2026-09-01.md)
