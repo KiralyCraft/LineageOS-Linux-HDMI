@@ -420,6 +420,10 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
 
+    def test_composer_abi_comparison_has_deterministic_collation(self):
+        verifier = (ROOT / "build-support/verify-composer-abi.sh").read_text()
+        self.assertIn("export LC_ALL=C", verifier)
+
 
 if __name__ == "__main__":
     unittest.main()

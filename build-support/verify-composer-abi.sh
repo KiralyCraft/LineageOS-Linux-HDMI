@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# readelf symbol names contain punctuation whose collation differs between
+# developer shells.  sort, comm, and join must all use the same byte ordering.
+export LC_ALL=C
+
 BASELINE=${1:?baseline artifact directory}
 PATCHED=${2:?patched artifact directory}
 LLVM_READOBJ=${3:-${LLVM_READOBJ:-}}
