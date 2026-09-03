@@ -1,6 +1,6 @@
 id=hdmi-los
 name=HDMI Xorg takeover for LineageOS pdx234
-version=0.2.8-candidate.10-current-install
-versionCode=20260920
+version=0.2.8-candidate.11-current-install
+versionCode=20260921
 author=KiralyCraft
 description=Armed, mode-safe Xorg DRM-lease takeover with verified scanout and accelerated continuous LXDE.

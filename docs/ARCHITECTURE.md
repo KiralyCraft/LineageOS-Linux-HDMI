@@ -11,11 +11,15 @@ one connected pluggable display it performs this staged sequence:
 2. Release the global pluggable-display handler lock. The non-Android takeover
    state defers hotplug teardown, while the per-display sequence lock pins each
    short operation without blocking a driver callback on the global lock.
-3. Pause the existing external `HWCDisplay`, acknowledge that phase, and issue
-   the same primary-display refresh used by Qualcomm's stock display-status
-   path. The internal DSI display is never part of the lease.
-4. Create a DRM lease containing exactly those three objects and pass its file
-   descriptor to the root broker.
+3. Pause updates on the existing external `HWCDisplay` without powering off
+   its negotiated CRTC timing. The internal DSI display is never part of the
+   lease.
+4. Under Qualcomm's global SurfaceFlinger command-sequence lock, refresh the
+   CRTC-fixed primary selection. If it still carries Android's framebuffer,
+   disable that plane with the blocking standard `MODE_SETPLANE` fb-id-zero
+   operation and verify it is detached. Create a DRM lease containing exactly
+   the connector, CRTC, and detached primary, then pass its file descriptor to
+   the root broker.
 5. On release, revoke the lease, detach any lessee plane state, reset the DAL's
    cached CRTC/plane state, and resume the same `HWCDisplay` object.
 

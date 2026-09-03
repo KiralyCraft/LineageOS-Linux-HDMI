@@ -1,6 +1,6 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.10` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.11` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and glamor module plus `libgallium`, `libGLX_mesa`, and `libEGL_mesa`
@@ -10,6 +10,12 @@ Candidate 10 also serializes the final DRM-lease handoff with Qualcomm
 composer command processing. It refreshes and validates the CRTC's fixed
 primary plane immediately before lease creation, closing the cross-display
 stale-plane race seen during repeated live hotplug tests.
+
+Candidate 11 additionally handles the valid case where Android still scans
+out through that fixed primary after updates are paused. Under the same global
+command lock, composer performs the standard blocking plane-disable operation
+and verifies the plane is detached before leasing it. This removes the
+measured active-plane `SETCRTC`/`ENOSPC` failure without a delay or retry.
 
 The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
 images, queues a same-context GPU resolve into persistent linear renderonly

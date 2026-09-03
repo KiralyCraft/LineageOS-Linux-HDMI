@@ -113,6 +113,24 @@ mutex to match the existing SurfaceFlinger-to-lease call order. This closes
 the cross-display stale-plane window without a delay, retry loop, or runtime
 DRM-object-id assumption.
 
+Repeated candidate-10 cycles then separated plane identity from plane
+quiescence. A successful run entered `CREATE` with fixed primary plane 112
+already detached (`assigned-crtc=0`) and Xorg's legacy `SETCRTC` succeeded. A
+later run entered the same serialized handoff with plane 112 still assigned to
+external CRTC 235. Lease creation succeeded, but `SETCRTC` returned `EINVAL`
+and the exact-mode fallback page flip returned `ENOSPC`. The framebuffer,
+connector, CRTC, mode and private Xorg/Mesa build were otherwise the same.
+
+The final handoff therefore disables an active selected primary through the
+standard blocking `DRM_IOCTL_MODE_SETPLANE` operation with framebuffer id zero,
+which the [kernel KMS documentation](https://docs.kernel.org/5.10/gpu/drm-kms.html)
+defines as the legacy plane-disable entry point, including for atomic drivers.
+It then verifies that the plane reports no CRTC before creating the lease and
+leaves the connector and CRTC active at Android's negotiated timing. This
+operation runs inside the same global composer command serialization and
+fails closed on either the disable or readback check; it does not wait or
+retry for a coincidentally unused plane.
+
 The same probe exposed two independent agent readiness defects. The root-owned
 runtime directory prevented user `kiraly` from reading its Xauthority cookie,
 and the installed `xinput` does not accept a `--display` option. The runtime is

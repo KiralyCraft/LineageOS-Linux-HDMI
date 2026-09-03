@@ -104,6 +104,13 @@ quirk: an otherwise identical legacy `SETCRTC` returned `EINVAL`. The current
 tracer permits only an exact same-timing page flip as a narrow fallback and
 verifies the resulting framebuffer before LXDE is declared ready.
 
+Repeated takeover testing also showed that Android may or may not leave the
+CRTC-fixed primary plane active after its external updates are paused. The
+composer now serializes the final handoff against all SurfaceFlinger command
+batches, disables that primary through the standard blocking KMS plane-disable
+operation when necessary, verifies it is detached, and only then creates the
+lease. There is no timing delay or retry in this handoff.
+
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
 combination is safe.

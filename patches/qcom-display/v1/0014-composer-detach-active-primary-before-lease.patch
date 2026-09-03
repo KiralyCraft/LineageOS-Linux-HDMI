@@ -1,0 +1,88 @@
+From 34a0ab36e03a61133f82446c7fe492b9796a1e63 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Thu, 3 Sep 2026 15:02:00 +0300
+Subject: [PATCH] composer: detach an active primary before leasing it
+
+Repeated live takeovers showed that the CRTC-fixed primary plane can still
+carry Android's last framebuffer after screen updates are paused.  Leasing
+that active plane succeeds, but the lessee's first legacy SETCRTC can fail and
+the guarded same-mode page flip then returns ENOSPC.  The same path succeeds
+when that fixed primary is already detached.
+
+While the final handoff is serialized against all SurfaceFlinger command
+batches, disable only the selected fixed-primary plane through the standard
+blocking MODE_SETPLANE fb_id=0 UAPI.  Verify that the plane is detached before
+creating the lease, while leaving the negotiated CRTC and connector timing
+active.  Fail closed on any detach or verification error.
+---
+ sdm/libs/dal/hw_device_drm.cpp | 48 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 006140f..3a705fe 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -218,6 +218,50 @@ DisplayError GetFixedPrimaryPlane(int fd, uint32_t crtc_id, uint32_t *crtc_index
+   return kErrorNone;
+ }
+ 
++DisplayError DisablePlaneForLease(int fd, uint32_t plane_id, uint32_t crtc_id) {
++  drmModePlanePtr plane = drmModeGetPlane(fd, plane_id);
++  if (!plane) {
++    DLOGE("hdmi-los: cannot inspect fixed primary plane %u: %s", plane_id,
++          strerror(errno));
++    return kErrorHardware;
++  }
++  const uint32_t assigned_crtc = plane->crtc_id;
++  drmModeFreePlane(plane);
++  if (assigned_crtc == 0) return kErrorNone;
++  if (assigned_crtc != crtc_id) {
++    DLOGE("hdmi-los: fixed primary plane %u belongs to CRTC %u before detach "
++          "(external CRTC %u)",
++          plane_id, assigned_crtc, crtc_id);
++    return kErrorResources;
++  }
++
++  // DRM_IOCTL_MODE_SETPLANE with fb_id=0 is the standard blocking UAPI for
++  // disabling a plane.  Leave the active CRTC and connector untouched so the
++  // sink retains Android's negotiated timing while ownership is transferred.
++  if (drmModeSetPlane(fd, plane_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) < 0) {
++    DLOGE("hdmi-los: cannot detach fixed primary plane %u from CRTC %u: %s",
++          plane_id, crtc_id, strerror(errno));
++    return kErrorHardware;
++  }
++
++  plane = drmModeGetPlane(fd, plane_id);
++  if (!plane) {
++    DLOGE("hdmi-los: cannot verify fixed primary plane %u detach: %s", plane_id,
++          strerror(errno));
++    return kErrorHardware;
++  }
++  const uint32_t verified_crtc = plane->crtc_id;
++  drmModeFreePlane(plane);
++  if (verified_crtc != 0) {
++    DLOGE("hdmi-los: fixed primary plane %u still belongs to CRTC %u after detach",
++          plane_id, verified_crtc);
++    return kErrorResources;
++  }
++  DLOGI("hdmi-los: detached fixed primary plane %u from CRTC %u for lease",
++        plane_id, crtc_id);
++  return kErrorNone;
++}
++
+ }  // namespace
+ 
+ std::atomic<uint32_t> HWDeviceDRM::hw_dest_scaler_blocks_used_(0);
+@@ -2753,6 +2797,10 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+           state.plane_id, plane_crtc_id, token_.crtc_id);
+     return kErrorResources;
+   }
++  if (plane_crtc_id == token_.crtc_id) {
++    error = DisablePlaneForLease(dev_fd_, state.plane_id, token_.crtc_id);
++    if (error != kErrorNone) return error;
++  }
+ 
+   uint32_t objects[] = {token_.conn_id, token_.crtc_id, state.plane_id};
+   uint32_t lessee_id = 0;
+-- 
+2.53.0

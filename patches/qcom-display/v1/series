@@ -11,3 +11,4 @@
 0011-composer-keep-last-frame-active-for-lease.patch
 0012-composer-synchronize-power-state-after-lease.patch
 0013-composer-serialize-final-lease-handoff.patch
+0014-composer-detach-active-primary-before-lease.patch

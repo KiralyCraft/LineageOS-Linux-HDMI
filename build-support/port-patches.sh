@@ -61,6 +61,20 @@ grep -q 'GetFixedPrimaryPlane' <<<"$lease_create" || {
     printf 'patch-port check failed: fixed primary plane is not refreshed at final handoff\n' >&2
     exit 1
 }
+grep -q 'DisablePlaneForLease' <<<"$lease_create" || {
+    printf 'patch-port check failed: active fixed primary plane is not detached before leasing\n' >&2
+    exit 1
+}
+lease_disable=$(sed -n '/DisplayError DisablePlaneForLease/,/}  \/\/ namespace/p' \
+    "$lease_source")
+grep -q 'drmModeSetPlane(fd, plane_id, 0, 0' <<<"$lease_disable" || {
+    printf 'patch-port check failed: fixed primary detach does not use MODE_SETPLANE fb_id=0\n' >&2
+    exit 1
+}
+grep -q 'verified_crtc != 0' <<<"$lease_disable" || {
+    printf 'patch-port check failed: fixed primary detach is not verified before leasing\n' >&2
+    exit 1
+}
 composer_source=$DISPLAY/composer/hwc_session.cpp
 composer_header=$DISPLAY/composer/hdmi_los_protocol.h
 for phase in PREPARE PAUSE CREATE; do
