@@ -39,10 +39,11 @@ Android desktop-mode application.
 
 ## What it does
 
-During a takeover, Android keeps rendering the internal DSI panel while the
-external connector, CRTC, and primary plane are leased to an X server running
-inside a Linux chroot. LXDE, a mouse, and a keyboard can then use the connected
-monitor. Stopping the session returns the same display to Android mirroring.
+During a takeover, Android keeps rendering the internal DSI panel while every
+Android plane on the external CRTC is detached and the external connector,
+CRTC, and fixed primary plane are leased to an X server running inside a Linux
+chroot. LXDE, a mouse, and a keyboard can then use the connected monitor.
+Stopping the session returns the same display to Android mirroring.
 
 The project consists of:
 
@@ -104,11 +105,13 @@ quirk: an otherwise identical legacy `SETCRTC` returned `EINVAL`. The current
 tracer permits only an exact same-timing page flip as a narrow fallback and
 verifies the resulting framebuffer before LXDE is declared ready.
 
-Repeated takeover testing also showed that Android may or may not leave the
-CRTC-fixed primary plane active after its external updates are paused. The
+Repeated takeover testing also showed that Android may leave several planes on
+the external CRTC active after its updates are paused. Sanitizing only the
+fixed primary allowed a second Android overlay to remain above Xorg. The
 composer now serializes the final handoff against all SurfaceFlinger command
-batches, disables that primary through the standard blocking KMS plane-disable
-operation when necessary, verifies it is detached, and only then creates the
+batches, enumerates every plane assigned to the external CRTC, and resets them
+together with the fixed primary in one tested atomic commit. It verifies every
+written standard and supported Qualcomm private property before creating the
 lease. There is no timing delay or retry in this handoff.
 
 This remains research-quality software. A successful source build does not
@@ -127,7 +130,8 @@ Android connects external display at that mode; operator accepts Mirror
 patched composer pauses only the external HWC display
                   |
                   v
-composer creates a DRM lease for connector + CRTC + primary plane
+composer atomically clears all external CRTC planes, then leases
+connector + CRTC + fixed primary plane
                   |
                   v
 root broker passes the lease to the chroot agent and Xorg :1

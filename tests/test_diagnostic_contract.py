@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.12")
-        self.assertEqual(release["version_code"], 20260922)
+        self.assertEqual(release["version"], "0.2.8-candidate.13")
+        self.assertEqual(release["version_code"], 20260923)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -420,7 +420,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
 
-    def test_composer_sanitizes_the_fixed_primary_before_leasing(self):
+    def test_composer_sanitizes_all_external_planes_before_leasing(self):
         patch_name = "0014-composer-detach-active-primary-before-lease.patch"
         patch = (ROOT / "patches/qcom-display/v1" / patch_name).read_text()
         series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
@@ -429,11 +429,14 @@ class DiagnosticContractTests(unittest.TestCase):
             if line.startswith("+") and not line.startswith("+++")
         )
         self.assertEqual(series[-1], patch_name)
-        self.assertIn("SanitizePlaneForLease", added)
+        self.assertIn("SanitizeExternalPlanesForLease", added)
+        self.assertIn("drmModeGetPlaneResources", added)
+        self.assertIn("plane->crtc_id == crtc_id", added)
+        self.assertIn("is_leased_plane || is_external_plane", added)
         self.assertIn('"scaler_v2", 0, false', added)
         self.assertIn("DRM_MODE_ATOMIC_TEST_ONLY", added)
         self.assertIn("value != reset.value", added)
-        self.assertLess(patch.index("SanitizePlaneForLease(dev_fd_"),
+        self.assertLess(patch.index("SanitizeExternalPlanesForLease(dev_fd_"),
                         patch.index("uint32_t objects[]"))
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())

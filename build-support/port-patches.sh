@@ -61,22 +61,30 @@ grep -q 'GetFixedPrimaryPlane' <<<"$lease_create" || {
     printf 'patch-port check failed: fixed primary plane is not refreshed at final handoff\n' >&2
     exit 1
 }
-grep -q 'SanitizePlaneForLease' <<<"$lease_create" || {
-    printf 'patch-port check failed: fixed primary plane is not sanitized before leasing\n' >&2
+grep -q 'SanitizeExternalPlanesForLease' <<<"$lease_create" || {
+    printf 'patch-port check failed: external planes are not sanitized before leasing\n' >&2
     exit 1
 }
-lease_sanitize=$(sed -n '/DisplayError SanitizePlaneForLease/,/}  \/\/ namespace/p' \
+lease_sanitize=$(sed -n '/DisplayError SanitizeExternalPlanesForLease/,/}  \/\/ namespace/p' \
     "$lease_source")
+grep -q 'drmModeGetPlaneResources' <<<"$lease_sanitize" || {
+    printf 'patch-port check failed: external planes are not enumerated before leasing\n' >&2
+    exit 1
+}
+grep -q 'plane->crtc_id == crtc_id' <<<"$lease_sanitize" || {
+    printf 'patch-port check failed: active external planes are not selected for reset\n' >&2
+    exit 1
+}
 grep -q '"scaler_v2", 0, false' <<<"$lease_sanitize" || {
-    printf 'patch-port check failed: fixed primary sanitize does not clear scaler_v2\n' >&2
+    printf 'patch-port check failed: external plane sanitize does not clear scaler_v2\n' >&2
     exit 1
 }
 grep -q 'DRM_MODE_ATOMIC_TEST_ONLY' <<<"$lease_sanitize" || {
-    printf 'patch-port check failed: fixed primary sanitize is not tested atomically\n' >&2
+    printf 'patch-port check failed: external plane sanitize is not tested atomically\n' >&2
     exit 1
 }
 grep -q 'value != reset.value' <<<"$lease_sanitize" || {
-    printf 'patch-port check failed: fixed primary sanitize is not verified before leasing\n' >&2
+    printf 'patch-port check failed: external plane sanitize is not verified before leasing\n' >&2
     exit 1
 }
 composer_source=$DISPLAY/composer/hwc_session.cpp

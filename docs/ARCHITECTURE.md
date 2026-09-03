@@ -75,6 +75,16 @@ state.  It deliberately does not use `HWDeviceDRM::active_`: that legacy DAL
 member is never maintained in this source tree and remains false even while an
 external CRTC and primary plane are actively scanning out.
 
+The final handoff runs under Qualcomm composer's global command-sequence lock.
+It enumerates the complete DRM plane set and selects the CRTC-fixed primary
+plus every plane still assigned to the external CRTC. One atomic request
+detaches those planes, clears their source/destination geometry, and resets
+supported Qualcomm scaler and exclusion-rectangle state. Composer submits the
+request with `TEST_ONLY`, commits it synchronously, and reads every property
+back before creating the connector/CRTC/fixed-primary lease. The connector and
+CRTC timing remain active. This prevents both stale Android overlays above Xorg
+and inherited private scaler state without a delay, retry, or object-id guess.
+
 The composer independently revokes after 65 seconds or when its broker
 disconnects. In an explicitly registered continuous session, the broker omits
 its normal 60-second deadline and renews the composer's watchdog every 20

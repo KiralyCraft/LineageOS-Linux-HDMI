@@ -121,15 +121,26 @@ external CRTC 235. Lease creation succeeded, but `SETCRTC` returned `EINVAL`
 and the exact-mode fallback page flip returned `ENOSPC`. The framebuffer,
 connector, CRTC, mode and private Xorg/Mesa build were otherwise the same.
 
-The final handoff therefore disables an active selected primary through the
-standard blocking `DRM_IOCTL_MODE_SETPLANE` operation with framebuffer id zero,
-which the [kernel KMS documentation](https://docs.kernel.org/5.10/gpu/drm-kms.html)
-defines as the legacy plane-disable entry point, including for atomic drivers.
-It then verifies that the plane reports no CRTC before creating the lease and
-leaves the connector and CRTC active at Android's negotiated timing. This
-operation runs inside the same global composer command serialization and
-fails closed on either the disable or readback check; it does not wait or
-retry for a coincidentally unused plane.
+Candidate-11 testing further showed that a legacy plane disable clears the DRM
+core's framebuffer association but can leave Qualcomm's pointer-valued
+`scaler_v2` state in the duplicated plane state. Candidate 12 replaced that
+operation with a `TEST_ONLY` plus real atomic reset of the fixed primary's
+CRTC, framebuffer, geometry, scaler, and exclusion properties, followed by
+readback of every written property. This allowed Xorg's first modeset to
+succeed even when fixed primary plane 112 entered the handoff assigned to
+external CRTC 235.
+
+That same successful run revealed a separate active Android overlay. Xorg used
+plane 112 with framebuffer 317 at z-position 0, while plane 130 still scanned
+Android framebuffer 367 on CRTC 235 at z-position 1. Accelerated `glxgears`
+rendered normally but was visibly covered wherever that portrait Android plane
+overlapped it. Candidate 13 therefore enumerates the full DRM plane set under
+the same global command serialization and selects both the fixed primary and
+every plane assigned to the external CRTC. It resets all selected planes in a
+single tested atomic transaction, verifies every property, then leases only
+the connector, CRTC, and fixed primary required by Xorg. The connector and
+CRTC remain active at Android's negotiated timing. The implementation fails
+closed; it has no delay, retry, or runtime DRM-object-id assumption.
 
 The same probe exposed two independent agent readiness defects. The root-owned
 runtime directory prevented user `kiraly` from reading its Xauthority cookie,
