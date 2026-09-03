@@ -1,32 +1,43 @@
 From 34a0ab36e03a61133f82446c7fe492b9796a1e63 Mon Sep 17 00:00:00 2001
 From: hdmi-los-builder <hdmi-los@localhost>
 Date: Thu, 3 Sep 2026 15:02:00 +0300
-Subject: [PATCH] composer: detach an active primary before leasing it
+Subject: [PATCH] composer: sanitize the primary plane before leasing it
 
 Repeated live takeovers showed that the CRTC-fixed primary plane can still
-carry Android's last framebuffer after screen updates are paused.  Leasing
-that active plane succeeds, but the lessee's first legacy SETCRTC can fail and
-the guarded same-mode page flip then returns ENOSPC.  The same path succeeds
-when that fixed primary is already detached.
+carry Android's last framebuffer after screen updates are paused.  A standard
+MODE_SETPLANE disable detaches the framebuffer, but it does not clear
+Qualcomm's private scaler_v2 property.  The lessee then inherits pixel
+extension values for Android's former buffer and SDE rejects the first Xorg
+SETCRTC when its dimensions differ.
 
 While the final handoff is serialized against all SurfaceFlinger command
-batches, disable only the selected fixed-primary plane through the standard
-blocking MODE_SETPLANE fb_id=0 UAPI.  Verify that the plane is detached before
-creating the lease, while leaving the negotiated CRTC and connector timing
-active.  Fail closed on any detach or verification error.
+batches, atomically detach the fixed primary, clear its geometry, and reset
+the supported Qualcomm scaler and exclusion-rectangle properties.  Perform a
+TEST_ONLY commit first and verify every written property after the real
+commit.  Run the sanitization even when the standard plane state already
+reports detached, because private properties can survive that detach.  Leave
+the negotiated CRTC and connector timing active for an exact same-mode
+handoff, and fail closed on any reset or verification error.
 ---
- sdm/libs/dal/hw_device_drm.cpp | 48 +++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ sdm/libs/dal/hw_device_drm.cpp | 107 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
 
 diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
-index 006140f..3a705fe 100644
+index 006140f..78c12ee 100644
 --- a/sdm/libs/dal/hw_device_drm.cpp
 +++ b/sdm/libs/dal/hw_device_drm.cpp
-@@ -218,6 +218,50 @@ DisplayError GetFixedPrimaryPlane(int fd, uint32_t crtc_id, uint32_t *crtc_index
+@@ -218,6 +218,109 @@ DisplayError GetFixedPrimaryPlane(int fd, uint32_t crtc_id, uint32_t *crtc_index
    return kErrorNone;
  }
  
-+DisplayError DisablePlaneForLease(int fd, uint32_t plane_id, uint32_t crtc_id) {
++struct PlanePropertyReset {
++  const char *name;
++  uint64_t value;
++  bool required;
++  uint32_t id = 0;
++};
++
++DisplayError SanitizePlaneForLease(int fd, uint32_t plane_id, uint32_t crtc_id) {
 +  drmModePlanePtr plane = drmModeGetPlane(fd, plane_id);
 +  if (!plane) {
 +    DLOGE("hdmi-los: cannot inspect fixed primary plane %u: %s", plane_id,
@@ -35,51 +46,103 @@ index 006140f..3a705fe 100644
 +  }
 +  const uint32_t assigned_crtc = plane->crtc_id;
 +  drmModeFreePlane(plane);
-+  if (assigned_crtc == 0) return kErrorNone;
-+  if (assigned_crtc != crtc_id) {
-+    DLOGE("hdmi-los: fixed primary plane %u belongs to CRTC %u before detach "
++  if (assigned_crtc != 0 && assigned_crtc != crtc_id) {
++    DLOGE("hdmi-los: fixed primary plane %u belongs to CRTC %u before sanitize "
 +          "(external CRTC %u)",
 +          plane_id, assigned_crtc, crtc_id);
 +    return kErrorResources;
 +  }
 +
-+  // DRM_IOCTL_MODE_SETPLANE with fb_id=0 is the standard blocking UAPI for
-+  // disabling a plane.  Leave the active CRTC and connector untouched so the
-+  // sink retains Android's negotiated timing while ownership is transferred.
-+  if (drmModeSetPlane(fd, plane_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) < 0) {
-+    DLOGE("hdmi-los: cannot detach fixed primary plane %u from CRTC %u: %s",
-+          plane_id, crtc_id, strerror(errno));
-+    return kErrorHardware;
-+  }
++  // A legacy MODE_SETPLANE disable only resets the DRM core's FB/CRTC
++  // association.  Qualcomm's pointer-valued scaler state remains in the
++  // duplicated plane state and is inherited by the lessee.  Reset the full
++  // scanout geometry and the private state that affects validation in the
++  // same atomic transaction, while retaining the negotiated CRTC timing.
++  PlanePropertyReset resets[] = {
++      {"CRTC_ID", 0, true}, {"FB_ID", 0, true},
++      {"CRTC_X", 0, true},  {"CRTC_Y", 0, true},
++      {"CRTC_W", 0, true},  {"CRTC_H", 0, true},
++      {"SRC_X", 0, true},   {"SRC_Y", 0, true},
++      {"SRC_W", 0, true},   {"SRC_H", 0, true},
++      {"scaler_v2", 0, false}, {"scaler_v1", 0, false},
++      {"excl_rect_v1", 0, false},
++  };
 +
-+  plane = drmModeGetPlane(fd, plane_id);
-+  if (!plane) {
-+    DLOGE("hdmi-los: cannot verify fixed primary plane %u detach: %s", plane_id,
-+          strerror(errno));
-+    return kErrorHardware;
-+  }
-+  const uint32_t verified_crtc = plane->crtc_id;
-+  drmModeFreePlane(plane);
-+  if (verified_crtc != 0) {
-+    DLOGE("hdmi-los: fixed primary plane %u still belongs to CRTC %u after detach",
-+          plane_id, verified_crtc);
++  drmModeAtomicReqPtr request = drmModeAtomicAlloc();
++  if (!request) {
++    DLOGE("hdmi-los: cannot allocate plane-sanitize request: %s", strerror(errno));
 +    return kErrorResources;
 +  }
-+  DLOGI("hdmi-los: detached fixed primary plane %u from CRTC %u for lease",
-+        plane_id, crtc_id);
++
++  bool has_scaler_reset = false;
++  DisplayError result = kErrorNone;
++  for (auto &reset : resets) {
++    if (!GetDrmProperty(fd, plane_id, DRM_MODE_OBJECT_PLANE, reset.name, &reset.id,
++                        nullptr)) {
++      if (reset.required) {
++        DLOGE("hdmi-los: fixed primary plane %u lacks required property %s", plane_id,
++              reset.name);
++        result = kErrorResources;
++        break;
++      }
++      continue;
++    }
++    if (strncmp(reset.name, "scaler_v", strlen("scaler_v")) == 0) {
++      has_scaler_reset = true;
++    }
++    if (drmModeAtomicAddProperty(request, plane_id, reset.id, reset.value) < 0) {
++      DLOGE("hdmi-los: cannot add plane %u property %s to sanitize request: %s",
++            plane_id, reset.name, strerror(errno));
++      result = kErrorHardware;
++      break;
++    }
++  }
++
++  if (result == kErrorNone &&
++      drmModeAtomicCommit(fd, request,
++                          DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_TEST_ONLY,
++                          nullptr) < 0) {
++    DLOGE("hdmi-los: TEST_ONLY plane %u sanitize failed: %s", plane_id,
++          strerror(errno));
++    result = kErrorHardware;
++  }
++  if (result == kErrorNone &&
++      drmModeAtomicCommit(fd, request, DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr) < 0) {
++    DLOGE("hdmi-los: plane %u sanitize commit failed: %s", plane_id, strerror(errno));
++    result = kErrorHardware;
++  }
++  drmModeAtomicFree(request);
++  if (result != kErrorNone) return result;
++
++  for (const auto &reset : resets) {
++    if (reset.id == 0) continue;
++    uint64_t value = UINT64_MAX;
++    if (!GetDrmProperty(fd, plane_id, DRM_MODE_OBJECT_PLANE, reset.name, nullptr,
++                        &value) ||
++        value != reset.value) {
++      DLOGE("hdmi-los: fixed primary plane %u property %s did not reset "
++            "(expected=%" PRIu64 " actual=%" PRIu64 ")",
++            plane_id, reset.name, reset.value, value);
++      return kErrorResources;
++    }
++  }
++
++  DLOGI("hdmi-los: atomically sanitized fixed primary plane %u from CRTC %u "
++        "for lease (private-scaler=%s)",
++        plane_id, assigned_crtc, has_scaler_reset ? "reset" : "not-present");
 +  return kErrorNone;
 +}
 +
  }  // namespace
  
  std::atomic<uint32_t> HWDeviceDRM::hw_dest_scaler_blocks_used_(0);
-@@ -2753,6 +2797,10 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+@@ -2753,6 +2856,10 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
            state.plane_id, plane_crtc_id, token_.crtc_id);
      return kErrorResources;
    }
-+  if (plane_crtc_id == token_.crtc_id) {
-+    error = DisablePlaneForLease(dev_fd_, state.plane_id, token_.crtc_id);
-+    if (error != kErrorNone) return error;
++  error = SanitizePlaneForLease(dev_fd_, state.plane_id, token_.crtc_id);
++  if (error != kErrorNone) {
++    return error;
 +  }
  
    uint32_t objects[] = {token_.conn_id, token_.crtc_id, state.plane_id};

@@ -61,18 +61,22 @@ grep -q 'GetFixedPrimaryPlane' <<<"$lease_create" || {
     printf 'patch-port check failed: fixed primary plane is not refreshed at final handoff\n' >&2
     exit 1
 }
-grep -q 'DisablePlaneForLease' <<<"$lease_create" || {
-    printf 'patch-port check failed: active fixed primary plane is not detached before leasing\n' >&2
+grep -q 'SanitizePlaneForLease' <<<"$lease_create" || {
+    printf 'patch-port check failed: fixed primary plane is not sanitized before leasing\n' >&2
     exit 1
 }
-lease_disable=$(sed -n '/DisplayError DisablePlaneForLease/,/}  \/\/ namespace/p' \
+lease_sanitize=$(sed -n '/DisplayError SanitizePlaneForLease/,/}  \/\/ namespace/p' \
     "$lease_source")
-grep -q 'drmModeSetPlane(fd, plane_id, 0, 0' <<<"$lease_disable" || {
-    printf 'patch-port check failed: fixed primary detach does not use MODE_SETPLANE fb_id=0\n' >&2
+grep -q '"scaler_v2", 0, false' <<<"$lease_sanitize" || {
+    printf 'patch-port check failed: fixed primary sanitize does not clear scaler_v2\n' >&2
     exit 1
 }
-grep -q 'verified_crtc != 0' <<<"$lease_disable" || {
-    printf 'patch-port check failed: fixed primary detach is not verified before leasing\n' >&2
+grep -q 'DRM_MODE_ATOMIC_TEST_ONLY' <<<"$lease_sanitize" || {
+    printf 'patch-port check failed: fixed primary sanitize is not tested atomically\n' >&2
+    exit 1
+}
+grep -q 'value != reset.value' <<<"$lease_sanitize" || {
+    printf 'patch-port check failed: fixed primary sanitize is not verified before leasing\n' >&2
     exit 1
 }
 composer_source=$DISPLAY/composer/hwc_session.cpp

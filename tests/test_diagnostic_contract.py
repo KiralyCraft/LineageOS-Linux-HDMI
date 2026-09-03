@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.11")
-        self.assertEqual(release["version_code"], 20260921)
+        self.assertEqual(release["version"], "0.2.8-candidate.12")
+        self.assertEqual(release["version_code"], 20260922)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -420,7 +420,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
 
-    def test_composer_detaches_an_active_fixed_primary_before_leasing(self):
+    def test_composer_sanitizes_the_fixed_primary_before_leasing(self):
         patch_name = "0014-composer-detach-active-primary-before-lease.patch"
         patch = (ROOT / "patches/qcom-display/v1" / patch_name).read_text()
         series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
@@ -429,10 +429,11 @@ class DiagnosticContractTests(unittest.TestCase):
             if line.startswith("+") and not line.startswith("+++")
         )
         self.assertEqual(series[-1], patch_name)
-        self.assertIn("DisablePlaneForLease", added)
-        self.assertIn("drmModeSetPlane(fd, plane_id, 0, 0", added)
-        self.assertIn("verified_crtc != 0", added)
-        self.assertLess(patch.index("DisablePlaneForLease(dev_fd_"),
+        self.assertIn("SanitizePlaneForLease", added)
+        self.assertIn('"scaler_v2", 0, false', added)
+        self.assertIn("DRM_MODE_ATOMIC_TEST_ONLY", added)
+        self.assertIn("value != reset.value", added)
+        self.assertLess(patch.index("SanitizePlaneForLease(dev_fd_"),
                         patch.index("uint32_t objects[]"))
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
