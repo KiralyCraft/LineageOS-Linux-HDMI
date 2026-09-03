@@ -227,11 +227,12 @@ Its absolute monotonic software schedule is test instrumentation, not a
 production presentation workaround. It separates an SDL/GL swap-control stall
 from a later bridge, X Present, or KMS cadence fault.
 
-On the MacroSilicon capture adapter used for the 1280x720 tests, V4L2 exposes
-MJPEG at a nominal 60 frames per second, but a controlled Gray-code run showed
-30 unique visual samples per second. Use 30 Hz as the conservative visual
-cadence target until a known-60-Hz source proves that the adapter records 60
-unique frames; do not infer unique capture rate from the V4L2 packet rate.
+The MacroSilicon capture adapter used for the 1280x720 tests exposes MJPEG at
+60 frames per second. A 60-Hz controlled Gray-code run recorded more than 50
+unique updates per second even while X Present reported skipped source frames,
+so this adapter is not limited to 30 unique frames per second. Keep capture at
+60 FPS. A 30-Hz source should normally produce two captured samples per source
+ID; its 1/2/3-sample hold distribution remains useful evidence of jitter.
 
 Keep V4L2 open continuously while collecting rolling evidence. Closing and
 reopening this particular adapter's video endpoint can deassert HDMI hotplug
@@ -256,6 +257,13 @@ updates, skipped source IDs, top/bottom counter disagreement (tearing), visual
 hold-time percentiles, and the number of capture samples in each completed
 hold. Compare those results with the probe CSV rather than attributing card
 sampling jitter to the phone from either stream alone.
+
+The accepted 1280x720 at 60 Hz GPU-slot/Present-flip reference result is 59.695
+unique updates per second, no source skips, no top/bottom disagreement, and 20
+ms p99 visual holds. The corresponding client result is 59.697 FPS with 17.237
+ms p95 and 17.954 ms p99 frame time. Confirm bridge statistics report flip
+completions and zero copies/skips for a fullscreen synchronized run. A high
+application FPS alone is not an acceptance result.
 
 Experimental presets can be selected only while disarmed:
 

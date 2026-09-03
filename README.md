@@ -70,7 +70,7 @@ shadow-present path is tested as the next performance candidate:
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
-| `kgsl-kms-bridge` with `--client-present bridge` | Native Freedreno/KGSL plus adaptive CPU/GPU presentation copies | Default; visible LXDE and GL, continuous operation, and unplug recovery were validated on the device |
+| `kgsl-kms-bridge` with `--client-present bridge` | Native Freedreno/KGSL rendering plus fenced GPU resolves into persistent Xorg-owned, flip-eligible presentation buffers | Default; capture-verified at 1280x720 at 60 Hz with 59.695 unique updates/s, no source skips or tearing; continuous operation and unplug recovery were also validated |
 | `kgsl-kms-bridge` with `--client-present shadow` | Private tiled/UBWC KGSL rendering, same-context GPU resolve into persistent linear renderonly buffers, ordinary DRI3 Present | Opt-in candidate; matched AArch64 Mesa/GLX/EGL compilation passes, but live visibility, performance, and unplug recovery are not yet accepted |
 | `kgsl-kms-bridge` with `--client-present direct` | Applications render directly into linear renderonly buffers | Diagnostic only; GL readback is correct but the Xorg window is black on this downstream stack |
 

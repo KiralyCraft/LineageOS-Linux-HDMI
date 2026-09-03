@@ -377,27 +377,33 @@ drops superseded frames before mapping them. The worker waits the selected
 fence, copies only that completed image into one of three shared pixmaps, and
 submits it with X Present. Present Complete and Idle events release each slot;
 there is no sleep, polling timer, or guessed buffer lifetime. Synchronized
-swaps wait for their actual presentation sequence, while uncapped rendering
-rotates through four KGSL back buffers and keeps running independently of the
-display refresh.
+swaps fill the three Present slots with distinct future-MSC requests and are
+backpressured only when all slots are busy. The initial Present establishes the
+server MSC, and subsequent requests retain one refresh of scheduling lead so a
+full-surface resolve does not race the immediately following vblank. Uncapped
+rendering rotates through four KGSL back buffers and keeps running independently
+of the display refresh.
 
 EGL damage rectangles are currently treated conservatively and GLX swaps copy
-the full drawable. Set `MESA_KGSL_X11_BRIDGE_STATS=1` for periodic
-produced/presented/dropped/copy statistics. The agent uses
+the full drawable. Set `MESA_KGSL_X11_BRIDGE_STATS=1` for periodic produced,
+presented, dropped, server-skipped, flip/copy/suboptimal-mode, and byte
+statistics. The agent uses
 `FD_MESA_DEBUG=noubwc`: UBWC must remain disabled for reliable CPU-visible
 readback, but ordinary Freedreno tiling remains enabled.
 
-The prior agent also enabled `MESA_KGSL_X11_GPU_BRIDGE=1`. Mesa kept the
-CPU/MIT-SHM path for surfaces below 8,000,000 pixels. At or above that
-threshold, Xorg
-allocates three KMS-compatible presentation pixmaps, exports them through DRI3,
-and the worker imports them into KGSL. The application continues rendering into
-fast tiled client buffers; only a selected completed frame is GPU-blitted into
-an Xorg-owned display slot. This removes CPU readback and the MIT-SHM server
-copy without returning to the broken direction where Xorg imports an ordinary
-client KGSL allocation. Set `MESA_KGSL_X11_GPU_BRIDGE_MIN_PIXELS=0` to force
-the GPU path for measurement, or a larger value to keep CPU copies for more
-surface sizes.
+The agent also enables `MESA_KGSL_X11_GPU_BRIDGE=1`. Mesa now attempts the GPU
+path at every drawable size. Xorg allocates three KMS-compatible presentation
+pixmaps, exports them through DRI3, and the worker imports them into KGSL. The
+application continues rendering into fast tiled client buffers; only a
+selected completed frame is GPU-blitted into an Xorg-owned display slot. A
+synchronized fullscreen Present leaves that pixmap flip-eligible; interval zero
+adds only the standard Present `ASYNC` option. This removes CPU readback and the
+MIT-SHM server copy without returning to the broken direction where Xorg
+imports an ordinary client KGSL allocation. If allocation or import fails,
+Mesa falls back to forced-copy MIT-SHM. A nonzero
+`MESA_KGSL_X11_GPU_BRIDGE_MIN_PIXELS` remains available for diagnostic A/B
+tests, but is no longer the default because small forced-copy surfaces cannot
+provide tear-free 60 Hz presentation.
 
 This client presentation step is not zero-copy. It is narrower than ShadowFB:
 there is no continuous full-screen copy, and non-GL desktop content stays on
@@ -414,6 +420,39 @@ glxgears:        55.233 and 57.364 FPS over two five-second samples
 Both the solid-color GL probe and the gears were visible in root-window XWD
 captures. Three bounded takeover runs restored Android normally, and the
 device did not reboot or crash.
+
+### Measured presentation cadence
+
+The deterministic fullscreen SDL probe and a continuously open MacroSilicon
+MJPEG capture established the presentation bottleneck directly at 1280x720 at
+60 Hz.
+The card remained configured for 60 FPS throughout. A controlled 60-Hz source
+produced more than 50 distinct captured images per second even while the old X
+Present path skipped requests, disproving the tentative assumption that the
+card could capture only 30 unique frames per second.
+
+The old synchronized bridge waited for each frame's CompleteNotify before the
+application could begin its next frame. It produced 30.0 FPS and twice stopped
+permanently waiting for a Present event. Moving the wait to the next swap still
+produced 30.0 FPS: beginning a full-surface copy only after CompleteNotify was
+too late for `complete_msc + 1` on this stack. Queueing three future-MSC slots
+removed that serialization and completed a 70-second run, but a forced Present
+copy still updated the scanout mid-frame.
+
+With Xorg-owned GPU slots made flip-eligible, the same 50-second run measured:
+
+```text
+Mesa:    2985 frames / 50.003 s = 59.697 FPS
+         p95 frame time 17.237 ms; p99 17.954 ms
+Present: all reported completions were flips; 0 copies; 0 skips
+Capture: 59.695 unique updates/s; 0 source skips; 0 torn frames
+         median hold 16 ms; p95/p99 20 ms
+```
+
+One 164-174 ms outlier appeared in both the client and capture streams, but it
+did not start a persistent stall and did not affect the p99. The accepted
+mechanism is therefore Present flip/idle backpressure over persistent
+Xorg-owned buffers, not software pacing or an elapsed-time recovery rule.
 
 The asynchronous worker changes what the `glxgears` number means. A 300x300
 swap-interval-zero client no longer blocks at about 60 FPS: live samples ranged
@@ -485,8 +524,9 @@ KMS-dumb buffers was visibly correct, but scored 688 versus 764 FPS in the
 so the retained path uses them only as presentation slots. A dma-heap GPU slot
 behind MIT-SHM scored 209 versus 224 FPS at 4K because it still required Xorg's
 SHM copy. The retained Xorg-owned GPU slots are the first variant that improved
-the resolution-sensitive 4K case and they leave smaller surfaces on the faster
-CPU path.
+the resolution-sensitive 4K case. Although the CPU path won some uncapped small
+window microbenchmarks, the capture-backed cadence test showed that it cannot
+be the default: forced copies tore under synchronized 60 Hz presentation.
 
 ### Private Mesa ABI set
 
