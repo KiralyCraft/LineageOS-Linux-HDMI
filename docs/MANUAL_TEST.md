@@ -219,13 +219,43 @@ p95, and p99 visual hold durations. The CSV independently reports each
 The controlled asynchronous comparison is:
 
 ```sh
-./sdl-frame-pacing --swap-interval 0 --pace-hz 60 \
-  --csv /home/kiraly/Downloads/pacing-async-60.csv
+./sdl-frame-pacing --swap-interval 0 --pace-hz 30 \
+  --csv /home/kiraly/Downloads/pacing-async-30.csv
 ```
 
 Its absolute monotonic software schedule is test instrumentation, not a
 production presentation workaround. It separates an SDL/GL swap-control stall
 from a later bridge, X Present, or KMS cadence fault.
+
+On the MacroSilicon capture adapter used for the 1280x720 tests, V4L2 exposes
+MJPEG at a nominal 60 frames per second, but a controlled Gray-code run showed
+30 unique visual samples per second. Use 30 Hz as the conservative visual
+cadence target until a known-60-Hz source proves that the adapter records 60
+unique frames; do not infer unique capture rate from the V4L2 packet rate.
+
+Keep V4L2 open continuously while collecting rolling evidence. Closing and
+reopening this particular adapter's video endpoint can deassert HDMI hotplug
+and make Android tear down the external display. From the repository root:
+
+```sh
+./scripts/capture-loop.sh \
+  /dev/v4l/by-id/usb-MACROSILICON_USB_Video-video-index0 \
+  /tmp/hdmi-capture-ring
+```
+
+The segment muxer alternates between two 60-second Matroska files while one
+FFmpeg process retains the V4L2 descriptor. Copy the completed, inactive slot
+before analysis. With OpenCV installed, decode its Gray-code counters using:
+
+```sh
+python scripts/analyze-cadence.py /tmp/captured-slot.mkv
+```
+
+The report distinguishes nominal capture frames, actual displayed counter
+updates, skipped source IDs, top/bottom counter disagreement (tearing), visual
+hold-time percentiles, and the number of capture samples in each completed
+hold. Compare those results with the probe CSV rather than attributing card
+sampling jitter to the phone from either stream alone.
 
 Experimental presets can be selected only while disarmed:
 

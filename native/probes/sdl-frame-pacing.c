@@ -280,6 +280,17 @@ main(int argc, char **argv)
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
 
+    if (fullscreen) {
+        SDL_DisplayMode mode;
+
+        if (SDL_GetCurrentDisplayMode(0, &mode) == 0) {
+            width = mode.w;
+            height = mode.h;
+        } else {
+            fprintf(stderr, "warning: SDL_GetCurrentDisplayMode: %s\n",
+                    SDL_GetError());
+        }
+    }
     Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN |
                    SDL_WINDOW_ALLOW_HIGHDPI;
     if (fullscreen)
@@ -330,6 +341,12 @@ main(int argc, char **argv)
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN)
                 quit = true;
+            if (event.type == SDL_WINDOWEVENT &&
+                (event.window.event == SDL_WINDOWEVENT_RESIZED ||
+                 event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)) {
+                SDL_GL_GetDrawableSize(window, &width, &height);
+                glViewport(0, 0, width, height);
+            }
         }
         if (quit)
             break;
