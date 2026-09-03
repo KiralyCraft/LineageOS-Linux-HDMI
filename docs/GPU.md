@@ -224,6 +224,71 @@ from the same 21.1.24 tree. First live presentation, FPS comparison, and
 unplug/replug recovery remain required before this candidate can replace the
 verified baseline in the status matrix.
 
+### Tiling, UBWC, and linear scanout
+
+Do not set `FD_MESA_DEBUG=notile` or `FD_MESA_DEBUG=noubwc` in the normal
+takeover environment. In Freedreno these are global diagnostic switches:
+`notile` disables tiling for every internal buffer, while `noubwc` disables
+UBWC for every internal buffer. The current agent deliberately unsets
+`FD_MESA_DEBUG` and the `kiraly` login environment does not restore it. Mesa's
+[Freedreno documentation](https://docs.mesa3d.org/drivers/freedreno.html)
+describes Adreno as primarily a tile-mode renderer and treats layout overrides
+as diagnostic controls.
+
+A native Freedreno `FD740` surfaceless check on 2026-09-03 used Mesa's
+`peglgears`, modified only to accept a pbuffer size. `FD_MESA_DEBUG=layout`
+reported the default 1920x1080 RGB565 target as stride 3840, aligned height
+1088, and UBWC. Adding `notile` changed the same target to aligned height 1080
+and linear. The flag therefore has the intended layout effect on this device;
+it is not ignored.
+
+Interleaved five-second samples gave these averages:
+
+| Pbuffer | Default | `notile` | Difference |
+| --- | ---: | ---: | ---: |
+| 1920x1080 | 17,148 FPS | 17,227 FPS | +0.46% |
+| 3840x2160 | 5,290 FPS | 5,280 FPS | -0.18% |
+
+Those differences are smaller than the run-to-run spread. Gears is a simple
+submission-heavy workload, so this establishes that globally disabling tiling
+has no measurable benefit here; it does not establish the cost for a textured,
+bandwidth-heavy application. It should remain a diagnostic flag, not a
+performance default. The earlier 1280x720 `glmark2 build` result is more useful
+for that boundary: rendering directly into Xorg-owned linear KMS-dumb buffers
+scored 688 FPS versus 764 FPS with a tiled render target and presentation copy,
+about 10% slower.
+
+There are two separate layout decisions in the current renderonly candidate:
+
+- ordinary private textures and render targets retain Freedreno's default
+  tiling and UBWC choices;
+- a buffer that must be scanned out is allocated by KMS as a dumb buffer and
+  is necessarily linear, independently of `FD_MESA_DEBUG`.
+
+The second point is the likely remaining performance constraint at high
+resolution. It cannot be fixed by enabling or disabling `notile`. If the live
+candidate confirms a material loss, the appropriate Mesa-side design is a
+tiled GPU render resource plus a driver-managed GPU resolve into its linear
+renderonly scanout resource at `flush_resource`. Mesa's
+[renderonly contract](https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/gallium/auxiliary/renderonly/renderonly.h)
+explicitly provides for this kind of resolve. It avoids the old CPU/SHM path,
+keeps synchronization inside the graphics stack, and does not require a
+polling or timer bridge. An upstream
+[MSM/KMS discussion](https://lore.gitlab.freedesktop.org/drm-ai-reviews/review-overall-20260304-msm-restore-ioctls-v1-1-b28f9231fcd2%40oss.qualcomm.com/T/)
+also recommends allocating from the render GPU and importing into KMS instead
+of rendering into a dumb buffer. That would be preferable here, but this
+downstream SDE stack has already rejected ordinary KGSL/dma-heap client
+allocations as framebuffers.
+
+The tiling matrix itself produced no new KGSL fault, hang, timeout, or reset.
+Three `CP: AHB bus error` messages at uptime 28103 predated it and correlate
+with a separate test that loaded the candidate client libraries against
+Termux:X11; the same instant also logged SELinux denials for Termux:X11
+`xshmfence` memfds. That test did not request `notile` or `noubwc`. Xorg and
+SurfaceFlinger survived, but candidate libraries should remain paired with the
+private HDMI Xorg rather than injected into the running Termux:X11 server for
+further measurements.
+
 ## Previous adaptive allocation and presentation bridge
 
 The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. That
