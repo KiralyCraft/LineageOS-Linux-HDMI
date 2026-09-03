@@ -651,8 +651,8 @@ void configure_gpu_environment() {
     std::string mesa = g_bundle + "/lib/mesa";
     setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);
     // KGSL is the render device and Qualcomm DRM is the display device. Mesa's
-    // standard renderonly/PRIME path allocates exact KMS scanout resources and
-    // performs the render-to-display blit on the GPU for both Xorg and clients.
+    // standard renderonly path allocates exact KMS scanout resources, imports
+    // them into KGSL, and renders directly into the shared DRI3 buffers.
     setenv("FD_KGSL_RENDERONLY", "1", 1);
   }
 }

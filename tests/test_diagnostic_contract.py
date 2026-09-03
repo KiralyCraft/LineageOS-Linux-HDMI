@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.7")
-        self.assertEqual(release["version_code"], 20260917)
+        self.assertEqual(release["version"], "0.2.8-candidate.8")
+        self.assertEqual(release["version_code"], 20260918)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -253,8 +253,11 @@ class DiagnosticContractTests(unittest.TestCase):
         ).read_text()
         self.assertIn("renderonly_create_kms_dumb_buffer_for_resource", freedreno_screen)
         self.assertIn("FD_KGSL_RENDERONLY", freedreno_screen)
-        self.assertIn("*original_fd = *fd_render_gpu", loader)
-        self.assertIn("*fd_render_gpu = kgsl_fd", loader)
+        self.assertNotIn('loader_open_device("/dev/kgsl-3d0")', loader)
+        self.assertIn("dev->control_fd = fd", (
+            ROOT
+            / "third_party/mesa-for-android-container/src/freedreno/drm/freedreno_device.c"
+        ).read_text())
         self.assertNotIn('return open("/dev/kgsl-3d0"', x11_dri3)
 
         render_node_patch = (

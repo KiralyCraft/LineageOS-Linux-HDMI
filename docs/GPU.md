@@ -94,12 +94,13 @@ Setting only `GALLIUM_DRIVER=zink` makes GLX identify the renderer as Zink over
 Turnip/KGSL and execute GPU work, but it does not make the result visible on
 this ShadowFB screen. `LIBGL_KOPPER_DRI2=true` confirms the missing interface:
 Mesa reports that DRI3 is required for presentation and then fails to create a
-swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black.
-Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
+swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black. Do
+not add `MESA_LOADER_DRIVER_OVERRIDE=kgsl` to the `safe` ShadowFB mode: that
+override is valid only with the matched accelerated Xorg/renderonly stack.
 
 The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `f897e810` on the
+submodule at commit `f4cb22e8` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -113,6 +114,7 @@ a3eb373e dri3: bridge native render fences to Present
 6c30ef8c freedreno/kgsl: scope translated handles to KMS scanout
 1200a245 dri3: add adaptive GPU bridge for UHD X11
 f897e810 dri3: use renderonly PRIME for leased KGSL displays
+f4cb22e8 loader: retain the DRI3 fd for KGSL renderonly
 ```
 
 The separate `fix/kgsl-present-wait-fence` line exports a native Freedreno
@@ -178,17 +180,18 @@ timeout restored Android.
 ## Standard renderonly/PRIME candidate
 
 The previous bridge proved that KMS-owned buffers are accepted by both KGSL
-and SDE, but it bypassed Mesa's ordinary multi-GPU presentation model. The
-current candidate instead follows the same split-render/display design used by
-Mesa's `kmsro` users such as Lima and V3D:
+and SDE, but it bypassed Mesa's ordinary renderonly presentation model. The
+current candidate follows the same KMS-owned-allocation design used by Mesa's
+`kmsro` users such as Lima and V3D, while retaining one logical DRI3 screen:
 
 ```text
 Xorg DRI3 opens /dev/dri/renderD128 for the client
-  -> Mesa retains it as the display fd and opens /dev/kgsl-3d0 as the render fd
-  -> Freedreno renders into its normal fast image
+  -> the KGSL driver retains that fd as its KMS control fd
+  -> Freedreno opens /dev/kgsl-3d0 internally for GPU submission
   -> renderonly allocates an exact width/height/format KMS dumb image
-  -> Mesa's standard PRIME path GPU-blits render image to display image
-  -> X Present receives a native fence covering that blit
+  -> Freedreno imports that dma-buf and renders into it directly
+  -> ordinary DRI3 shares the same buffer with Xorg
+  -> X Present receives the native GPU completion fence
 ```
 
 This removes the CPU readback, MIT-SHM request, private presentation worker,
@@ -205,10 +208,12 @@ Two Xorg 21.1.24 backports are required and are stored under
 - the Present wait-fence callback is disarmed before re-execution, matching the
   lifetime fix already used by Termux:X11.
 
-Mesa no longer intercepts `x11_dri3_open()` to return KGSL. The ordinary DRI3
-fd remains visible as the display GPU, while the loader's opt-in
-`FD_FORCE_KGSL=1` selection supplies the non-DRM KGSL render fd. The display
-Freedreno screen uses Mesa's `struct renderonly` and
+Mesa no longer intercepts `x11_dri3_open()` to return KGSL, nor does the
+generic loader pretend that KGSL is a discoverable DRI PRIME device. The
+ordinary DRI3 fd remains the screen's control/cache identity. The existing
+opt-in `FD_FORCE_KGSL=1` Freedreno device path opens the non-DRM KGSL fd only
+for GPU submission, so `FD_KGSL_RENDERONLY=1` can still see the MSM/KMS
+control fd. That Freedreno screen uses Mesa's `struct renderonly` and
 `renderonly_create_kms_dumb_buffer_for_resource()` rather than constructing a
 one-row dumb buffer inside the byte-oriented KGSL BO allocator.
 
@@ -466,9 +471,9 @@ DISPLAY=:0 glxgears -info
 
 `Xvfb` can be used to compare headless client rendering when the HDMI lease is
 unavailable, but it cannot validate this presentation path: without a real DRM
-display fd it cannot exercise DRI3's render/display split, renderonly scanout,
-or Present fences. Treat a headless number only as a KGSL rendering baseline,
-not as evidence that leased HDMI presentation works.
+control fd it cannot exercise renderonly scanout allocation, DRI3 buffer
+sharing, or Present fences. Treat a headless number only as a KGSL rendering
+baseline, not as evidence that leased HDMI presentation works.
 
 During a safe ShadowFB leased-Xorg session, this command verifies GPU context
 creation and command execution, but its window is black because that mode has

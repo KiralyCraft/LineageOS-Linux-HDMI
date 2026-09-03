@@ -1,14 +1,15 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.7` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.8` keeps the Quick Settings tile as an arm/disarm
 control and replaces the adaptive KGSL presentation bridge with Mesa's
 standard renderonly/PRIME path. The accelerated runtime requires a matched
 private Xorg 21.1.24 binary and glamor module plus `libgallium`, `libGLX_mesa`,
 and `libEGL_mesa` carrying ABI 4. The launcher refuses a partial or stale set.
-Mesa renders into its normal fast KGSL image, GPU-blits into an exact
-KMS-allocated display image, and attaches a native completion fence to the
-ordinary X Present request. There is no MIT-SHM readback, timer, or
-pixel-count threshold in the default path.
+Mesa uses the DRI3 DRM fd as Freedreno's KMS control fd, allocates an exact
+renderonly scanout image, imports it into KGSL, renders into it directly, and
+attaches a native completion fence to the ordinary X Present request. There is
+no MIT-SHM readback, per-frame copy, timer, or pixel-count threshold in the
+default path.
 
 Candidate 5 changed the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at

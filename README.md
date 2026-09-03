@@ -70,16 +70,16 @@ with a standard renderonly/PRIME candidate:
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
 | Previous `kgsl-kms-bridge` | Native Freedreno/KGSL plus adaptive CPU/GPU presentation copies | Visible LXDE, uncapped `glxgears`, continuous operation, and unplug recovery were validated on the device |
-| Current `kgsl-kms-bridge` candidate | Native Freedreno/KGSL plus Mesa renderonly and its standard DRI3/PRIME render-to-display blit | The matched ARM build, exact 1280x720 KMS allocation, dma-buf export/import, and private Xorg ABI were validated. A rearmed HDMI cycle is still required for the first live presentation and performance result |
+| Current `kgsl-kms-bridge` candidate | Native Freedreno/KGSL rendering directly into Mesa renderonly scanout buffers shared through ordinary DRI3 | The matched ARM build, exact 1280x720 KMS allocation, dma-buf export/import, and private Xorg ABI were validated. A rearmed HDMI cycle is still required for the first live presentation and performance result |
 
 The current candidate removes the hot-path MIT-SHM readback and the separate
-bridge worker. Xorg gives clients the DRM render node through ordinary DRI3;
-Mesa retains that fd as the display device, selects KGSL as the render device,
-allocates exact linear scanout buffers with `renderonly`, and performs the
-usual PRIME GPU blit from fast render storage. A native fence covering that
-blit is supplied to X Present. Fullscreen windows can use Xorg's normal page
-flip path; there is no timer or guessed buffer lifetime. The previous bridge
-and its measured costs remain documented as the baseline in
+bridge worker. Xorg gives clients its DRM node through ordinary DRI3; Mesa
+keeps that as Freedreno's KMS control fd, opens KGSL internally for GPU
+submission, allocates exact linear scanout buffers with `renderonly`, and
+imports those buffers into KGSL for direct rendering. A native completion
+fence is supplied to X Present. Fullscreen windows can use Xorg's normal page
+flip path; there is no timer, per-frame CPU copy, or guessed buffer lifetime.
+The previous bridge and its measured costs remain documented as the baseline in
 [GPU acceleration](docs/GPU.md).
 
 Before HDMI is connected, the broker asks Android to prefer the configured
@@ -176,7 +176,7 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`f897e810`](https://github.com/KiralyCraft/mesa-for-android-container/commit/f897e810d23c7909c42b0417d1dde85db86a2dd3).
+[`f4cb22e8`](https://github.com/KiralyCraft/mesa-for-android-container/commit/f4cb22e8082e9874dd8d6854c953ebe49691e73a).
 That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The Xorg 21.1.24 backports used with it are kept as reviewable patches under
