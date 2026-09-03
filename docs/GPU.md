@@ -173,7 +173,7 @@ timeout restored Android.
 ## KGSL/KMS allocation and presentation bridge
 
 The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. The
-custom Mesa work now ends at commit `3ce48e02` on
+custom Mesa work now ends at commit `6c30ef8c` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
 that base and intentionally does not contain the KMS/X11 bridge.
@@ -195,6 +195,11 @@ asks for the scanout handle. The agent sets this mode only in Xorg. This made
 the glamor-rendered root desktop visible with no `failed to add fb` errors, so
 Xorg's final scanout remains zero-copy.
 
+The GEM-handle translation is likewise gated by `FD_KGSL_USE_KMS_DUMB`.
+Ordinary KGSL clients retain the established `fd_bo_handle()` allocation-id
+behavior; merely having the KMS callback installed must not turn a native,
+non-exportable KGSL BO into handle zero.
+
 An ordinary client DRI3 pixmap was still black. This was tested with normal
 dma-heap and KMS-dumb client allocations, DRI2 fallback, `glFinish`, and forced
 linear/no-UBWC layouts. The diagnostic client read back the expected
@@ -202,6 +207,14 @@ linear/no-UBWC layouts. The diagnostic client read back the expected
 window was visible with llvmpipe. The remaining fault is therefore the
 cross-context KGSL dma-buf consumption on this downstream stack, not rendering,
 mode setting, or the Present completion fence.
+
+The chroot's Xorg 21.1.24 also retains the repeated Present wait-fence callback
+bug fixed in
+[`fc534e51`](https://github.com/KiralyCraft/termux-x11/commit/fc534e514d7ad4851d0aca3357495816260e4549).
+The SHM bridge does not expose its native KGSL fence to Xorg: its worker waits
+locally and submits only a completed SHM pixmap. Therefore that Xorg bug is not
+on the active bridge path, but the fix is required before safely revisiting the
+direct DRI3 wait-fence route.
 
 For that boundary, Mesa provides the opt-in
 `MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application.
@@ -241,11 +254,49 @@ The asynchronous worker changes what the `glxgears` number means. A 300x300
 swap-interval-zero client no longer blocks at about 60 FPS: live samples ranged
 from roughly 1.1k to 2.0k FPS depending on device state, versus roughly 1.4k to
 2.4k FPS on Termux:X11 in the corresponding runs. The remaining bridge cost on
-this microbenchmark was about 17-22%. The external screen still receives only
-the newest completed image at its real refresh rate. Experiments that omitted
-the per-swap native fence, used an unexported internal fence, or deferred the
-flush reduced throughput or let the KGSL queue run far ahead; the explicit
-exported-fence lifecycle is retained.
+this microbenchmark was about 7-22%, with GPU DVFS and device state producing
+substantial run-to-run variation. The external screen still receives only the
+newest completed image at its real refresh rate. Experiments that omitted the
+per-swap native fence, used an unexported internal fence, or deferred the flush
+reduced throughput or let the KGSL queue run far ahead; the explicit
+exported-fence lifecycle is retained. In a same-state 2026-09-03 A/B,
+pre-dropping swaps before fence export reduced leased-Xorg `glxgears` from
+1165-1200 FPS to 960-1125 FPS, depending on the replacement flush path.
+
+### Workload and resolution cost
+
+A follow-up comparison on 2026-09-03 used `glmark2` because a fast, small
+`glxgears` window deliberately drops almost every swap before the bridge maps
+it. This can hide the cost that matters to a full-screen application. The same
+private Mesa build, immediate swap mode, 24-bit depth visual, and drawable size
+were used on Termux:X11 and leased Xorg:
+
+| Drawable and scene | Termux:X11 | Leased Xorg bridge | Reported process CPU busy |
+| --- | ---: | ---: | ---: |
+| 1280x720 `bump:high-poly` | 752 FPS | 638-639 FPS | 20% vs 25% |
+| 1280x720 `build` | 848 FPS | 772-859 FPS | 20% vs 26-28% |
+| 3840x2160 `build` | 217 FPS | 230 FPS | 14% vs 24% |
+
+The 1280x720 bridge copied approximately 150-200 MiB/s. The 4K bridge run
+copied about 11.1 GiB during the eight-second scene, or roughly 1.5 GiB/s,
+while presenting only the newest completed surfaces. The application FPS did
+not collapse because the fence wait, readback, memory copy, and X request are
+on the persistent worker rather than the application's main thread. The extra
+CPU work and memory/cache traffic remain real, however, and scale directly
+with drawable area. This is a credible contributor to the observed 4K cursor
+and window stutter even when an uncapped FPS counter remains high.
+
+The 4K number above used an oversized drawable clipped by the existing
+1280x720 X screen. It prices 4K rendering and the bridge copy without risking a
+live HDMI mode change; it does not by itself validate physical 4K scanout.
+The worker retains row-sized copies: replacing them with one contiguous 4K
+`memcpy` reduced the otherwise identical `build` result from 227 to 193 FPS.
+Although reported CPU busy fell from 26% to 23%, the larger burst increased
+contention with the GPU enough to lose 15% of application throughput.
+The real application mentioned in the
+[upstream discussion](https://github.com/lfdevs/mesa-for-android-container/pull/96#issuecomment-5507168374)
+was an offer from another tester, not a downloadable test artifact, so
+`glmark2` is the reproducible local substitute.
 
 ### Private Mesa ABI set
 
