@@ -98,7 +98,7 @@ Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
 The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `6c30ef8c` on the
+submodule at commit `1200a245` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -110,6 +110,7 @@ a3eb373e dri3: bridge native render fences to Present
 4c72c7a4 dri3: decouple KGSL rendering from SHM presentation
 3ce48e02 dri3: wait on KGSL bridge events without polling
 6c30ef8c freedreno/kgsl: scope translated handles to KMS scanout
+1200a245 dri3: add adaptive GPU bridge for UHD X11
 ```
 
 The separate `fix/kgsl-present-wait-fence` line exports a native Freedreno
@@ -174,7 +175,7 @@ timeout restored Android.
 ## KGSL/KMS allocation and presentation bridge
 
 The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. The
-custom Mesa work now ends at commit `6c30ef8c` on
+custom Mesa work now ends at commit `1200a245` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
 that base and intentionally does not contain the KMS/X11 bridge.
@@ -234,6 +235,17 @@ the full drawable. Set `MESA_KGSL_X11_BRIDGE_STATS=1` for periodic
 produced/presented/dropped/copy statistics. The agent uses
 `FD_MESA_DEBUG=noubwc`: UBWC must remain disabled for reliable CPU-visible
 readback, but ordinary Freedreno tiling remains enabled.
+
+The agent also enables `MESA_KGSL_X11_GPU_BRIDGE=1`. Mesa keeps the CPU/MIT-SHM
+path for surfaces below 8,000,000 pixels. At or above that threshold, Xorg
+allocates three KMS-compatible presentation pixmaps, exports them through DRI3,
+and the worker imports them into KGSL. The application continues rendering into
+fast tiled client buffers; only a selected completed frame is GPU-blitted into
+an Xorg-owned display slot. This removes CPU readback and the MIT-SHM server
+copy without returning to the broken direction where Xorg imports an ordinary
+client KGSL allocation. Set `MESA_KGSL_X11_GPU_BRIDGE_MIN_PIXELS=0` to force
+the GPU path for measurement, or a larger value to keep CPU copies for more
+surface sizes.
 
 This client presentation step is not zero-copy. It is narrower than ShadowFB:
 there is no continuous full-screen copy, and non-GL desktop content stays on
@@ -297,7 +309,32 @@ contention with the GPU enough to lose 15% of application throughput.
 The real application mentioned in the
 [upstream discussion](https://github.com/lfdevs/mesa-for-android-container/pull/96#issuecomment-5507168374)
 was an offer from another tester, not a downloadable test artifact, so
-`glmark2` is the reproducible local substitute.
+`glmark2` is the reproducible local substitute. That tester later measured the
+wait-fence patch at a 48-61% loss in the `glmark2` scenes but within the normal
+0.70 FPS run-to-run spread in the CPU-heavy 2005 game. This is why the bridge
+decision uses both pixel-copy measurements and a workload matrix rather than a
+small `glxgears` number alone.
+
+The GPU destination experiment produced a clear size-dependent crossover on
+the same live session. These are paired eight-second `build` samples unless a
+different scene is named:
+
+| Drawable | CPU/MIT-SHM | Xorg-owned GPU slots | Result |
+| --- | ---: | ---: | --- |
+| 1280x720 `bump:high-poly` | 633 FPS | 599 FPS | CPU 5% faster |
+| 1920x1080 `build` | 510 FPS | 465 FPS | CPU 9% faster |
+| 2560x1440 `build` | 345 FPS | 299 FPS | CPU 13% faster |
+| 3200x1800 `build` | 249 FPS | 242 FPS | approximately even |
+| 3840x2160 `build` | 224-231 FPS | 252-269 FPS | GPU 12-16% faster |
+
+A direct zero-copy variant in which applications rendered into Xorg-owned
+KMS-dumb buffers was visibly correct, but scored 688 versus 764 FPS in the
+1280x720 `build` scene. Those linear scanout buffers are poor render targets,
+so the retained path uses them only as presentation slots. A dma-heap GPU slot
+behind MIT-SHM scored 209 versus 224 FPS at 4K because it still required Xorg's
+SHM copy. The retained Xorg-owned GPU slots are the first variant that improved
+the resolution-sensitive 4K case and they leave smaller surfaces on the faster
+CPU path.
 
 ### Private Mesa ABI set
 

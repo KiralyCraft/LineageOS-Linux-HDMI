@@ -5,7 +5,8 @@ control and adds the asynchronous KGSL presentation path. The accelerated
 runtime now requires a matched private `libgallium`, `libGLX_mesa`, and
 `libEGL_mesa` set carrying bridge ABI 3; the launcher refuses a partial or
 stale set. It also leaves Freedreno tiling enabled and disables only UBWC for
-the CPU-visible bridge copy.
+the bridge. Smaller accelerated surfaces use CPU-visible MIT-SHM slots;
+UHD-sized surfaces use GPU blits into Xorg-owned KMS-compatible slots.
 
 Candidate 5 changed the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at

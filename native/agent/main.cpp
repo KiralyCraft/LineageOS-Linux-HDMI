@@ -628,6 +628,7 @@ void configure_gpu_environment(bool kms_scanout_server) {
   unsetenv("FD_KGSL_USE_KMS_DUMB");
   unsetenv("FD_KGSL_KMS_DEVICE");
   unsetenv("MESA_KGSL_X11_SHM_BRIDGE");
+  unsetenv("MESA_KGSL_X11_GPU_BRIDGE");
   unsetenv("FD_MESA_DEBUG");
   setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);
   setenv("FD_FORCE_KGSL", "1", 1);
@@ -645,6 +646,10 @@ void configure_gpu_environment(bool kms_scanout_server) {
       // downstream stack.  Keep native KGSL rendering, then copy each
       // completed drawable through Mesa's persistent MIT-SHM bridge.
       setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);
+      // At UHD-sized drawables the CPU bridge saturates memory bandwidth and
+      // competes with KGSL.  Mesa automatically switches those large surfaces
+      // to GPU blits into Xorg-owned KMS-compatible presentation pixmaps.
+      setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);
       setenv("FD_MESA_DEBUG", "noubwc", 1);
     }
   }
