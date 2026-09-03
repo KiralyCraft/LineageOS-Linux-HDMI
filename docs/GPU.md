@@ -1,7 +1,7 @@
 # GPU acceleration on the chroot displays
 
-This note records live results from the Xperia 1 V (`pdx234`, Adreno 740) on
-2026-09-01. It distinguishes the Termux:X11 display from the Xorg server that
+This note records results from the Xperia 1 V (`pdx234`, Adreno 740) through
+2026-09-03. It distinguishes the Termux:X11 display from the Xorg server that
 owns the external display through a DRM lease. They use the same chroot Mesa
 installation but expose different rendering interfaces to clients.
 
@@ -43,7 +43,8 @@ does.
 | Leased Xorg `:1`, `GALLIUM_DRIVER=zink` | Zink over Turnip Adreno 740 | context/commands use the GPU | Fails to present: the application window stays black |
 | Leased Xorg `:1`, interactive-login `MESA_LOADER_DRIVER_OVERRIDE=kgsl` | none | no | Loader cannot retrieve the device; the client disconnects |
 | Leased Xorg `:1`, modesetting glamor plus native KGSL, without the allocation bridge | native Freedreno `FD740` | yes | DRI3 works, but Qualcomm KMS rejects the scanout framebuffer; HDMI stays black |
-| Leased Xorg `:1`, `kgsl-kms-bridge` | native Freedreno `FD740` | yes | Visible LXDE and `glxgears`; uncapped 300x300 `glxgears` runs at GPU speed while the newest completed image is independently paced to the display |
+| Leased Xorg `:1`, previous adaptive bridge | native Freedreno `FD740` | yes | Visible LXDE and `glxgears`; uncapped 300x300 `glxgears` runs at GPU speed while the newest completed image is independently paced to the display |
+| Leased Xorg `:1`, current renderonly/PRIME candidate | native Freedreno `FD740` | build and allocation probes pass | Matched ARM Xorg/Mesa stack is staged; live DRI3 presentation awaits an HDMI rearm cycle |
 
 The software `glxgears` run measured approximately 40 and 22 FPS. The Zink
 over Turnip run reported approximately 420-500 FPS, but those swap/FPS reports
@@ -98,7 +99,7 @@ Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
 The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `1200a245` on the
+submodule at commit `f897e810` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -111,6 +112,7 @@ a3eb373e dri3: bridge native render fences to Present
 3ce48e02 dri3: wait on KGSL bridge events without polling
 6c30ef8c freedreno/kgsl: scope translated handles to KMS scanout
 1200a245 dri3: add adaptive GPU bridge for UHD X11
+f897e810 dri3: use renderonly PRIME for leased KGSL displays
 ```
 
 The separate `fix/kgsl-present-wait-fence` line exports a native Freedreno
@@ -122,8 +124,9 @@ maps the selected client image and submits an already-complete SHM pixmap.
 That server-side wait-fence bug is therefore not on this bridge's hot path.
 
 In the safe ShadowFB configuration the X server's 2D rendering remains
-software-based. The default `kgsl-kms-bridge` configuration described below is
-the verified native-Freedreno exception.
+software-based. The old adaptive bridge below is the verified
+native-Freedreno baseline; the renderonly/PRIME path is the current performance
+candidate.
 
 ## Native KGSL glamor diagnostic
 
@@ -172,10 +175,54 @@ register as its scanout framebuffer. Disabling page flips does not avoid that
 initial framebuffer registration. The phone remained stable and the normal
 timeout restored Android.
 
-## KGSL/KMS allocation and presentation bridge
+## Standard renderonly/PRIME candidate
 
-The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. The
-custom Mesa work now ends at commit `1200a245` on
+The previous bridge proved that KMS-owned buffers are accepted by both KGSL
+and SDE, but it bypassed Mesa's ordinary multi-GPU presentation model. The
+current candidate instead follows the same split-render/display design used by
+Mesa's `kmsro` users such as Lima and V3D:
+
+```text
+Xorg DRI3 opens /dev/dri/renderD128 for the client
+  -> Mesa retains it as the display fd and opens /dev/kgsl-3d0 as the render fd
+  -> Freedreno renders into its normal fast image
+  -> renderonly allocates an exact width/height/format KMS dumb image
+  -> Mesa's standard PRIME path GPU-blits render image to display image
+  -> X Present receives a native fence covering that blit
+```
+
+This removes the CPU readback, MIT-SHM request, private presentation worker,
+and pixel-count threshold from the default path. It also restores Xorg's
+normal page-flip policy, so an eligible fullscreen surface can be scanned out
+directly. Ordinary windows still use the server's normal composition path.
+
+Two Xorg 21.1.24 backports are required and are stored under
+[`patches/xserver`](../patches/xserver):
+
+- glamor chooses the DRM render node for DRI3 clients, matching current
+  upstream Xorg, rather than reopening the primary node and attempting legacy
+  DRM authentication through a lease;
+- the Present wait-fence callback is disarmed before re-execution, matching the
+  lifetime fix already used by Termux:X11.
+
+Mesa no longer intercepts `x11_dri3_open()` to return KGSL. The ordinary DRI3
+fd remains visible as the display GPU, while the loader's opt-in
+`FD_FORCE_KGSL=1` selection supplies the non-DRM KGSL render fd. The display
+Freedreno screen uses Mesa's `struct renderonly` and
+`renderonly_create_kms_dumb_buffer_for_resource()` rather than constructing a
+one-row dumb buffer inside the byte-oriented KGSL BO allocator.
+
+The ARM build and device-side allocation probe passed before live cutover. An
+exact 1280x720 resource was allocated with pitch 5120, exported as dma-buf,
+and imported by KGSL. The private Xorg binary and glamor module are both built
+from the same 21.1.24 tree. First live presentation, FPS comparison, and
+unplug/replug recovery remain required before this candidate can replace the
+verified baseline in the status matrix.
+
+## Previous adaptive allocation and presentation bridge
+
+The bridge was implemented and tested live on 2026-09-02 and 2026-09-03. That
+Mesa implementation ended at commit `1200a245` on
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen),
 directly based on `91f7e8c6`. The `fix/kgsl-present-wait-fence` branch ends at
 that base and intentionally does not contain the KMS/X11 bridge.
@@ -190,10 +237,10 @@ SDE KMS dumb allocation
   -> SDE KMS framebuffer
 ```
 
-Mesa now has an explicit `FD_KGSL_USE_KMS_DUMB=1` allocation mode. It creates
-the shared storage with KMS, imports the dma-buf into KGSL for rendering, and
-translates the KGSL BO back to a GEM handle on Mesa's KMS control fd when GBM
-asks for the scanout handle. The agent sets this mode only in Xorg. This made
+It added an explicit `FD_KGSL_USE_KMS_DUMB=1` allocation mode. It created the
+shared storage with KMS, imported the dma-buf into KGSL for rendering, and
+translated the KGSL BO back to a GEM handle on Mesa's KMS control fd when GBM
+asks for the scanout handle. The agent set this mode only in Xorg. This made
 the glamor-rendered root desktop visible with no `failed to add fb` errors, so
 Xorg's final scanout remains zero-copy.
 
@@ -210,13 +257,13 @@ window was visible with llvmpipe. The remaining fault is therefore the
 cross-context KGSL dma-buf consumption on this downstream stack, not rendering,
 mode setting, or the Present completion fence.
 
-The chroot's Xorg 21.1.24 also retains the repeated Present wait-fence callback
-bug fixed in
+The chroot's system Xorg 21.1.24 retained the repeated Present wait-fence
+callback bug fixed in
 [`fc534e51`](https://github.com/KiralyCraft/termux-x11/commit/fc534e514d7ad4851d0aca3357495816260e4549).
 The SHM bridge does not expose its native KGSL fence to Xorg: its worker waits
 locally and submits only a completed SHM pixmap. Therefore that Xorg bug is not
-on the active bridge path, but the fix is required before safely revisiting the
-direct DRI3 wait-fence route.
+on that bridge path. The current private Xorg applies the same fix before using
+the standard DRI3 wait-fence route.
 
 For that boundary, Mesa provides the opt-in
 `MESA_KGSL_X11_SHM_BRIDGE=1` fallback. KGSL still renders the application.
@@ -236,8 +283,9 @@ produced/presented/dropped/copy statistics. The agent uses
 `FD_MESA_DEBUG=noubwc`: UBWC must remain disabled for reliable CPU-visible
 readback, but ordinary Freedreno tiling remains enabled.
 
-The agent also enables `MESA_KGSL_X11_GPU_BRIDGE=1`. Mesa keeps the CPU/MIT-SHM
-path for surfaces below 8,000,000 pixels. At or above that threshold, Xorg
+The prior agent also enabled `MESA_KGSL_X11_GPU_BRIDGE=1`. Mesa kept the
+CPU/MIT-SHM path for surfaces below 8,000,000 pixels. At or above that
+threshold, Xorg
 allocates three KMS-compatible presentation pixmaps, exports them through DRI3,
 and the worker imports them into KGSL. The application continues rendering into
 fast tiled client buffers; only a selected completed frame is GPU-blitted into
@@ -354,8 +402,12 @@ lib/mesa/libGLX_mesa.so.0
 lib/mesa/libEGL_mesa.so.0
 ```
 
-All three carry `HDMI_LOS_MESA_BRIDGE_ABI=3`. `run-agent.sh` checks every file
-before starting accelerated mode and refuses a missing, stale, or mixed set.
+All three current libraries carry `HDMI_LOS_MESA_BRIDGE_ABI=4`. `run-agent.sh`
+checks every file before starting accelerated mode and refuses a missing,
+stale, or mixed set. Accelerated mode additionally requires the matched
+private Xorg at `libexec/Xorg` and its glamor module at
+`lib/xorg/modules/libglamoregl.so`. The system Xorg remains available to the
+`safe` diagnostic mode.
 
 ## External display mode
 
@@ -412,6 +464,12 @@ DISPLAY=:0 glxinfo -B
 DISPLAY=:0 glxgears -info
 ```
 
+`Xvfb` can be used to compare headless client rendering when the HDMI lease is
+unavailable, but it cannot validate this presentation path: without a real DRM
+display fd it cannot exercise DRI3's render/display split, renderonly scanout,
+or Present fences. Treat a headless number only as a KGSL rendering baseline,
+not as evidence that leased HDMI presentation works.
+
 During a safe ShadowFB leased-Xorg session, this command verifies GPU context
 creation and command execution, but its window is black because that mode has
 no presentation bridge:
@@ -457,7 +515,7 @@ no phone-side capture, `kgsl-kms-bridge`, LXDE, and a renewable continuous
 lease. The tile, volume-button escape, failed heartbeat, disconnect, and Xorg
 exit still restore Android.
 
-The default requires the matched private `libgallium-*.so`,
+The default requires the matched private Xorg pair plus `libgallium-*.so`,
 `libGLX_mesa.so.0`, and `libEGL_mesa.so.0` below `lib/mesa/`.
 Its full equivalent command is:
 
@@ -466,9 +524,9 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 ./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge --session lxde --no-timeout
 ```
 
-The runner deliberately rejects this mode if any private Mesa library is
-missing or carries the wrong bridge ABI. Use `--timeout` to restore the bounded
-60-second session deadline.
+The runner deliberately rejects this mode if a private Xorg component or Mesa
+library is missing, or if Mesa carries the wrong bridge ABI. Use `--timeout` to
+restore the bounded 60-second session deadline.
 Use `--xorg-accel safe` for the software-rendered ShadowFB fallback; these can
 be combined as `./run-agent.sh --xorg-accel safe --timeout` during staged
 safety testing.

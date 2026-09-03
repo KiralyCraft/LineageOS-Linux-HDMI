@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.6")
-        self.assertEqual(release["version_code"], 20260916)
+        self.assertEqual(release["version"], "0.2.8-candidate.7")
+        self.assertEqual(release["version_code"], 20260917)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -146,7 +146,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("loader_dri3_get_pixmap_buffer", source)
         self.assertIn("__BLIT_FLAG_FINISH", source)
         self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", source)
-        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=3', header)
+        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=4', header)
         self.assertNotIn("nanosleep(", source)
         self.assertNotIn("usleep(", source)
         bridge = source.split("static bool\ndri3_shm_bridge_present(", 1)[1].split(
@@ -155,7 +155,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("xcb_request_check", bridge)
 
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
-        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=3", runner)
+        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=4", runner)
         self.assertIn("grep -aFq", runner)
         self.assertIn("stale or incompatible", runner)
         self.assertIn("libGLX_mesa.so.0", runner)
@@ -216,14 +216,17 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);', agent)
         self.assertIn('setenv("FD_FORCE_KGSL", "1", 1);', agent)
         self.assertIn('setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);', agent)
-        self.assertIn('setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);', agent)
-        self.assertIn('setenv("FD_KGSL_KMS_DEVICE", "/dev/dri/card0", 1);', agent)
-        self.assertIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
-        self.assertIn('setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);', agent)
-        self.assertIn('setenv("FD_MESA_DEBUG", "noubwc", 1);', agent)
+        self.assertIn('setenv("FD_KGSL_RENDERONLY", "1", 1);', agent)
+        self.assertNotIn('setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);', agent)
+        self.assertNotIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
+        self.assertNotIn('setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);', agent)
+        self.assertNotIn('setenv("FD_MESA_DEBUG", "noubwc", 1);', agent)
         self.assertIn('setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);', agent)
         self.assertIn('/lib/mesa', agent)
+        self.assertIn('/libexec/Xorg', agent)
+        self.assertIn('/lib/xorg/modules,/usr/lib/xorg/modules', agent)
         self.assertIn('g_kgsl_glamor ? "glamor" : "none"', agent)
+        self.assertIn('g_kgsl_glamor ? "true" : "false"', agent)
         self.assertIn('g_kgsl_glamor ? "false"', agent)
         self.assertIn("DRM_IOCTL_MODE_GETCONNECTOR", agent)
         self.assertIn("DRM_IOCTL_MODE_GETCRTC", agent)
@@ -238,12 +241,37 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge", runner)
         self.assertIn("--session lxde|none", runner)
 
+        freedreno_screen = (
+            ROOT
+            / "third_party/mesa-for-android-container/src/gallium/drivers/freedreno/freedreno_screen.c"
+        ).read_text()
+        loader = (
+            ROOT / "third_party/mesa-for-android-container/src/loader/loader.c"
+        ).read_text()
+        x11_dri3 = (
+            ROOT / "third_party/mesa-for-android-container/src/x11/x11_dri3.c"
+        ).read_text()
+        self.assertIn("renderonly_create_kms_dumb_buffer_for_resource", freedreno_screen)
+        self.assertIn("FD_KGSL_RENDERONLY", freedreno_screen)
+        self.assertIn("*original_fd = *fd_render_gpu", loader)
+        self.assertIn("*fd_render_gpu = kgsl_fd", loader)
+        self.assertNotIn('return open("/dev/kgsl-3d0"', x11_dri3)
+
+        render_node_patch = (
+            ROOT / "patches/xserver/0002-glamor-prefer-render-node-for-dri3.patch"
+        ).read_text()
+        present_patch = (
+            ROOT / "patches/xserver/0001-present-disarm-wait-fence-callback.patch"
+        ).read_text()
+        self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
+        self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)
+
         xorg_spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)[1]
         xorg_spawn = xorg_spawn.split("pid_t spawn_lxde()", 1)[0]
         lxde_spawn = agent.split("pid_t spawn_lxde()", 1)[1]
         lxde_spawn = lxde_spawn.split("bool xorg_ready()", 1)[0]
-        self.assertIn("configure_gpu_environment(true);", xorg_spawn)
-        self.assertIn("configure_gpu_environment(false);", lxde_spawn)
+        self.assertIn("configure_gpu_environment();", xorg_spawn)
+        self.assertIn("configure_gpu_environment();", lxde_spawn)
 
     def test_tracer_is_packaged_from_chroot_lib(self):
         package = (ROOT / "build-support/package.sh").read_text()
@@ -258,6 +286,8 @@ class DiagnosticContractTests(unittest.TestCase):
         )[1].split("else", 1)
         self.assertNotIn("third_party/mesa-for-android-container", repackage)
         self.assertIn("third_party/mesa-for-android-container", composer_reuse)
+        self.assertIn("patches/xserver/*", composer_reuse)
+        self.assertIn("build-support/package-gpu-stack.sh", composer_reuse)
 
     def test_tracer_identifies_property_operations_and_values(self):
         tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()

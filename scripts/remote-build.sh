@@ -79,10 +79,11 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
                 scripts/collect-crash-evidence.sh|build-support/remote-entry.sh|\
                 build-support/package.sh|build-support/build-native.sh|\
                 build-support/build-tile.sh|build-support/write-build-info.py|\
+                build-support/package-gpu-stack.sh|\
                 build-support/reuse-composer.sh|\
                 build-support/verify-reused-composer.py|\
                 build-support/verify-reused-build.py|\
-                third_party/mesa-for-android-container)
+                patches/xserver/*|third_party/mesa-for-android-container)
                     ;;
                 *)
                     printf 'Refusing composer reuse: composer-producing path changed: %s\n' \

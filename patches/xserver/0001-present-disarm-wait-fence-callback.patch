@@ -1,0 +1,26 @@
+From: KiralyCraft <alexucu@gmail.com>
+Subject: [PATCH 1/2] present: disarm wait-fence callback before re-execution
+
+diff --git a/present/present_execute.c b/present/present_execute.c
+index 68a5878be..4acb7b592 100644
+--- a/present/present_execute.c
++++ b/present/present_execute.c
+@@ -33,6 +33,14 @@ present_wait_fence_triggered(void *param)
+     present_vblank_ptr      vblank = param;
+-    ScreenPtr               screen = vblank->screen;
+-    present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+-
+-    screen_priv->re_execute(vblank);
++    ScreenPtr               screen = vblank->screen;
++    present_screen_priv_ptr screen_priv = present_screen_priv(screen);
++
++    /*
++     * miSyncTriggerFence() restarts its trigger-list scan after every fired
++     * callback because the callback may modify that list.  Disarm this
++     * callback before re-executing: re_execute() may queue the request for a
++     * future MSC and leave the Present fence alive, which would otherwise
++     * make this same trigger fire repeatedly in the restarted scan.
++     */
++    present_fence_set_callback(vblank->wait_fence, NULL, NULL);
++    screen_priv->re_execute(vblank);
+ }

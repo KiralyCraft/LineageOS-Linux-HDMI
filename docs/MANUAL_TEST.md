@@ -1,12 +1,14 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.6` keeps the Quick Settings tile as an arm/disarm
-control and adds the asynchronous KGSL presentation path. The accelerated
-runtime now requires a matched private `libgallium`, `libGLX_mesa`, and
-`libEGL_mesa` set carrying bridge ABI 3; the launcher refuses a partial or
-stale set. It also leaves Freedreno tiling enabled and disables only UBWC for
-the bridge. Smaller accelerated surfaces use CPU-visible MIT-SHM slots;
-UHD-sized surfaces use GPU blits into Xorg-owned KMS-compatible slots.
+Release `0.2.8-candidate.7` keeps the Quick Settings tile as an arm/disarm
+control and replaces the adaptive KGSL presentation bridge with Mesa's
+standard renderonly/PRIME path. The accelerated runtime requires a matched
+private Xorg 21.1.24 binary and glamor module plus `libgallium`, `libGLX_mesa`,
+and `libEGL_mesa` carrying ABI 4. The launcher refuses a partial or stale set.
+Mesa renders into its normal fast KGSL image, GPU-blits into an exact
+KMS-allocated display image, and attaches a native completion fence to the
+ordinary X Present request. There is no MIT-SHM readback, timer, or
+pixel-count threshold in the default path.
 
 Candidate 5 changed the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at
@@ -70,9 +72,10 @@ a probe after a freeze or reset until all available evidence has been copied.
 5. Replace the complete prior chroot bundle with
    `dist/hdmi-los-current-install-chroot.tar.gz`. Do not mix an older agent
    with this module.
-6. For `kgsl-kms-bridge`, place the three matched ABI-3 Mesa libraries below
-   the bundle's `lib/mesa/`. Do not reuse the system GLX/EGL frontends with the
-   private DRI target.
+6. For `kgsl-kms-bridge`, place the matched private Xorg at `libexec/Xorg`, its
+   glamor module at `lib/xorg/modules/libglamoregl.so`, and the three ABI-4
+   Mesa libraries below `lib/mesa/`. Do not reuse the system GLX/EGL frontends
+   with the private DRI target.
 7. Verify `/data/adb/hdmi-los/logs/gate.log`, `compatible.ok`, and the three
    read-only executable composer bind mounts.
 

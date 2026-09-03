@@ -265,6 +265,11 @@ bool process_alive(pid_t pid) {
   return pid > 1 && kill(pid, 0) == 0;
 }
 
+std::string xorg_binary() {
+  if (g_kgsl_kms_bridge) return g_bundle + "/libexec/Xorg";
+  return "/usr/lib/Xorg";
+}
+
 void terminate_group(pid_t *pid) {
   if (!pid || *pid <= 1) return;
   pid_t target = *pid;
@@ -349,10 +354,17 @@ std::string random_cookie() {
 
 bool trace_preflight() {
   std::string library = g_bundle + "/lib/libhdmi-los-drmtrace.so";
+  std::string xorg_path = xorg_binary();
+  std::string glamor_module = g_bundle + "/lib/xorg/modules/libglamoregl.so";
   struct stat xorg = {};
-  if (stat("/usr/lib/Xorg", &xorg) != 0 || !S_ISREG(xorg.st_mode) ||
+  if (stat(xorg_path.c_str(), &xorg) != 0 || !S_ISREG(xorg.st_mode) ||
+      access(xorg_path.c_str(), X_OK) != 0 ||
       (xorg.st_mode & (S_ISUID | S_ISGID)) != 0 || access(library.c_str(), R_OK) != 0) {
     log_message("error", "Xorg or DRM tracer failed the secure preload gate");
+    return false;
+  }
+  if (g_kgsl_kms_bridge && access(glamor_module.c_str(), R_OK) != 0) {
+    log_message("error", "the matched private Xorg glamor module is missing");
     return false;
   }
 
@@ -367,7 +379,7 @@ bool trace_preflight() {
     snprintf(descriptor, sizeof(descriptor), "%d", sockets[1]);
     setenv("HDMI_LOS_TRACE_FD", descriptor, 1);
     setenv("LD_PRELOAD", library.c_str(), 1);
-    execl("/usr/lib/Xorg", "/usr/lib/Xorg", "-version", static_cast<char *>(nullptr));
+    execl(xorg_path.c_str(), xorg_path.c_str(), "-version", static_cast<char *>(nullptr));
     _exit(127);
   }
   close(sockets[1]);
@@ -585,7 +597,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Driver \"modesetting\"\n"
       "  Option \"kmsdev\" \"/dev/dri/card0\"\n"
       "  Option \"AccelMethod\" \"%s\"\n"
-      "  Option \"PageFlip\" \"false\"\n"
+      "  Option \"PageFlip\" \"%s\"\n"
       "  Option \"ShadowFB\" \"%s\"\n"
       "  Option \"Atomic\" \"%s\"\n"
       "  Option \"SWcursor\" \"true\"\n"
@@ -612,6 +624,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       mode.vdisplay, mode.vsync_start, mode.vsync_end, mode.vtotal,
       mode_flags.c_str(), kModeName,
       g_kgsl_glamor ? "glamor" : "none",
+      g_kgsl_glamor ? "true" : "false",
       g_kgsl_glamor ? "false" : "true",
       probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false", kModeName);
   bool ok = result > 0;
@@ -621,12 +634,13 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
   return ok;
 }
 
-void configure_gpu_environment(bool kms_scanout_server) {
+void configure_gpu_environment() {
   if (!g_kgsl_glamor) return;
   unsetenv("GALLIUM_DRIVER");
   unsetenv("VK_DRIVER_FILES");
   unsetenv("FD_KGSL_USE_KMS_DUMB");
   unsetenv("FD_KGSL_KMS_DEVICE");
+  unsetenv("FD_KGSL_RENDERONLY");
   unsetenv("MESA_KGSL_X11_SHM_BRIDGE");
   unsetenv("MESA_KGSL_X11_GPU_BRIDGE");
   unsetenv("FD_MESA_DEBUG");
@@ -636,22 +650,10 @@ void configure_gpu_environment(bool kms_scanout_server) {
   if (g_kgsl_kms_bridge) {
     std::string mesa = g_bundle + "/lib/mesa";
     setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);
-    if (kms_scanout_server) {
-      // Only Xorg's scanout allocation must be accepted by SDE KMS.  Client
-      // render buffers stay on KGSL's normal dma-heap allocation path.
-      setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);
-      setenv("FD_KGSL_KMS_DEVICE", "/dev/dri/card0", 1);
-    } else {
-      // Cross-context imports of KGSL render dma-bufs are black on this
-      // downstream stack.  Keep native KGSL rendering, then copy each
-      // completed drawable through Mesa's persistent MIT-SHM bridge.
-      setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);
-      // At UHD-sized drawables the CPU bridge saturates memory bandwidth and
-      // competes with KGSL.  Mesa automatically switches those large surfaces
-      // to GPU blits into Xorg-owned KMS-compatible presentation pixmaps.
-      setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);
-      setenv("FD_MESA_DEBUG", "noubwc", 1);
-    }
+    // KGSL is the render device and Qualcomm DRM is the display device. Mesa's
+    // standard renderonly/PRIME path allocates exact KMS scanout resources and
+    // performs the render-to-display blit on the GPU for both Xorg and clients.
+    setenv("FD_KGSL_RENDERONLY", "1", 1);
   }
 }
 
@@ -765,6 +767,8 @@ pid_t spawn_xorg(int lease_fd) {
   std::string auth = std::string(kRuntime) + "/Xauthority";
   std::string log = std::string(kRuntime) + "/Xorg.1.log";
   std::string tracer = g_bundle + "/lib/libhdmi-los-drmtrace.so";
+  std::string xorg_path = xorg_binary();
+  std::string module_path = g_bundle + "/lib/xorg/modules,/usr/lib/xorg/modules";
   mkdir(config_dir.c_str(), 0700);
   setenv("HDMI_LOS_TRACE_FD", trace_fd_text, 1);
   setenv("HDMI_LOS_SUPPRESS_CONNECTOR_PROPERTY_NOOPS", "1", 1);
@@ -774,10 +778,11 @@ pid_t spawn_xorg(int lease_fd) {
   setenv("HDMI_LOS_EXPECTED_CONNECTOR", connector_text, 1);
   setenv("HDMI_LOS_EXPECTED_CRTC", crtc_text, 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
-  configure_gpu_environment(true);
-  execl("/usr/lib/Xorg", "/usr/lib/Xorg", kDisplay, "-masterfd", fd_text,
+  configure_gpu_environment();
+  execl(xorg_path.c_str(), xorg_path.c_str(), kDisplay, "-masterfd", fd_text,
         "-config", config.c_str(), "-configdir", config_dir.c_str(),
         "-auth", auth.c_str(), "-logfile", log.c_str(), "-nolisten", "tcp",
+        "-modulepath", module_path.c_str(),
         "-novtswitch", "-noreset", static_cast<char *>(nullptr));
   _exit(127);
 }
@@ -805,7 +810,7 @@ pid_t spawn_lxde() {
   setenv("TMPDIR", "/tmp", 1);
   setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   setenv("XDG_RUNTIME_DIR", (std::string(kRuntime) + "/user-runtime").c_str(), 1);
-  configure_gpu_environment(false);
+  configure_gpu_environment();
   execl("/usr/bin/dbus-run-session", "/usr/bin/dbus-run-session", "--",
         "/usr/bin/startlxde", static_cast<char *>(nullptr));
   _exit(127);

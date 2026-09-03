@@ -146,7 +146,15 @@ fi
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
     printf 'WARNING: KGSL glamor is an isolated diagnostic; prefer kgsl-kms-bridge or safe ShadowFB\n' >&2
 elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
-    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=3'
+    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=4'
+    for xorg_file in \
+        "$BUNDLE/libexec/Xorg" \
+        "$BUNDLE/lib/xorg/modules/libglamoregl.so"; do
+        [[ -x $xorg_file || $xorg_file == */libglamoregl.so && -r $xorg_file ]] || {
+            printf 'Required private Xorg component is missing: %s\n' "$xorg_file" >&2
+            exit 1
+        }
+    done
     shopt -s nullglob
     gallium_libraries=("$BUNDLE"/lib/mesa/libgallium-*.so)
     shopt -u nullglob
@@ -173,7 +181,7 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
             exit 1
         }
     done
-    printf 'Using matched private Mesa GLX/EGL/DRI libraries with the KGSL/KMS MIT-SHM bridge\n' >&2
+    printf 'Using matched private Xorg and Mesa with the KGSL renderonly/PRIME path\n' >&2
 fi
 
 if ((NO_TIMEOUT)); then

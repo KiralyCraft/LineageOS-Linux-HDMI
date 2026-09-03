@@ -29,9 +29,10 @@ Android desktop-mode application.
    composer leases only the external connector, CRTC, and plane to the chroot
    agent. Android continues using the phone's internal display.
 5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
-   LXDE. The default accelerated path uses a matched private Mesa GLX/EGL/DRI
-   set for Freedreno/KGSL rendering and the Qualcomm-compatible presentation
-   bridge; a separate preloaded tracer validates Xorg's DRM operations.
+   LXDE. The accelerated path uses a matched private Xorg and Mesa set. Mesa
+   renders on KGSL, allocates display buffers through its standard `renderonly`
+   interface, and uses the normal DRI3/PRIME presentation path; a separate
+   preloaded tracer validates Xorg's DRM operations.
 6. Tapping the tile again, unplugging HDMI, stopping the agent, an Xorg or
    watchdog failure, or holding both volume buttons stops Xorg and returns the
    external display to Android.
@@ -50,7 +51,7 @@ The project consists of:
 - a chroot agent, Xorg DRM tracer, and input bridge;
 - a signed Quick Settings tile used to request a takeover;
 - exact ROM profiles, build gates, diagnostic probes, and recovery tooling;
-- an optional patched Mesa build for native Freedreno/KGSL acceleration.
+- an optional matched Xorg/Mesa build for native Freedreno/KGSL acceleration.
 
 It does not replace Android, flash a Linux kernel, write a boot or vendor
 partition, or start Xorg automatically at boot. The Magisk ZIP and matching
@@ -61,24 +62,24 @@ mode is stable, and the foreground chroot agent is ready.
 
 ## Current status
 
-Two Xorg paths have been tested on the target device:
+The safe path and the previous accelerated bridge have been tested on the
+target device. This revision replaces that bridge as the accelerated default
+with a standard renderonly/PRIME candidate:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
-| `kgsl-kms-bridge` (default) | Native Freedreno/KGSL, zero-copy Xorg scanout, and an adaptive asynchronous bridge for the newest completed accelerated drawable | Visible LXDE and `glxgears` are verified. Uncapped `glxgears` now remains GPU-speed instead of being limited to the display refresh rate; continuous operation and unplug recovery were also validated on the device |
+| Previous `kgsl-kms-bridge` | Native Freedreno/KGSL plus adaptive CPU/GPU presentation copies | Visible LXDE, uncapped `glxgears`, continuous operation, and unplug recovery were validated on the device |
+| Current `kgsl-kms-bridge` candidate | Native Freedreno/KGSL plus Mesa renderonly and its standard DRI3/PRIME render-to-display blit | The matched ARM build, exact 1280x720 KMS allocation, dma-buf export/import, and private Xorg ABI were validated. A rearmed HDMI cycle is still required for the first live presentation and performance result |
 
-The accelerated path still needs a copy for each GL image delivered to Xorg because this
-downstream Qualcomm stack renders correct pixels in the client but Xorg sees a
-black image when it imports the same KGSL dma-buf in another context. It does
-not continuously copy the full screen. The bridge drops superseded uncapped
-frames, waits native KGSL fences in a worker, and uses X Present
-completion/idle events rather than a timer. Smaller surfaces use the established
-CPU/MIT-SHM copy; UHD-sized surfaces use one GPU blit into an Xorg-owned,
-KMS-compatible pixmap and avoid CPU readback. On the 300x300 test workload the
-CPU path kept application-side throughput within roughly 17-22% of
-Termux:X11, while the adaptive GPU path improved the measured 4K-sized scene.
-The exact investigation and tested environment are documented in
+The current candidate removes the hot-path MIT-SHM readback and the separate
+bridge worker. Xorg gives clients the DRM render node through ordinary DRI3;
+Mesa retains that fd as the display device, selects KGSL as the render device,
+allocates exact linear scanout buffers with `renderonly`, and performs the
+usual PRIME GPU blit from fast render storage. A native fence covering that
+blit is supplied to X Present. Fullscreen windows can use Xorg's normal page
+flip path; there is no timer or guessed buffer lifetime. The previous bridge
+and its measured costs remain documented as the baseline in
 [GPU acceleration](docs/GPU.md).
 
 Before HDMI is connected, the broker asks Android to prefer the configured
@@ -146,7 +147,8 @@ installed `dev.kiraly.hdmilos` package UID (or is root).
 - Sony Xperia 1 V `XQ-DQ72` / `pdx234` with the exact supported LineageOS build
 - Magisk/root access and working `su`
 - a USB-C DisplayPort/HDMI dock and an external display
-- an ext4 Linux chroot containing Xorg and LXDE
+- an ext4 Linux chroot containing Xorg and LXDE; accelerated mode additionally
+  needs the matched private Xorg/Mesa files described below
 - a Linux build host with enough space for the captured LineageOS source tree
 - access to the exact proprietary Sony inputs recorded by the selected profile
 
@@ -154,7 +156,7 @@ A USB HDMI capture device is useful for development but is not required for a
 normal monitor. During testing, power the capture device from the workstation,
 not from the phone's OTG dock.
 
-## Source and patched Mesa
+## Source and accelerated graphics stack
 
 Clone the main repository normally for the safe path:
 
@@ -174,16 +176,31 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`1200a245`](https://github.com/KiralyCraft/mesa-for-android-container/commit/1200a2450b079cd2804c176018b65d66582bf079).
-That branch alone contains the leased-screen KMS/SHM bridge; the separate
+[`f897e810`](https://github.com/KiralyCraft/mesa-for-android-container/commit/f897e810d23c7909c42b0417d1dde85db86a2dd3).
+That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
-The HDMI build does not compile the submodule automatically. The resulting
-private `libgallium-*.so`, `libGLX_mesa.so.0`, and `libEGL_mesa.so.0` must all
-come from the same completed Mesa build and be placed below `lib/mesa/` in the
-chroot runtime bundle before the accelerated agent mode will start. Do not
-replace only `libgallium`: GLX and EGL embed the bridge drawable structure and
-a mixed set can corrupt memory. The launcher checks the ABI marker in all three
-files and fails closed.
+The Xorg 21.1.24 backports used with it are kept as reviewable patches under
+[`patches/xserver`](patches/xserver). They select a render node for DRI3, as
+current upstream Xorg does, and fix the Present wait-fence callback lifetime.
+The HDMI build does not compile the graphics stack automatically. Place the
+matched private Xorg binary at `libexec/Xorg`, its glamor module at
+`lib/xorg/modules/libglamoregl.so`, and the private `libgallium-*.so`,
+`libGLX_mesa.so.0`, and `libEGL_mesa.so.0` below `lib/mesa/` in the chroot
+runtime bundle. All three Mesa libraries must come from the same completed
+build. Do not replace only `libgallium`: GLX, EGL, and the DRI target share
+private loader structures, so a mixed set can corrupt memory. The launcher
+checks the ABI marker in all three files and fails closed.
+
+After both trees have been built for AArch64, assemble the overlay without
+mixing components:
+
+```sh
+./build-support/package-gpu-stack.sh \
+  <mesa-build-dir> <xserver-build-dir> \
+  dist/hdmi-los-gpu-stack-aarch64.tar.gz
+```
+
+Extract that archive over the matching chroot runtime directory.
 
 ## Build and verify
 
