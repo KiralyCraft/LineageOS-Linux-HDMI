@@ -98,7 +98,7 @@ Do not also set `MESA_LOADER_DRIVER_OVERRIDE=kgsl` on the leased display.
 
 The installed Mesa source is pinned by the optional
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `3ce48e02` on the
+submodule at commit `6c30ef8c` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -109,6 +109,7 @@ a3eb373e dri3: bridge native render fences to Present
 2788d8df dri3: pipeline the KGSL X11 SHM bridge
 4c72c7a4 dri3: decouple KGSL rendering from SHM presentation
 3ce48e02 dri3: wait on KGSL bridge events without polling
+6c30ef8c freedreno/kgsl: scope translated handles to KMS scanout
 ```
 
 The separate `fix/kgsl-present-wait-fence` line exports a native Freedreno

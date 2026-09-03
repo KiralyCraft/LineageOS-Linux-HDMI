@@ -171,7 +171,7 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`3ce48e02`](https://github.com/KiralyCraft/mesa-for-android-container/commit/3ce48e027e1a84c3b1ad527dda35fbc5c11d87ae).
+[`6c30ef8c`](https://github.com/KiralyCraft/mesa-for-android-container/commit/6c30ef8c98091bcdd044fd9798ca83f4ec511ef4).
 That branch alone contains the leased-screen KMS/SHM bridge; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The HDMI build does not compile the submodule automatically. The resulting
