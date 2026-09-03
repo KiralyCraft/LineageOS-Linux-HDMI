@@ -191,6 +191,42 @@ libraries, and no KGSL/display fault appears. Shadow is not accepted until it
 also completes 10,000 swaps, a 10-30 minute run, resize/fullscreen tests, an
 Xorg restart, and unplug/replug recovery.
 
+For display-cadence measurements, build the deterministic SDL2 probe inside
+the chroot:
+
+```sh
+gcc -std=c11 -O2 -Wall -Wextra -Werror \
+  native/probes/sdl-frame-pacing.c $(sdl2-config --cflags --libs) -lGL \
+  -o sdl-frame-pacing
+```
+
+Run it from a terminal belonging to the active accelerated LXDE session so it
+inherits the agent's matched private Mesa environment:
+
+```sh
+./sdl-frame-pacing --csv /home/kiraly/Downloads/pacing-vsync.csv
+```
+
+The default run is fullscreen for 65 seconds with swap interval one. Identical
+Gray-coded frame counters appear along the top and bottom edges; disagreeing
+counters in one captured HDMI frame prove a torn scanout. A yellow sweep has
+120 exact positions and therefore crosses the screen once every two seconds
+at 60 displayed frames per second. Decode the counter sequence from a 60 FPS
+capture to measure repeated frames, skipped source frames, and the median,
+p95, and p99 visual hold durations. The CSV independently reports each
+`SDL_GL_SwapWindow` duration and frame-completion interval.
+
+The controlled asynchronous comparison is:
+
+```sh
+./sdl-frame-pacing --swap-interval 0 --pace-hz 60 \
+  --csv /home/kiraly/Downloads/pacing-async-60.csv
+```
+
+Its absolute monotonic software schedule is test instrumentation, not a
+production presentation workaround. It separates an SDL/GL swap-control stall
+from a later bridge, X Present, or KMS cadence fault.
+
 Experimental presets can be selected only while disarmed:
 
 ```sh

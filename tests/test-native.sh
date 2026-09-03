@@ -18,6 +18,14 @@ gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
     -I"$ROOT/native/common" "$ROOT/native/drm-trace/selftest.c" \
     -o "$TEMP/drmtrace-selftest"
 
+if pkg-config --exists sdl2 gl; then
+    gcc -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+        "$ROOT/native/probes/sdl-frame-pacing.c" \
+        $(pkg-config --cflags --libs sdl2 gl) \
+        -o "$TEMP/sdl-frame-pacing"
+    "$TEMP/sdl-frame-pacing" --help >/dev/null
+fi
+
 "$TEMP/drmtrace-selftest" "$TEMP/libhdmi-los-drmtrace.so"
 if "$TEMP/hdmi-losd" probe invalid >/dev/null 2>&1; then
     printf 'invalid broker probe unexpectedly succeeded\n' >&2
