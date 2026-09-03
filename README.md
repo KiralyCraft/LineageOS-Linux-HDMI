@@ -189,7 +189,7 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`64b6af2f`](https://github.com/KiralyCraft/mesa-for-android-container/commit/64b6af2fcce).
+[`99c6bd35`](https://github.com/KiralyCraft/mesa-for-android-container/commit/99c6bd35433a08d39e2044daecad448eb181f394).
 That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The Xorg 21.1.24 backports used with it are kept as reviewable patches under
