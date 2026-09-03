@@ -7,11 +7,12 @@ RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
 AGENT_PID=0
 XORG_ACCEL=kgsl-kms-bridge
+CLIENT_PRESENT=bridge
 SESSION=lxde
 NO_TIMEOUT=1
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--session lxde|none] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -29,6 +30,11 @@ while (($#)); do
         --session)
             (($# >= 2)) || { usage; exit 2; }
             SESSION=$2
+            shift 2
+            ;;
+        --client-present)
+            (($# >= 2)) || { usage; exit 2; }
+            CLIENT_PRESENT=$2
             shift 2
             ;;
         --no-timeout)
@@ -49,9 +55,17 @@ done
 [[ $XORG_ACCEL == safe || $XORG_ACCEL == kgsl-glamor || \
    $XORG_ACCEL == kgsl-kms-bridge ]] || { usage; exit 2; }
 [[ $SESSION == lxde || $SESSION == none ]] || { usage; exit 2; }
+[[ $CLIENT_PRESENT == bridge || $CLIENT_PRESENT == shadow || \
+   $CLIENT_PRESENT == direct ]] || { usage; exit 2; }
+if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
+    printf '%s requires --xorg-accel kgsl-kms-bridge\n' \
+        "--client-present $CLIENT_PRESENT" >&2
+    exit 2
+fi
 
 if ((EUID != 0)); then
-    args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" --session "$SESSION")
+    args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
+          --client-present "$CLIENT_PRESENT" --session "$SESSION")
     if ((NO_TIMEOUT)); then
         args+=(--no-timeout)
     else
@@ -146,7 +160,7 @@ fi
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
     printf 'WARNING: KGSL glamor is an isolated diagnostic; prefer kgsl-kms-bridge or safe ShadowFB\n' >&2
 elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
-    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=4'
+    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=5'
     for xorg_file in \
         "$BUNDLE/libexec/Xorg" \
         "$BUNDLE/lib/xorg/modules/libglamoregl.so"; do
@@ -180,8 +194,15 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
             printf 'Expected embedded bridge contract: %s\n' "$mesa_bridge_abi" >&2
             exit 1
         }
+        if ! runuser -u kiraly -- test -r "$mesa_library"; then
+            printf 'Private Mesa library is not accessible to user kiraly: %s\n' \
+                "$mesa_library" >&2
+            printf 'Ensure the extracted bundle and its parent directories are searchable by kiraly.\n' >&2
+            exit 1
+        fi
     done
-    printf 'Using matched private Xorg and Mesa with the KGSL renderonly/PRIME path\n' >&2
+    printf 'Using matched private Xorg renderonly scanout with client presentation mode: %s\n' \
+        "$CLIENT_PRESENT" >&2
 fi
 
 if ((NO_TIMEOUT)); then
@@ -189,7 +210,8 @@ if ((NO_TIMEOUT)); then
     printf 'The composer watchdog will be renewed while the broker and agent remain healthy\n' >&2
 fi
 
-agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" --session "$SESSION")
+agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
+            --client-present "$CLIENT_PRESENT" --session "$SESSION")
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!

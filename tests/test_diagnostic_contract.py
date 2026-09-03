@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.8")
-        self.assertEqual(release["version_code"], 20260918)
+        self.assertEqual(release["version"], "0.2.8-candidate.9")
+        self.assertEqual(release["version_code"], 20260919)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -146,7 +146,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("loader_dri3_get_pixmap_buffer", source)
         self.assertIn("__BLIT_FLAG_FINISH", source)
         self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", source)
-        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=4', header)
+        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=5', header)
         self.assertNotIn("nanosleep(", source)
         self.assertNotIn("usleep(", source)
         bridge = source.split("static bool\ndri3_shm_bridge_present(", 1)[1].split(
@@ -155,11 +155,13 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("xcb_request_check", bridge)
 
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
-        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=4", runner)
+        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=5", runner)
         self.assertIn("grep -aFq", runner)
         self.assertIn("stale or incompatible", runner)
         self.assertIn("libGLX_mesa.so.0", runner)
         self.assertIn("libEGL_mesa.so.0", runner)
+        self.assertIn('runuser -u kiraly -- test -r "$mesa_library"', runner)
+        self.assertIn("not accessible to user kiraly", runner)
 
         glx = (mesa / "src/glx/dri3_glx.c").read_text()
         egl = (
@@ -218,9 +220,12 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn('setenv("FD_KGSL_ENABLE_DMABUF", "1", 1);', agent)
         self.assertIn('setenv("FD_KGSL_RENDERONLY", "1", 1);', agent)
         self.assertNotIn('setenv("FD_KGSL_USE_KMS_DUMB", "1", 1);', agent)
-        self.assertNotIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
-        self.assertNotIn('setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);', agent)
-        self.assertNotIn('setenv("FD_MESA_DEBUG", "noubwc", 1);', agent)
+        self.assertIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', agent)
+        self.assertIn('setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);', agent)
+        self.assertIn('setenv("FD_MESA_DEBUG", "noubwc", 1);', agent)
+        self.assertIn('setenv("MESA_KGSL_X11_SHADOW", "1", 1);', agent)
+        self.assertIn("CLIENT_PRESENT=bridge", runner)
+        self.assertIn("--client-present bridge|shadow|direct", runner)
         self.assertIn('setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);', agent)
         self.assertIn('/lib/mesa', agent)
         self.assertIn('/libexec/Xorg', agent)
@@ -253,12 +258,14 @@ class DiagnosticContractTests(unittest.TestCase):
         ).read_text()
         self.assertIn("renderonly_create_kms_dumb_buffer_for_resource", freedreno_screen)
         self.assertIn("FD_KGSL_RENDERONLY", freedreno_screen)
+        self.assertIn('!strcmp(version->name, "msm_drm")', freedreno_screen)
         self.assertNotIn('loader_open_device("/dev/kgsl-3d0")', loader)
         self.assertIn("dev->control_fd = fd", (
             ROOT
             / "third_party/mesa-for-android-container/src/freedreno/drm/freedreno_device.c"
         ).read_text())
-        self.assertNotIn('return open("/dev/kgsl-3d0"', x11_dri3)
+        self.assertIn('getenv("MESA_KGSL_X11_SHM_BRIDGE")', x11_dri3)
+        self.assertIn('return open("/dev/kgsl-3d0", O_RDWR | O_CLOEXEC);', x11_dri3)
 
         render_node_patch = (
             ROOT / "patches/xserver/0002-glamor-prefer-render-node-for-dri3.patch"
@@ -273,8 +280,53 @@ class DiagnosticContractTests(unittest.TestCase):
         xorg_spawn = xorg_spawn.split("pid_t spawn_lxde()", 1)[0]
         lxde_spawn = agent.split("pid_t spawn_lxde()", 1)[1]
         lxde_spawn = lxde_spawn.split("bool xorg_ready()", 1)[0]
-        self.assertIn("configure_gpu_environment();", xorg_spawn)
-        self.assertIn("configure_gpu_environment();", lxde_spawn)
+        self.assertIn("configure_gpu_environment(true);", xorg_spawn)
+        self.assertIn("configure_gpu_environment(false);", lxde_spawn)
+        self.assertNotIn('setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);', xorg_spawn)
+
+    def test_kgsl_shadow_uses_private_render_and_explicit_present_buffers(self):
+        mesa = ROOT / "third_party/mesa-for-android-container"
+        header = (
+            mesa / "src/gallium/frontends/dri/loader_dri3_helper.h"
+        ).read_text()
+        source = (
+            mesa / "src/gallium/frontends/dri/loader_dri3_helper.c"
+        ).read_text()
+        device = (
+            mesa / "src/freedreno/drm/freedreno_device.c"
+        ).read_text()
+        screen = (
+            mesa / "src/gallium/drivers/freedreno/freedreno_screen.c"
+        ).read_text()
+
+        self.assertIn("bool         needs_present_blit;", header)
+        self.assertIn("bool shadow_present;", header)
+        self.assertIn('MESA_KGSL_X11_SHADOW', source)
+        self.assertIn("buffer->needs_present_blit = true;", source)
+        self.assertIn("__DRI_IMAGE_USE_SCANOUT", source)
+        self.assertIn("back->linear_buffer, back->image", source)
+        self.assertIn("flush_drawable_with_fence_fd(draw, flush_flags)", source)
+        self.assertIn("back->busy = 1", source)
+        self.assertIn("buf->busy = 0", source)
+        self.assertIn("return dev->fd;", device)
+        self.assertIn("fd_device_control_fd", device)
+        self.assertIn("fd_device_control_fd(screen->dev)", screen)
+        self.assertIn("fd_kgsl_renderonly_create(fd_device_control_fd(dev))", screen)
+
+        alloc = source.split(
+            "static struct loader_dri3_buffer *\ndri3_alloc_render_buffer", 1
+        )[1]
+        shadow_alloc = alloc.split("if (shadow_present) {", 1)[1].split(
+            "} else if (draw->dri_screen_render_gpu", 1
+        )[0]
+        private_alloc, present_alloc = shadow_alloc.split(
+            "buffer->linear_buffer =", 1
+        )
+        self.assertNotIn("__DRI_IMAGE_USE_SHARE", private_alloc)
+        self.assertNotIn("__DRI_IMAGE_USE_SCANOUT", private_alloc)
+        self.assertIn("__DRI_IMAGE_USE_SHARE", present_alloc)
+        self.assertIn("__DRI_IMAGE_USE_LINEAR", present_alloc)
+        self.assertIn("__DRI_IMAGE_USE_SCANOUT", present_alloc)
 
     def test_tracer_is_packaged_from_chroot_lib(self):
         package = (ROOT / "build-support/package.sh").read_text()

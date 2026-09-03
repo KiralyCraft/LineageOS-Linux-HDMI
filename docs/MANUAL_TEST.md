@@ -1,15 +1,18 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.8` keeps the Quick Settings tile as an arm/disarm
-control and replaces the adaptive KGSL presentation bridge with Mesa's
-standard renderonly/PRIME path. The accelerated runtime requires a matched
-private Xorg 21.1.24 binary and glamor module plus `libgallium`, `libGLX_mesa`,
-and `libEGL_mesa` carrying ABI 4. The launcher refuses a partial or stale set.
-Mesa uses the DRI3 DRM fd as Freedreno's KMS control fd, allocates an exact
-renderonly scanout image, imports it into KGSL, renders into it directly, and
-attaches a native completion fence to the ordinary X Present request. There is
-no MIT-SHM readback, per-frame copy, timer, or pixel-count threshold in the
-default path.
+Release `0.2.8-candidate.9` keeps the Quick Settings tile as an arm/disarm
+control and keeps the live-validated adaptive KGSL presentation bridge as the
+default. The accelerated runtime requires a matched private Xorg 21.1.24
+binary and glamor module plus `libgallium`, `libGLX_mesa`, and `libEGL_mesa`
+carrying ABI 5. The launcher refuses a partial or stale set.
+
+The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
+images, queues a same-context GPU resolve into persistent linear renderonly
+images, and attaches a native completion fence to ordinary X Present. Present
+Idle controls reuse. It has no MIT-SHM readback, private X connection, polling
+timer, per-frame allocation, or global tiling override. The direct renderonly
+mode remains diagnostic because live tests showed correct client readback but
+black Xorg contents.
 
 Candidate 5 changed the Quick Settings tile from an immediate
 takeover button to an arm/disarm control. The default preset is 1920x1080 at
@@ -74,7 +77,7 @@ a probe after a freeze or reset until all available evidence has been copied.
    `dist/hdmi-los-current-install-chroot.tar.gz`. Do not mix an older agent
    with this module.
 6. For `kgsl-kms-bridge`, place the matched private Xorg at `libexec/Xorg`, its
-   glamor module at `lib/xorg/modules/libglamoregl.so`, and the three ABI-4
+   glamor module at `lib/xorg/modules/libglamoregl.so`, and the three ABI-5
    Mesa libraries below `lib/mesa/`. Do not reuse the system GLX/EGL frontends
    with the private DRI target.
 7. Verify `/data/adb/hdmi-los/logs/gate.log`, `compatible.ok`, and the three
@@ -151,6 +154,22 @@ requested connector, CRTC, coordinates, and full mode timing exactly equal the
 currently active leased mode. The agent then verifies that framebuffer through
 `GETCRTC`. Any other error or mismatch aborts and restores Android.
 
+Keep the first accelerated takeover on the default client bridge. After it
+restores cleanly, repeat the same mode and topology with the shadow candidate:
+
+```sh
+./run-agent.sh --capture none --xorg-accel kgsl-kms-bridge \
+  --client-present shadow --session lxde --timeout
+```
+
+Verify a solid-color GL window and `glxgears` visually before benchmarking.
+Then compare bridge and shadow under the same mode and thermal state with
+300x300 `glxgears` at swap intervals zero and one and windowed 1280x720
+`glmark2`. Confirm the renderer is `FD740`, the process maps the bundled Mesa
+libraries, and no KGSL/display fault appears. Shadow is not accepted until it
+also completes 10,000 swaps, a 10-30 minute run, resize/fullscreen tests, an
+Xorg restart, and unplug/replug recovery.
+
 Experimental presets can be selected only while disarmed:
 
 ```sh
@@ -172,8 +191,9 @@ cd /home/kiraly/Downloads/hdmi-los-runtime
 ./run-agent.sh
 ```
 
-This is equivalent to `--capture none --xorg-accel kgsl-kms-bridge --session
-lxde --no-timeout`. Connect HDMI, accept Mirror, and verify that broker status
+This is equivalent to `--capture none --xorg-accel kgsl-kms-bridge
+--client-present bridge --session lxde --no-timeout`. Connect HDMI, accept
+Mirror, and verify that broker status
 reports continuous watchdog mode. End one short cycle with the volume chord,
 one by tapping the tile, and one by unplugging HDMI. Android must recover after
 all three. The unplug cycle must show broker-first Xorg shutdown rather than an

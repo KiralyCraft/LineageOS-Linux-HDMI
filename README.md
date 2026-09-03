@@ -29,10 +29,10 @@ Android desktop-mode application.
    composer leases only the external connector, CRTC, and plane to the chroot
    agent. Android continues using the phone's internal display.
 5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
-   LXDE. The accelerated path uses a matched private Xorg and Mesa set. Mesa
-   renders on KGSL, allocates display buffers through its standard `renderonly`
-   interface, and uses the normal DRI3/PRIME presentation path; a separate
-   preloaded tracer validates Xorg's DRM operations.
+   LXDE. The accelerated path uses a matched private Xorg and Mesa set. Xorg
+   renders on KGSL into KMS-owned scanout buffers. Applications render on KGSL
+   and use either the verified adaptive bridge or the opt-in integrated shadow
+   path described below; a preloaded tracer validates Xorg's DRM operations.
 6. Tapping the tile again, unplugging HDMI, stopping the agent, an Xorg or
    watchdog failure, or holding both volume buttons stops Xorg and returns the
    external display to Android.
@@ -62,24 +62,26 @@ mode is stable, and the foreground chroot agent is ready.
 
 ## Current status
 
-The safe path and the previous accelerated bridge have been tested on the
-target device. This revision replaces that bridge as the accelerated default
-with a standard renderonly/PRIME candidate:
+The safe path and adaptive accelerated bridge have been tested on the target
+device. The bridge remains the operational default while an integrated
+shadow-present path is tested as the next performance candidate:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
-| Previous `kgsl-kms-bridge` | Native Freedreno/KGSL plus adaptive CPU/GPU presentation copies | Visible LXDE, uncapped `glxgears`, continuous operation, and unplug recovery were validated on the device |
-| Current `kgsl-kms-bridge` candidate | Native Freedreno/KGSL rendering directly into Mesa renderonly scanout buffers shared through ordinary DRI3 | The matched ARM build, exact 1280x720 KMS allocation, dma-buf export/import, and private Xorg ABI were validated. A rearmed HDMI cycle is still required for the first live presentation and performance result |
+| `kgsl-kms-bridge` with `--client-present bridge` | Native Freedreno/KGSL plus adaptive CPU/GPU presentation copies | Default; visible LXDE and GL, continuous operation, and unplug recovery were validated on the device |
+| `kgsl-kms-bridge` with `--client-present shadow` | Private tiled/UBWC KGSL rendering, same-context GPU resolve into persistent linear renderonly buffers, ordinary DRI3 Present | Opt-in candidate; matched AArch64 Mesa/GLX/EGL compilation passes, but live visibility, performance, and unplug recovery are not yet accepted |
+| `kgsl-kms-bridge` with `--client-present direct` | Applications render directly into linear renderonly buffers | Diagnostic only; GL readback is correct but the Xorg window is black on this downstream stack |
 
-The current candidate removes the hot-path MIT-SHM readback and the separate
-bridge worker. Xorg gives clients its DRM node through ordinary DRI3; Mesa
-keeps that as Freedreno's KMS control fd, opens KGSL internally for GPU
-submission, allocates exact linear scanout buffers with `renderonly`, and
-imports those buffers into KGSL for direct rendering. A native completion
-fence is supplied to X Present. Fullscreen windows can use Xorg's normal page
-flip path; there is no timer, per-frame CPU copy, or guessed buffer lifetime.
-The previous bridge and its measured costs remain documented as the baseline in
+Shadow mode gives each client-owned DRI3 back buffer two persistent images:
+applications render into a non-exported Adreno-optimal image, then Mesa queues
+a full GPU resolve into a linear KMS/renderonly image in the same context.
+Only the linear image and a native fence covering both rendering and resolve
+are passed to X Present. Present Idle controls buffer reuse. This removes the
+bridge's CPU readback and private X connection without a timer, per-frame
+allocation, or guessed lifetime. It deliberately does not shadow imported
+pixmaps, front buffers, or externally owned images. The verified adaptive
+bridge and its measured costs remain documented in
 [GPU acceleration](docs/GPU.md).
 
 Before HDMI is connected, the broker asks Android to prefer the configured
@@ -176,7 +178,7 @@ git submodule update --init --depth 1 third_party/mesa-for-android-container
 
 It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
 repository to commit
-[`f4cb22e8`](https://github.com/KiralyCraft/mesa-for-android-container/commit/f4cb22e8082e9874dd8d6854c953ebe49691e73a).
+[`64b6af2f`](https://github.com/KiralyCraft/mesa-for-android-container/commit/64b6af2fcce).
 That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The Xorg 21.1.24 backports used with it are kept as reviewable patches under
@@ -264,6 +266,7 @@ cd <hdmi-los-runtime>
 ./run-agent.sh \
   --capture none \
   --xorg-accel kgsl-kms-bridge \
+  --client-present bridge \
   --session lxde \
   --no-timeout
 ```
@@ -285,6 +288,9 @@ watchdog every 20 seconds. If renewal stops, the agent or broker disconnects,
 Xorg exits, HDMI is unplugged, or the volume escape is used, Android is
 restored. Use `--timeout` for a bounded 60-second session, and use
 `--xorg-accel safe` for the software-rendered ShadowFB fallback.
+Use `--client-present shadow` for the integrated GPU-resolve candidate.
+`--client-present direct` is retained only for diagnosis and is known to
+produce black client contents on the supported device.
 
 ## Safety and recovery
 

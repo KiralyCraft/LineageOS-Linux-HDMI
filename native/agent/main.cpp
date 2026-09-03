@@ -49,6 +49,8 @@ uint32_t g_probe_mode = HDMI_LOS_PROBE_NONE;
 std::string g_bundle;
 bool g_kgsl_glamor = false;
 bool g_kgsl_kms_bridge = false;
+enum class ClientPresentMode { kBridge, kShadow, kDirect };
+ClientPresentMode g_client_present = ClientPresentMode::kBridge;
 bool g_start_lxde = true;
 bool g_no_timeout = false;
 std::string g_mouse;
@@ -634,7 +636,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
   return ok;
 }
 
-void configure_gpu_environment() {
+void configure_gpu_environment(bool kms_scanout_server) {
   if (!g_kgsl_glamor) return;
   unsetenv("GALLIUM_DRIVER");
   unsetenv("VK_DRIVER_FILES");
@@ -643,6 +645,7 @@ void configure_gpu_environment() {
   unsetenv("FD_KGSL_RENDERONLY");
   unsetenv("MESA_KGSL_X11_SHM_BRIDGE");
   unsetenv("MESA_KGSL_X11_GPU_BRIDGE");
+  unsetenv("MESA_KGSL_X11_SHADOW");
   unsetenv("FD_MESA_DEBUG");
   setenv("MESA_LOADER_DRIVER_OVERRIDE", "kgsl", 1);
   setenv("FD_FORCE_KGSL", "1", 1);
@@ -650,10 +653,29 @@ void configure_gpu_environment() {
   if (g_kgsl_kms_bridge) {
     std::string mesa = g_bundle + "/lib/mesa";
     setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);
-    // KGSL is the render device and Qualcomm DRM is the display device. Mesa's
-    // standard renderonly path allocates exact KMS scanout resources, imports
-    // them into KGSL, and renders directly into the shared DRI3 buffers.
-    setenv("FD_KGSL_RENDERONLY", "1", 1);
+    if (kms_scanout_server) {
+      // Xorg owns the leased display.  Its renderonly screen allocates exact
+      // KMS scanout resources and imports them into KGSL for glamor.
+      setenv("FD_KGSL_RENDERONLY", "1", 1);
+    } else if (g_client_present == ClientPresentMode::kBridge) {
+      // This downstream KGSL stack cannot consume an ordinary client's
+      // dma-buf from Xorg's separate GPU context.  Keep fast, tiled native
+      // KGSL rendering and present completed frames through the explicit,
+      // event-driven bridge into Xorg-owned pixmaps.
+      setenv("MESA_KGSL_X11_SHM_BRIDGE", "1", 1);
+      setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);
+      // CPU readback is used below the adaptive GPU-bridge threshold.  UBWC
+      // must be disabled for that mapping; ordinary Freedreno tiling remains.
+      setenv("FD_MESA_DEBUG", "noubwc", 1);
+    } else {
+      // Direct and shadow clients receive Xorg's leased DRM render node and
+      // use KGSL only for submission.  Renderonly owns the KMS-compatible
+      // presentation allocation; shadow mode keeps application rendering in
+      // a separate tiled/UBWC image and resolves it before exporting a fence.
+      setenv("FD_KGSL_RENDERONLY", "1", 1);
+      if (g_client_present == ClientPresentMode::kShadow)
+        setenv("MESA_KGSL_X11_SHADOW", "1", 1);
+    }
   }
 }
 
@@ -778,7 +800,7 @@ pid_t spawn_xorg(int lease_fd) {
   setenv("HDMI_LOS_EXPECTED_CONNECTOR", connector_text, 1);
   setenv("HDMI_LOS_EXPECTED_CRTC", crtc_text, 1);
   setenv("LD_PRELOAD", tracer.c_str(), 1);
-  configure_gpu_environment();
+  configure_gpu_environment(true);
   execl(xorg_path.c_str(), xorg_path.c_str(), kDisplay, "-masterfd", fd_text,
         "-config", config.c_str(), "-configdir", config_dir.c_str(),
         "-auth", auth.c_str(), "-logfile", log.c_str(), "-nolisten", "tcp",
@@ -810,7 +832,7 @@ pid_t spawn_lxde() {
   setenv("TMPDIR", "/tmp", 1);
   setenv("XAUTHORITY", (std::string(kRuntime) + "/Xauthority").c_str(), 1);
   setenv("XDG_RUNTIME_DIR", (std::string(kRuntime) + "/user-runtime").c_str(), 1);
-  configure_gpu_environment();
+  configure_gpu_environment(false);
   execl("/usr/bin/dbus-run-session", "/usr/bin/dbus-run-session", "--",
         "/usr/bin/startlxde", static_cast<char *>(nullptr));
   _exit(127);
@@ -1113,14 +1135,31 @@ int main(int argc, char **argv) {
         fprintf(stderr, "invalid session mode: %s\n", value);
         return 2;
       }
+    } else if (strcmp(argv[i], "--client-present") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "bridge") == 0)
+        g_client_present = ClientPresentMode::kBridge;
+      else if (strcmp(value, "shadow") == 0)
+        g_client_present = ClientPresentMode::kShadow;
+      else if (strcmp(value, "direct") == 0)
+        g_client_present = ClientPresentMode::kDirect;
+      else {
+        fprintf(stderr, "invalid client presentation mode: %s\n", value);
+        return 2;
+      }
     } else if (strcmp(argv[i], "--no-timeout") == 0) {
       g_no_timeout = true;
     } else {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
                       "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
+                      "[--client-present bridge|shadow|direct] "
                       "[--session lxde|none] [--no-timeout]\n");
       return 2;
     }
+  }
+  if (!g_kgsl_kms_bridge && g_client_present != ClientPresentMode::kBridge) {
+    fprintf(stderr, "--client-present shadow/direct requires --xorg-accel kgsl-kms-bridge\n");
+    return 2;
   }
   if (g_kgsl_kms_bridge) {
     struct stat mesa = {};

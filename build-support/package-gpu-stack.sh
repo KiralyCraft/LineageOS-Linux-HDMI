@@ -29,8 +29,8 @@ for file in "${mesa_files[@]}" "$xorg" "$glamor"; do
     }
 done
 for file in "${mesa_files[@]}"; do
-    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_BRIDGE_ABI=4' "$file" || {
-        printf 'Mesa component does not carry ABI 4: %s\n' "$file" >&2
+    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_BRIDGE_ABI=5' "$file" || {
+        printf 'Mesa component does not carry ABI 5: %s\n' "$file" >&2
         exit 1
     }
 done
