@@ -100,6 +100,19 @@ index in `drmModeGetPlaneResources()`. It still rejects the transition if that
 fixed plane has been reassigned to another CRTC. This is derived from the
 driver's construction contract and does not hardcode runtime DRM object ids.
 
+The initial implementation resolved that plane during the `PREPARE` phase,
+before Android external-display updates were quiesced. A live failure showed
+that a later SurfaceFlinger command batch could reassign it before `CREATE`,
+even though the external display's own sequence lock was respected. The final
+handoff now uses Qualcomm composer's existing `command_seq_mutex_`, which is
+the global serialization point for SurfaceFlinger command batches. While that
+lock is held, `CREATE` re-resolves the CRTC-indexed fixed primary plane, checks
+its current CRTC assignment, and calls `drmModeCreateLease()` before another
+display command can run. The lock is acquired before the HDMI lease-state
+mutex to match the existing SurfaceFlinger-to-lease call order. This closes
+the cross-display stale-plane window without a delay, retry loop, or runtime
+DRM-object-id assumption.
+
 The same probe exposed two independent agent readiness defects. The root-owned
 runtime directory prevented user `kiraly` from reading its Xauthority cookie,
 and the installed `xinput` does not accept a `--display` option. The runtime is

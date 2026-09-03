@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.9")
-        self.assertEqual(release["version_code"], 20260919)
+        self.assertEqual(release["version"], "0.2.8-candidate.10")
+        self.assertEqual(release["version_code"], 20260920)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -115,7 +115,7 @@ class DiagnosticContractTests(unittest.TestCase):
             line[1:] for line in patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
         )
-        self.assertEqual(series[-1], patch_name)
+        self.assertIn(patch_name, series)
         pause = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusPause)"
         resume = "display->SetDisplayStatus(HWCDisplay::kDisplayStatusResume)"
         self.assertIn(pause, added)
@@ -400,6 +400,25 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("primary_index == crtc_index", patch)
         self.assertIn("fixed-primary-plane", patch)
         self.assertNotIn("plane->crtc_id == token_.crtc_id &&", added)
+
+    def test_composer_serializes_and_refreshes_the_final_lease_handoff(self):
+        patch_name = "0013-composer-serialize-final-lease-handoff.patch"
+        patch = (ROOT / "patches/qcom-display/v1" / patch_name).read_text()
+        series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
+        added = "\n".join(
+            line[1:] for line in patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        self.assertEqual(series[-1], patch_name)
+        command_lock = "command_lock(command_seq_mutex_, std::defer_lock)"
+        lease_lock = "lease_lock(hdmi_lease_mutex_)"
+        self.assertIn(command_lock, added)
+        self.assertIn("phase == HDMI_LOS_ACQUIRE_CREATE", added)
+        self.assertLess(patch.index(command_lock), patch.index(lease_lock))
+        self.assertIn("GetFixedPrimaryPlane", added)
+        self.assertIn("belongs to CRTC", added)
+        self.assertNotIn("sleep", added.lower())
+        self.assertNotIn("retry", added.lower())
 
 
 if __name__ == "__main__":

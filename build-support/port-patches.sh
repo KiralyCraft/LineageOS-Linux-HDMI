@@ -44,15 +44,21 @@ if sed -n '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::IsExternalDi
     printf 'patch-port check failed: HDMI lease lifecycle must not use the unmaintained active_ flag\n' >&2
     exit 1
 fi
-lease_prepare=$(sed -n \
-    '/HWDeviceDRM::PrepareExternalDisplayLease/,/HWDeviceDRM::CreateExternalDisplayLease/p' \
-    "$lease_source")
-grep -q 'drm_resources->crtcs\[i\] == token_.crtc_id' <<<"$lease_prepare" || {
+lease_fixed_primary=$(sed -n \
+    '/DisplayError GetFixedPrimaryPlane/,/}  \/\/ namespace/p' "$lease_source")
+grep -q 'drm_resources->crtcs\[i\] == crtc_id' <<<"$lease_fixed_primary" || {
     printf 'patch-port check failed: external CRTC resource index is not resolved\n' >&2
     exit 1
 }
-grep -q 'primary_index == crtc_index' <<<"$lease_prepare" || {
+grep -q 'primary_index == \*crtc_index' <<<"$lease_fixed_primary" || {
     printf 'patch-port check failed: lease does not use the CRTC fixed primary plane\n' >&2
+    exit 1
+}
+lease_create=$(sed -n \
+    '/HWDeviceDRM::CreateExternalDisplayLease/,/HWDeviceDRM::RevokeExternalDisplayLease/p' \
+    "$lease_source")
+grep -q 'GetFixedPrimaryPlane' <<<"$lease_create" || {
+    printf 'patch-port check failed: fixed primary plane is not refreshed at final handoff\n' >&2
     exit 1
 }
 composer_source=$DISPLAY/composer/hwc_session.cpp
@@ -77,6 +83,17 @@ grep -q 'must not retain this global lock and deadlock a driver callback' "$comp
 }
 acquire_source=$(sed -n '/int HWCSession::AcquireHdmiLease/,/int HWCSession::ReleaseHdmiLease/p' \
     "$composer_source")
+grep -q 'if (phase == HDMI_LOS_ACQUIRE_CREATE) command_lock.lock()' <<<"$acquire_source" || {
+    printf 'patch-port check failed: final lease handoff is not serialized with composer commands\n' >&2
+    exit 1
+}
+command_lock_line=$(grep -n 'command_lock(command_seq_mutex_' <<<"$acquire_source" | cut -d: -f1)
+lease_lock_line=$(grep -n 'lease_lock(hdmi_lease_mutex_' <<<"$acquire_source" | cut -d: -f1)
+if [ -z "$command_lock_line" ] || [ -z "$lease_lock_line" ] ||
+   [ "$command_lock_line" -ge "$lease_lock_line" ]; then
+    printf 'patch-port check failed: final handoff violates composer-to-lease lock order\n' >&2
+    exit 1
+fi
 grep -q 'ToggleScreenUpdates(false)' <<<"$acquire_source" || {
     printf 'patch-port check failed: lease acquisition does not retain the last scanout\n' >&2
     exit 1

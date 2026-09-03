@@ -511,23 +511,88 @@ static void emit_object_property_details(uint32_t sequence, int fd,
 static int try_same_mode_pageflip(int fd, const void *argument, uint32_t sequence) {
   if (!g_same_mode_pageflip_fallback || !g_expected_crtc || !g_expected_connector) return 0;
   struct drm_mode_crtc requested;
-  if (!safe_copy(&requested, (uint64_t)(uintptr_t)argument, sizeof(requested)) ||
-      requested.crtc_id != g_expected_crtc || requested.fb_id == 0 ||
-      requested.count_connectors != 1 || !requested.mode_valid) return 0;
+  if (!safe_copy(&requested, (uint64_t)(uintptr_t)argument, sizeof(requested))) {
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                0, 0, 0, 0, "cannot read requested CRTC");
+    return 0;
+  }
+  if (requested.crtc_id != g_expected_crtc || requested.fb_id == 0 ||
+      requested.count_connectors != 1 || !requested.mode_valid) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "request crtc=%u fb=%u conns=%u mode=%u",
+             requested.crtc_id, requested.fb_id, requested.count_connectors,
+             requested.mode_valid);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                requested.crtc_id, requested.fb_id, requested.count_connectors,
+                requested.mode_valid, detail);
+    return 0;
+  }
   uint32_t connector = 0;
   if (!safe_copy(&connector, requested.set_connectors_ptr, sizeof(connector)) ||
-      connector != g_expected_connector) return 0;
+      connector != g_expected_connector) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "connector=%u expected=%u", connector,
+             g_expected_connector);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                connector, g_expected_connector, 0, 0, detail);
+    return 0;
+  }
 
   struct drm_mode_crtc current = {0};
   current.crtc_id = requested.crtc_id;
-  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_GETCRTC, &current) != 0 ||
-      !current.mode_valid || current.fb_id == 0 || current.x != requested.x ||
-      current.y != requested.y || !same_mode_timing(&current.mode, &requested.mode)) return 0;
+  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_GETCRTC, &current) != 0) {
+    int error = errno;
+    char detail[64];
+    snprintf(detail, sizeof(detail), "GETCRTC failed errno=%d", error);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                requested.crtc_id, error, 0, 0, detail);
+    return 0;
+  }
+  if (!current.mode_valid || current.fb_id == 0 || current.x != requested.x ||
+      current.y != requested.y) {
+    char detail[64];
+    snprintf(detail, sizeof(detail), "current fb=%u xy=%u,%u mode=%u",
+             current.fb_id, current.x, current.y, current.mode_valid);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                current.fb_id, current.x, current.y, current.mode_valid, detail);
+    return 0;
+  }
+  if (!same_mode_timing(&current.mode, &requested.mode)) {
+    char horizontal[64];
+    char vertical[64];
+    snprintf(horizontal, sizeof(horizontal), "clk=%u/%u h=%u,%u,%u,%u/%u,%u,%u,%u",
+             current.mode.clock, requested.mode.clock,
+             current.mode.hdisplay, current.mode.hsync_start,
+             current.mode.hsync_end, current.mode.htotal,
+             requested.mode.hdisplay, requested.mode.hsync_start,
+             requested.mode.hsync_end, requested.mode.htotal);
+    snprintf(vertical, sizeof(vertical), "v=%u,%u,%u,%u/%u,%u,%u,%u flags=%x/%x",
+             current.mode.vdisplay, current.mode.vsync_start,
+             current.mode.vsync_end, current.mode.vtotal,
+             requested.mode.vdisplay, requested.mode.vsync_start,
+             requested.mode.vsync_end, requested.mode.vtotal,
+             current.mode.flags, requested.mode.flags);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_MODE_H",
+                current.mode.clock, requested.mode.clock,
+                current.mode.htotal, requested.mode.htotal, horizontal);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_MODE_V",
+                current.mode.vtotal, requested.mode.vtotal,
+                current.mode.flags, requested.mode.flags, vertical);
+    return 0;
+  }
 
   struct drm_mode_crtc_page_flip flip = {0};
   flip.crtc_id = requested.crtc_id;
   flip.fb_id = requested.fb_id;
-  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip) != 0) return 0;
+  if (syscall(SYS_ioctl, fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip) != 0) {
+    int error = errno;
+    char detail[64];
+    snprintf(detail, sizeof(detail), "PAGE_FLIP fb=%u failed errno=%d",
+             requested.fb_id, error);
+    emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+                requested.crtc_id, requested.fb_id, error, 0, detail);
+    return 0;
+  }
 
   for (int attempt = 0; attempt < 20; ++attempt) {
     struct drm_mode_crtc verified = {0};
@@ -545,6 +610,9 @@ static int try_same_mode_pageflip(int fd, const void *argument, uint32_t sequenc
     }
     usleep(25000);
   }
+  emit_detail(sequence, fd, DRM_IOCTL_MODE_SETCRTC, "SETCRTC_FALLBACK_REJECT",
+              requested.crtc_id, current.fb_id, requested.fb_id, 0,
+              "PAGE_FLIP did not become current");
   errno = EIO;
   return -1;
 }
