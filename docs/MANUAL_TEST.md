@@ -1,10 +1,16 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.15` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.16` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and modules plus the matched private Gallium, GLX, EGL, DRI loader, and
 GBM stack carrying ABI 5. The launcher refuses a partial, stale, or mixed set.
+
+Candidate 16 adds Xorg's upstream modesetting TearFree implementation and its
+complete follow-up correctness series to the required private Xorg build. On
+the target lease, Xorg must log `TearFree: enabled` while Glamor and `PageFlip`
+remain enabled. TearFree uses alternating shadow scanout buffers and vblank
+flips; it does not disable kernel synchronization or add a pacing timer.
 
 Candidate 15 changes the DRM interposer's default from full-session tracing to
 startup tracing. Startup remains fail-closed and durably recorded through the
@@ -62,6 +68,15 @@ skipped 114 source frames, had 16 counter discontinuities, and every one of
 1,135 decoded updates disagreed between the top and bottom counters. The
 remaining defect is therefore output cadence and tearing, not KGSL rendering
 throughput or input submission.
+
+Candidate 16 repeats that A/B with upstream TearFree. The hidden-cursor control
+must remain near 60 FPS without source skips or tearing. The accepted reference
+run produced 59.992 client FPS and 60.022 active capture updates/s, with no
+duplicates, skips, discontinuities, or torn frames. The visible 120 Hz cursor
+run produced 59.968 client FPS, 18.486 ms frame-time p99, and 59.926 active
+capture updates/s, with two duplicates and no skips, discontinuities, or torn
+frames. A build that falls back without the `TearFree: enabled` log line does
+not satisfy this gate.
 
 The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
 images, queues a same-context GPU resolve into persistent linear renderonly

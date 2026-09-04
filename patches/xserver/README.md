@@ -1,4 +1,4 @@
-# Private Xorg 21.1.24 pair
+# Private Xorg 21.1.24 stack
 
 Accelerated mode uses a private Xorg binary and `libglamoregl.so` built from
 the same Xorg 21.1.24 tree. Keeping the pair private avoids changing the
@@ -17,7 +17,10 @@ while IFS= read -r patch; do
   git apply "../LineageOS-Linux-HDMI/patches/xserver/$patch"
 done < ../LineageOS-Linux-HDMI/patches/xserver/series
 meson setup build --prefix=/usr -Dxorg=true -Dglamor=true
-ninja -C build hw/xfree86/Xorg hw/xfree86/glamor_egl/libglamoregl.so
+ninja -C build \
+  hw/xfree86/Xorg \
+  hw/xfree86/glamor_egl/libglamoregl.so \
+  hw/xfree86/drivers/modesetting/modesetting_drv.so
 ```
 
 Build for the same AArch64 userspace and package versions as the target
@@ -36,6 +39,11 @@ ShadowFB mode continues to launch `/usr/lib/Xorg`.
 Patch 1 fixes the wait-fence callback lifetime used by the KGSL native-fence
 path. Patch 2 backports current upstream glamor behavior: give DRI3 clients the
 render node when one is available and use the primary node only as a fallback.
+Patch 3 backports upstream modesetting TearFree and its complete follow-up
+correctness series. TearFree keeps two shadow scanout buffers per CRTC, copies
+accumulated damage into the next buffer, and flips it at vblank. This restores
+coherent output cadence when Xorg's visible software cursor makes direct
+Present flips ineligible; it does not suppress `DIRTYFB` or add a timer.
 
 `optional/0003-modesetting-support-an-overlay-plane-cursor.patch` is not in
 the default series. It must be paired with the Qualcomm composer patch under

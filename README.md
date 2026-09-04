@@ -66,13 +66,15 @@ mode is stable, and the foreground chroot agent is ready.
 ## Current status
 
 The safe path and adaptive accelerated bridge have been tested on the target
-device. The bridge remains the operational default while an integrated
-shadow-present path is tested as the next performance candidate:
+device. The bridge remains the operational default, paired with a private
+Xorg that backports upstream modesetting TearFree for coherent vblank-paced
+scanout. The integrated shadow-present path remains an opt-in performance
+candidate:
 
 | Mode | Rendering and presentation | Status |
 | --- | --- | --- |
 | `safe` (diagnostic fallback) | A dumb scanout buffer, ShadowFB, and software GL | `0.2.8-candidate.4` displayed LXDE and completed a bounded 60-second takeover without stalling SurfaceFlinger during release |
-| `kgsl-kms-bridge` with `--client-present bridge` | Native Freedreno/KGSL rendering plus fenced GPU resolves into persistent Xorg-owned, flip-eligible presentation buffers | Default; capture-verified at 1280x720 at 60 Hz with 59.695 unique updates/s, no source skips or tearing; continuous operation and unplug recovery were also validated |
+| `kgsl-kms-bridge` with `--client-present bridge` | Native Freedreno/KGSL rendering plus fenced GPU resolves into persistent Xorg-owned presentation buffers; upstream Xorg TearFree coalesces root damage and flips at vblank | Default; candidate 16 delivered 59.926 active updates/s with a visible cursor moving at 120 Hz, with no source skips, discontinuities, or torn frames |
 | `kgsl-kms-bridge` with `--client-present shadow` | Private tiled/UBWC KGSL rendering, same-context GPU resolve into persistent linear renderonly buffers, ordinary DRI3 Present | Opt-in candidate; matched AArch64 Mesa/GLX/EGL compilation passes, but live visibility, performance, and unplug recovery are not yet accepted |
 | `kgsl-kms-bridge` with `--client-present direct` | Applications render directly into linear renderonly buffers | Diagnostic only; GL readback is correct but the Xorg window is black on this downstream stack |
 
@@ -117,20 +119,27 @@ written standard and supported Qualcomm private property before creating the
 lease. There is no timing delay or retry in this handoff.
 
 The Sony SDE kernel exposes no cursor-type plane and no legacy CRTC cursor
-callbacks. Moving Xorg's software cursor forced save/restore damage through
-the presentation path. With full-session tracing removed from the benchmark,
-both hidden- and visible-cursor clients sustain about 60 FPS, but physical HDMI
-does not: the hidden-cursor run delivered 60.034 coherent updates per second,
-while the visible-cursor run delivered 56.637, skipped 114 source frames, and
-tore every decoded updated frame. An experiment rendered the cursor on a
-separately leased overlay, but its synchronous plane updates also backpressured
-pointer submission. Exact-source inspection found the shared cause: a visible
-Xorg cursor disables Present flips and damages the root pixmap; Xorg forwards
-that damage through `DIRTYFB`, which this Sony kernel implements with a blocking
-atomic commit. The paired composer/Xorg overlay patches are therefore optional
-diagnostics, not part of the default patch series. The next cursor
-implementation must compose separately at the output cadence, as Termux:X11
-does, instead of issuing one synchronous KMS operation per pointer event.
+callbacks. Moving Xorg's software cursor therefore causes save/restore damage
+on the root pixmap. In Xorg 21.1.24 a visible sprite also disables direct
+Present flips, and the modesetting driver forwards that root damage through
+`DIRTYFB`; this Sony kernel implements `DIRTYFB` with a blocking atomic commit.
+Candidate 15 consequently delivered only 56.637 active updates/s, skipped 114
+source frames, and tore every decoded update during 120 Hz cursor motion.
+
+Candidate 16 backports Xorg's official modesetting TearFree implementation and
+its follow-up correctness fixes. TearFree maintains two additional scanout
+buffers per CRTC, copies accumulated damage into the next buffer, and flips it
+at vblank. It preserves the software cursor and kernel synchronization while
+coalescing presentation at the output cadence; there is no timer or
+`DIRTYFB` suppression. At 1280x720@60, a 1,200-frame visible-cursor run held
+59.968 client FPS with 18.486 ms frame-time p99. The capture measured 59.926
+active updates/s, zero source skips, zero discontinuities, zero torn frames,
+and two duplicate capture frames. The hidden control measured 60.022 active
+updates/s with no duplicates, skips, discontinuities, or tearing.
+
+The paired composer/Xorg overlay-plane cursor patches remain optional
+diagnostics. That experiment rendered the cursor separately but synchronous
+plane updates backpressured pointer submission and did not fix cadence.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
@@ -213,8 +222,9 @@ That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The Xorg 21.1.24 backports used with it are kept as reviewable patches under
 [`patches/xserver`](patches/xserver). They select a render node for DRI3, fix
-the Present wait-fence callback lifetime, and keep the unsuccessful
-overlay-plane cursor experiment explicitly optional.
+the Present wait-fence callback lifetime, and backport upstream modesetting
+TearFree plus its correctness follow-ups. The unsuccessful overlay-plane
+cursor experiment remains explicitly optional.
 The HDMI build does not compile the graphics stack automatically. Place the
 matched private Xorg binary at `libexec/Xorg`, its glamor and modesetting
 modules at `lib/xorg/modules/libglamoregl.so` and

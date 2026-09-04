@@ -99,29 +99,23 @@ stall presentation during pointer motion. They are omitted from the normal
 patch series and do not fix the cadence problem merely by rendering the cursor
 on a distinct plane.
 
-The remaining software-cursor slowdown is an interaction between upstream
-Xorg and this downstream DRM implementation. Xorg 21.1.24 probes `DIRTYFB`,
+The software-cursor slowdown in candidate 15 was an interaction between Xorg
+21.1.24 and this downstream DRM implementation. Xorg probes `DIRTYFB`,
 registers root-pixmap damage when the probe succeeds, and calls
 `drmModeDirtyFB()` for every accumulated damaged region. A visible Xorg cursor
 also increments `sprites_visible`, which makes modesetting's Present path
-reject page flips and fall back to copying into that damaged root pixmap. Sony's
-SM8550 framebuffer installs `drm_atomic_helper_dirtyfb` as its dirty callback;
-the kernel documents that helper as deliberately blocking and implements each
-call as a synchronous atomic commit. Pointer motion therefore both removes the
-fast flip path and adds blocking KMS work.
+reject direct page flips and fall back to copying into that damaged root
+pixmap. Sony's SM8550 framebuffer installs `drm_atomic_helper_dirtyfb` as its
+dirty callback; the kernel documents that helper as deliberately blocking and
+implements each call as a synchronous atomic commit. Pointer motion therefore
+removed the direct flip path while adding blocking KMS work.
 
-This also explains why the optional overlay is not the final design. Direct
+This also explains why the optional overlay is not the solution. Direct
 syscall tracing found its individual legacy plane ioctls completing in a few
 milliseconds; the seconds-long delay was client-side `XFlush` backpressure over
-many synchronous updates, not one 2.85-second `drmModeSetPlane()` syscall. A
-proper cursor path must coalesce cursor state and composite or commit it at the
-output cadence without damaging the root pixmap. Termux:X11 demonstrates the
-relevant architecture: its X cursor hooks update separate cursor state and wake
-the renderer, which blends a cursor texture into the rendered output before
-the swap. That is the model for the next implementation, rather than disabling
-kernel synchronization or adding timers.
+many synchronous updates, not one 2.85-second `drmModeSetPlane()` syscall.
 
-A candidate-15 capture confirms the consequence at the physical output. With
+A candidate-15 capture confirmed the consequence at the physical output. With
 the FD740 bridge and identical 120 Hz pointer motion, hiding the cursor produced
 60.034 active HDMI updates per second with no skipped or torn source frames.
 Showing it left the client near 60 FPS but reduced HDMI to 56.637 active updates
@@ -130,10 +124,28 @@ disagree between the top and bottom Gray-code counters. The problem is thus
 presentation eligibility and scanout coherence, not raw application rendering
 or input-injection speed.
 
+Candidate 16 uses Xorg's official modesetting TearFree path to provide that
+coalesced output cadence. The backport includes the upstream generic shadow and
+flip queues, Present integration, ordered-vblank and completion-timing fixes,
+unflip-before-modeset fix, and default enablement. For each CRTC it maintains
+two additional scanout buffers, copies accumulated damage into the next one,
+and flips at vblank. It does not skip `DIRTYFB`, weaken synchronization, or add
+a polling timer. The leased Qualcomm device supports universal planes, so the
+driver logged `TearFree: enabled` with Glamor and `PageFlip` enabled.
+
+In the same 1280x720@60 physical-capture test, the hidden-cursor control
+delivered 60.022 active updates/s with no duplicate, skipped, discontinuous, or
+torn frames. With the software cursor visible and moving at 120 Hz, the client
+held 59.968 FPS with 18.486 ms frame-time p99; HDMI delivered 59.926 active
+updates/s with no source skips, no discontinuities, no torn frames, and two
+duplicate capture frames. TearFree therefore resolves the measured cursor
+cadence defect while retaining the normal Xorg software cursor.
+
 Primary source references:
 
 - [Xorg modesetting root damage](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/driver.c)
 - [Xorg modesetting Present flip checks](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/present.c)
+- [upstream Xorg modesetting TearFree](https://gitlab.freedesktop.org/xorg/xserver/-/commit/a94dd95369941471774cc78d22474db95fc4bb50)
 - [pdx234 framebuffer dirty callback](https://github.com/LineageOS/android_kernel_sony_sm8550-modules/blob/ec2e039129f2b8f93fdfe62a8c6a595efb63d496/qcom/opensource/display-drivers/msm/msm_fb.c)
 - [exact Lineage kernel dirty helper](https://github.com/LineageOS/android_kernel_sony_sm8550/blob/d00ba216ccda5d4fcc0d864729ae69d5b63d860c/drivers/gpu/drm/drm_damage_helper.c)
 - [Termux:X11 cursor renderer](https://github.com/termux/termux-x11/blob/9df8b767645aa0d0a2f2576767449df55b41962f/lorie/src/main/cpp/lorie/renderer.cpp)

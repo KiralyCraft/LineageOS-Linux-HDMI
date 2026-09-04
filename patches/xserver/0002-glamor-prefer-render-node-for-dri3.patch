@@ -1,5 +1,5 @@
 From: LineageOS Linux HDMI contributors
-Subject: [PATCH 2/2] glamor: prefer render node for DRI3 clients
+Subject: [PATCH 2/3] glamor: prefer render node for DRI3 clients
 
 Backport the current upstream Xorg behavior to 21.1.24. DRI3 clients should
 receive the unprivileged render node when one exists; opening the primary node

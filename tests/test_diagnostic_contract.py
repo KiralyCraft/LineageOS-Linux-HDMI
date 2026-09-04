@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.15")
-        self.assertEqual(release["version_code"], 20260925)
+        self.assertEqual(release["version"], "0.2.8-candidate.16")
+        self.assertEqual(release["version_code"], 20260926)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -301,6 +301,9 @@ class DiagnosticContractTests(unittest.TestCase):
         present_patch = (
             ROOT / "patches/xserver/0001-present-disarm-wait-fence-callback.patch"
         ).read_text()
+        tearfree_patch = (
+            ROOT / "patches/xserver/0003-modesetting-backport-upstream-tearfree.patch"
+        ).read_text()
         cursor_patch = (
             ROOT / "patches/xserver/optional/0003-modesetting-support-an-overlay-plane-cursor.patch"
         ).read_text()
@@ -308,6 +311,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertEqual(xserver_series, [
             "0001-present-disarm-wait-fence-callback.patch",
             "0002-glamor-prefer-render-node-for-dri3.patch",
+            "0003-modesetting-backport-upstream-tearfree.patch",
         ])
         self.assertNotIn(
             "0003-modesetting-support-an-overlay-plane-cursor.patch",
@@ -315,6 +319,11 @@ class DiagnosticContractTests(unittest.TestCase):
         )
         self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
         self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)
+        self.assertIn('"TearFree", OPTV_BOOLEAN', tearfree_patch)
+        self.assertIn('"TearFree: enabled\\n"', tearfree_patch)
+        self.assertIn("ms_tearfree_dri_notify", tearfree_patch)
+        self.assertIn("ms_tearfree_update_damages", tearfree_patch)
+        self.assertIn("ms_tearfree_do_flips", tearfree_patch)
         self.assertIn('"OverlayCursor"', cursor_patch)
         self.assertIn("DRM_PLANE_TYPE_OVERLAY", cursor_patch)
         self.assertIn("drmModeSetPlane", cursor_patch)

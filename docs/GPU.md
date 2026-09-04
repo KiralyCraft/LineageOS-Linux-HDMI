@@ -226,18 +226,21 @@ timer, private X connection, per-frame allocation, CPU readback, or global
 full-surface resolve; damage-aware resolves require proven buffer-age handling
 and are deferred.
 
-Two Xorg 21.1.24 backports are required and are stored under
+Three Xorg 21.1.24 backports are required and are stored under
 [`patches/xserver`](../patches/xserver):
 
 - glamor chooses the DRM render node for DRI3 clients, matching current
   upstream Xorg, rather than reopening the primary node and attempting legacy
   DRM authentication through a lease;
 - the Present wait-fence callback is disarmed before re-execution, matching the
-  lifetime fix already used by Termux:X11.
+  lifetime fix already used by Termux:X11;
+- upstream modesetting TearFree and its complete follow-up correctness series
+  coalesce root damage into alternating scanout buffers and flip at vblank.
 
-The third patch under `patches/xserver/optional/` is an experiment, not a
-required backport. It must be paired with the optional Qualcomm composer cursor
-patch and explicitly enabled with `run-agent.sh --overlay-cursor`.
+The similarly numbered patch under `patches/xserver/optional/` is an
+experiment, not a required backport. It must be paired with the optional
+Qualcomm composer cursor patch and explicitly enabled with
+`run-agent.sh --overlay-cursor`.
 
 ## Cursor-motion presentation bottleneck
 
@@ -307,6 +310,37 @@ frames, 16 discontinuities, 36 ms p99 holds, and 1,135 torn updates out of
 1,135 decoded updates. This replaces the earlier full-trace FPS number as the
 performance baseline: cursor visibility primarily breaks flip eligibility and
 scanout cadence, while full tracing had additionally throttled the client.
+
+## Upstream TearFree correction
+
+Candidate 16 backports Xorg's official modesetting TearFree implementation and
+its correctness follow-ups to the pinned 21.1.24 server. TearFree allocates two
+additional scanout buffers per CRTC, copies accumulated root damage into the
+next buffer, and submits one vblank-paced flip. This is the upstream mechanism
+for presenting a composited root pixmap coherently when a visible software
+cursor makes a client's direct Present flip ineligible. It does not suppress
+`DIRTYFB`, fabricate Present completion, weaken a fence, or introduce a timer.
+
+The complete backport includes the public pixmap/rotation helpers, generic
+shadow and flip queues, Present's TearFree awareness, vblank coalescing and
+ordering, accurate Present completion timing, error cleanup, unflip before
+modeset, and default enablement. The exact leased Qualcomm DRM device accepted
+the universal-planes capability, and Xorg logged `TearFree: enabled` while
+Glamor and `PageFlip` remained enabled.
+
+The 1280x720@60 live A/B used the same FD740 bridge, fullscreen Gray-code probe,
+120 Hz deterministic pointer path, and continuously open 60 FPS capture stream
+as the candidate-15 baseline. The hidden-cursor control produced 59.992 client
+FPS and 60.022 active capture updates/s, with no duplicates, skips,
+discontinuities, or torn frames. With the software cursor visible, the client
+produced 59.968 FPS, 17.875 ms swap-time p99, and 18.486 ms frame-time p99. The
+capture produced 59.926 active updates/s, two duplicate frames, no source
+skips, no discontinuities, and no torn frames. Cursor submission remained
+nonblocking at 1.860 ms worst case.
+
+This fixes the measured presentation-cadence problem without changing the
+private Mesa bridge. The optional overlay-plane cursor remains a diagnostic
+only; it is neither enabled nor required by TearFree.
 
 Bridge clients ask `x11_dri3_open()` for KGSL because their completed images
 are copied independently. Shadow and direct clients retain Xorg's DRI3 DRM fd,
