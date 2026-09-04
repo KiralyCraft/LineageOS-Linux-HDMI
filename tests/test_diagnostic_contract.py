@@ -393,6 +393,9 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("third_party/mesa-for-android-container", composer_reuse)
         self.assertIn("patches/xserver/*", composer_reuse)
         self.assertIn("build-support/package-gpu-stack.sh", composer_reuse)
+        self.assertIn("patches/qcom-display/v1/README.md", composer_reuse)
+        self.assertIn("patches/qcom-display/v1/optional/*", composer_reuse)
+        self.assertNotIn("patches/qcom-display/v1/series", composer_reuse)
 
     def test_private_gpu_stack_packages_the_matched_modesetting_driver(self):
         package = (ROOT / "build-support/package-gpu-stack.sh").read_text()

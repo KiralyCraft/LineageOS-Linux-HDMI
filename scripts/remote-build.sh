@@ -83,6 +83,8 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
                 build-support/reuse-composer.sh|\
                 build-support/verify-reused-composer.py|\
                 build-support/verify-reused-build.py|\
+                patches/qcom-display/v1/README.md|\
+                patches/qcom-display/v1/optional/*|\
                 patches/xserver/*|third_party/mesa-for-android-container)
                     ;;
                 *)
