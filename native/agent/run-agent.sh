@@ -11,6 +11,8 @@ CLIENT_PRESENT=bridge
 SESSION=lxde
 NO_TIMEOUT=1
 DRM_TRACE=startup
+PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
+export PULSE_SERVER
 
 usage() {
     printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--no-timeout|--timeout]\n' "$0" >&2

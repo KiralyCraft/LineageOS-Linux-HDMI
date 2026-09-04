@@ -223,6 +223,14 @@ class DiagnosticContractTests(unittest.TestCase):
         spawn = spawn.split("bool xorg_ready()", 1)[0]
         self.assertIn('setenv("TMPDIR", "/tmp", 1);', spawn)
 
+    def test_runner_exports_the_termux_pulseaudio_socket(self):
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        self.assertIn(
+            "PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}",
+            runner,
+        )
+        self.assertIn("export PULSE_SERVER", runner)
+
     def test_kgsl_bridge_is_default_and_safe_mode_remains_available(self):
         agent = (ROOT / "native/agent/main.cpp").read_text()
         runner = (ROOT / "native/agent/run-agent.sh").read_text()

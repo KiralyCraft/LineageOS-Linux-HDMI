@@ -302,6 +302,11 @@ cd <hdmi-los-runtime>
 ./run-agent.sh
 ```
 
+The launcher passes Termux's chroot PulseAudio socket to LXDE applications via
+`PULSE_SERVER=unix:/hostMounts/chrootBind/pulseAudio.socket`. Start PulseAudio
+from Termux before launching the agent, and configure audio clients to prefer
+PulseAudio rather than accessing the phone's raw ALSA devices directly.
+
 That is equivalent to:
 
 ```sh

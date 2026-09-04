@@ -747,9 +747,13 @@ glxgears -info
 The current agent starts LXDE directly with `dbus-run-session`; it does not
 start an interactive login shell. `kgsl-kms-bridge` supplies the KGSL and
 presentation variables explicitly, so programs launched from that LXDE
-session inherit the working configuration. The direct glamor experiment still
-proves that merely enabling DRI3 is insufficient. Safe ShadowFB remains
-available as an explicit fallback.
+session inherit the working configuration. `run-agent.sh` also exports
+`PULSE_SERVER=unix:/hostMounts/chrootBind/pulseAudio.socket`, so applications
+can use the PulseAudio server started by Termux. Audio clients should select
+that server instead of probing the phone's raw ALSA devices. PulseAudio must be
+running from a genuine Termux session for its Android output module to be
+available. The direct glamor experiment still proves that merely enabling DRI3
+is insufficient. Safe ShadowFB remains available as an explicit fallback.
 
 ## Starting the takeover as `kiraly`
 
