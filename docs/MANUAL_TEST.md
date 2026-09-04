@@ -356,6 +356,11 @@ one by tapping the tile, and one by unplugging HDMI. Android must recover after
 all three. The unplug cycle must show broker-first Xorg shutdown rather than an
 HWC uevent-thread teardown.
 
+For one cycle, leave LXDE idle for at least eleven minutes. The HDMI stream
+must remain active after Xorg's historical ten-minute saver boundary. The
+agent launches Xorg with `-s 0`; no periodic input or saver-reset process is
+required.
+
 Continuous mode removes only the fixed broker deadline. It still requires both
 physical volume inputs and the suspend blocker. The broker renews the composer
 watchdog every 20 seconds; failed renewal, either control connection closing,

@@ -223,6 +223,12 @@ class DiagnosticContractTests(unittest.TestCase):
         spawn = spawn.split("bool xorg_ready()", 1)[0]
         self.assertIn('setenv("TMPDIR", "/tmp", 1);', spawn)
 
+    def test_xorg_disables_its_core_screen_saver(self):
+        agent = (ROOT / "native/agent/main.cpp").read_text()
+        spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)[1]
+        spawn = spawn.split("pid_t spawn_lxde()", 1)[0]
+        self.assertIn('"-s", "0", "-novtswitch"', spawn)
+
     def test_runner_exports_the_termux_pulseaudio_socket(self):
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
         self.assertIn(

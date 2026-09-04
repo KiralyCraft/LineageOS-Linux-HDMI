@@ -823,7 +823,7 @@ pid_t spawn_xorg(int lease_fd) {
         "-config", config.c_str(), "-configdir", config_dir.c_str(),
         "-auth", auth.c_str(), "-logfile", log.c_str(), "-nolisten", "tcp",
         "-modulepath", module_path.c_str(),
-        "-novtswitch", "-noreset", static_cast<char *>(nullptr));
+        "-s", "0", "-novtswitch", "-noreset", static_cast<char *>(nullptr));
   _exit(127);
 }
 

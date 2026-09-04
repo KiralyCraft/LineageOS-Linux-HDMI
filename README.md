@@ -306,6 +306,10 @@ The launcher passes Termux's chroot PulseAudio socket to LXDE applications via
 `PULSE_SERVER=unix:/hostMounts/chrootBind/pulseAudio.socket`. Start PulseAudio
 from Termux before launching the agent, and configure audio clients to prefer
 PulseAudio rather than accessing the phone's raw ALSA devices directly.
+The agent also starts Xorg with its core screen saver disabled (`-s 0`). The
+server's normal ten-minute saver calls the modesetting driver's output-power
+hook and would otherwise turn off the leased HDMI stream while leaving the
+broker and Xorg running.
 
 That is equivalent to:
 
