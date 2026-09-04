@@ -216,6 +216,18 @@ path.
 
 - https://github.com/LineageOS/android_kernel_sony_sm8550-modules
 
-Do not replace `msm_drm.ko`, add extra leased planes, suppress cursor calls, or
-backport that null check without a trace, pstore record, or Qualcomm display
-recovery dump that identifies the corresponding path.
+Do not replace `msm_drm.ko`, suppress cursor calls, or backport that null check
+without a trace, pstore record, or Qualcomm display recovery dump that
+identifies the corresponding path.
+
+Subsequent deterministic testing isolated one justified extra leased object.
+With native KGSL presentation otherwise holding 58-59 FPS, moving Xorg's
+visible software cursor at 120 Hz reduced the client to 32-35 FPS; hiding that
+same cursor restored 58-59 FPS. The input injector itself stayed below 3.1 ms,
+and the CPU presentation bridge was slower, so input and flip selection were
+not the bottleneck. This kernel creates only Primary and Overlay planes and has
+neither a Cursor plane nor legacy CRTC cursor callbacks. Candidate 14 therefore
+leases one compatible ARGB8888 overlay for an opt-in private-Xorg cursor path.
+Selection occurs inside the serialized final handoff, rejects planes assigned
+to any other CRTC, and is followed by the same atomic sanitize and readback
+gate as the primary plane.

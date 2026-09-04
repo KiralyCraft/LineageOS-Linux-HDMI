@@ -358,6 +358,8 @@ bool trace_preflight() {
   std::string library = g_bundle + "/lib/libhdmi-los-drmtrace.so";
   std::string xorg_path = xorg_binary();
   std::string glamor_module = g_bundle + "/lib/xorg/modules/libglamoregl.so";
+  std::string modesetting_module =
+      g_bundle + "/lib/xorg/modules/drivers/modesetting_drv.so";
   struct stat xorg = {};
   if (stat(xorg_path.c_str(), &xorg) != 0 || !S_ISREG(xorg.st_mode) ||
       access(xorg_path.c_str(), X_OK) != 0 ||
@@ -365,8 +367,10 @@ bool trace_preflight() {
     log_message("error", "Xorg or DRM tracer failed the secure preload gate");
     return false;
   }
-  if (g_kgsl_kms_bridge && access(glamor_module.c_str(), R_OK) != 0) {
-    log_message("error", "the matched private Xorg glamor module is missing");
+  if (g_kgsl_kms_bridge &&
+      (access(glamor_module.c_str(), R_OK) != 0 ||
+       access(modesetting_module.c_str(), R_OK) != 0)) {
+    log_message("error", "a matched private Xorg module is missing");
     return false;
   }
 
@@ -602,7 +606,8 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Option \"PageFlip\" \"%s\"\n"
       "  Option \"ShadowFB\" \"%s\"\n"
       "  Option \"Atomic\" \"%s\"\n"
-      "  Option \"SWcursor\" \"true\"\n"
+      "  Option \"SWcursor\" \"%s\"\n"
+      "  Option \"OverlayCursor\" \"%s\"\n"
       "  Option \"Monitor-DP-1\" \"HDMI Monitor\"\n"
       "EndSection\n"
       "Section \"Screen\"\n"
@@ -628,7 +633,9 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       g_kgsl_glamor ? "glamor" : "none",
       g_kgsl_glamor ? "true" : "false",
       g_kgsl_glamor ? "false" : "true",
-      probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false", kModeName);
+      probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false",
+      g_kgsl_glamor ? "false" : "true",
+      g_kgsl_glamor ? "true" : "false", kModeName);
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
   if (fclose(file) != 0) ok = false;

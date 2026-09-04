@@ -1,6 +1,6 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.13` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.14` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and glamor module plus `libgallium`, `libGLX_mesa`, and `libEGL_mesa`
@@ -26,6 +26,15 @@ CRTC and resets all of them together with the fixed primary in one tested
 atomic commit. It verifies each standard and supported Qualcomm private reset
 before creating the lease. This directly fixes the measured composition state
 without a delay, retry, or hard-coded plane id.
+
+Candidate 14 addresses the measured pointer-motion bottleneck. The Sony SDE
+kernel exposes overlays but no cursor plane or CRTC cursor callbacks, so Xorg's
+software cursor damaged the primary framebuffer on every move. Composer now
+selects one compatible external-or-idle ARGB8888 overlay during the serialized
+handoff, rejects any plane assigned to another CRTC, sanitizes it with the
+primary, and adds it to the lease. The matched private modesetting driver uses
+that plane only when `OverlayCursor` is enabled. Release cleanup sanitizes both
+leased planes before Android resumes.
 
 The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
 images, queues a same-context GPU resolve into persistent linear renderonly

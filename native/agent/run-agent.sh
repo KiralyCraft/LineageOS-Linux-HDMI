@@ -163,8 +163,9 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
     mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=5'
     for xorg_file in \
         "$BUNDLE/libexec/Xorg" \
-        "$BUNDLE/lib/xorg/modules/libglamoregl.so"; do
-        [[ -x $xorg_file || $xorg_file == */libglamoregl.so && -r $xorg_file ]] || {
+        "$BUNDLE/lib/xorg/modules/libglamoregl.so" \
+        "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so"; do
+        [[ -x $xorg_file || $xorg_file == *.so && -r $xorg_file ]] || {
             printf 'Required private Xorg component is missing: %s\n' "$xorg_file" >&2
             exit 1
         }

@@ -20,8 +20,9 @@ mesa_files=(
 )
 xorg="$XSERVER_BUILD/hw/xfree86/Xorg"
 glamor="$XSERVER_BUILD/hw/xfree86/glamor_egl/libglamoregl.so"
+modesetting="$XSERVER_BUILD/hw/xfree86/drivers/modesetting/modesetting_drv.so"
 
-for file in "${mesa_files[@]}" "$xorg" "$glamor"; do
+for file in "${mesa_files[@]}" "$xorg" "$glamor" "$modesetting"; do
     [[ -f $file ]] || { printf 'missing GPU stack component: %s\n' "$file" >&2; exit 1; }
     readelf -h "$file" | grep -q 'AArch64' || {
         printf 'GPU stack component is not AArch64: %s\n' "$file" >&2
@@ -35,12 +36,14 @@ for file in "${mesa_files[@]}"; do
     }
 done
 
-install -d "$STAGE/lib/mesa" "$STAGE/lib/xorg/modules" "$STAGE/libexec"
+install -d "$STAGE/lib/mesa" "$STAGE/lib/xorg/modules/drivers" "$STAGE/libexec"
 install -m 0644 "${gallium[0]}" "$STAGE/lib/mesa/${gallium[0]##*/}"
 install -m 0644 "${mesa_files[1]}" "$STAGE/lib/mesa/libGLX_mesa.so.0"
 install -m 0644 "${mesa_files[2]}" "$STAGE/lib/mesa/libEGL_mesa.so.0"
 install -m 0755 "$xorg" "$STAGE/libexec/Xorg"
 install -m 0644 "$glamor" "$STAGE/lib/xorg/modules/libglamoregl.so"
+install -m 0644 "$modesetting" \
+    "$STAGE/lib/xorg/modules/drivers/modesetting_drv.so"
 
 mkdir -p -- "$(dirname -- "$OUTPUT")"
 tar --sort=name --mtime='UTC 2026-09-03' --owner=0 --group=0 --numeric-owner \

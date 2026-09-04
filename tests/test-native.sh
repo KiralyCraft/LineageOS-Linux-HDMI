@@ -26,6 +26,14 @@ if pkg-config --exists sdl2 gl; then
     "$TEMP/sdl-frame-pacing" --help >/dev/null
 fi
 
+if pkg-config --exists x11 xtst xfixes; then
+    gcc -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+        "$ROOT/native/probes/x11-cursor-stress.c" \
+        $(pkg-config --cflags --libs x11 xtst xfixes) \
+        -o "$TEMP/x11-cursor-stress"
+    "$TEMP/x11-cursor-stress" --help >/dev/null
+fi
+
 "$TEMP/drmtrace-selftest" "$TEMP/libhdmi-los-drmtrace.so"
 if "$TEMP/hdmi-losd" probe invalid >/dev/null 2>&1; then
     printf 'invalid broker probe unexpectedly succeeded\n' >&2

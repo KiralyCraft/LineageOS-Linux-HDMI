@@ -1,0 +1,259 @@
+From 251d824ec71168ec7103d96209178babaf9d8360 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Thu, 3 Sep 2026 17:28:00 +0300
+Subject: [PATCH] composer: lease an overlay plane for the Xorg cursor
+
+Qualcomm SDE exposes primary and overlay planes but no DRM cursor plane and no
+legacy CRTC cursor callbacks.  Consequently, upstream modesetting falls back
+to a software cursor whose save/restore damage serializes the full KGSL-to-KMS
+presentation bridge on every pointer update.
+
+Select one ARGB8888-capable overlay compatible with the external CRTC while
+the final handoff is serialized.  Prefer an overlay already used by that
+external CRTC, otherwise use an unassigned overlay; never take a plane assigned
+to another CRTC.  Sanitize the selected object with the other external planes,
+verify that it is detached, and add it to the DRM lease.  This lets the private
+Xorg modesetting driver use the standard KMS plane API for the cursor without
+touching the primary framebuffer.
+
+Track the extra plane through revocation so a forced client exit cannot return
+stale cursor state to Android.  If the hardware has no compatible overlay,
+preserve the existing three-object lease and Xorg's software-cursor fallback.
+Enumeration or validation failures still fail closed.
+---
+ sdm/libs/dal/hw_device_drm.cpp | 140 ++++++++++++++++++++++++---------
+ 1 file changed, 103 insertions(+), 37 deletions(-)
+
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 78c12ee..5a80bbb 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -126,6 +126,7 @@ namespace {
+ 
+ struct ExternalDisplayLeaseState {
+   uint32_t plane_id = 0;
++  uint32_t cursor_plane_id = 0;
+   uint32_t lessee_id = 0;
+   bool prepared = false;
+   bool active = false;
+@@ -218,6 +219,76 @@ DisplayError GetFixedPrimaryPlane(int fd, uint32_t crtc_id, uint32_t *crtc_index
+   return kErrorNone;
+ }
+ 
++DisplayError GetCursorOverlayPlane(int fd, uint32_t crtc_index, uint32_t crtc_id,
++                                   uint32_t *plane_id) {
++  if (!plane_id || crtc_index >= 32) {
++    return kErrorParameters;
++  }
++  *plane_id = 0;
++
++  drmModePlaneResPtr resources = drmModeGetPlaneResources(fd);
++  if (!resources) {
++    DLOGE("hdmi-los: cannot enumerate cursor-overlay candidates: %s", strerror(errno));
++    return kErrorHardware;
++  }
++
++  uint32_t idle_candidate = 0;
++  uint64_t idle_zpos = 0;
++  uint32_t external_candidate = 0;
++  uint64_t external_zpos = 0;
++  for (uint32_t i = 0; i < resources->count_planes; ++i) {
++    drmModePlanePtr plane = drmModeGetPlane(fd, resources->planes[i]);
++    if (!plane) {
++      DLOGE("hdmi-los: cannot inspect cursor-overlay candidate %u: %s",
++            resources->planes[i], strerror(errno));
++      drmModeFreePlaneResources(resources);
++      return kErrorHardware;
++    }
++
++    uint64_t type = UINT64_MAX;
++    uint64_t zpos = 0;
++    const bool is_overlay =
++        GetDrmProperty(fd, plane->plane_id, DRM_MODE_OBJECT_PLANE, "type", nullptr, &type) &&
++        type == DRM_PLANE_TYPE_OVERLAY;
++    const bool has_zpos =
++        GetDrmProperty(fd, plane->plane_id, DRM_MODE_OBJECT_PLANE, "zpos", nullptr, &zpos);
++    bool has_argb8888 = false;
++    for (uint32_t format = 0; format < plane->count_formats; ++format) {
++      if (plane->formats[format] == DRM_FORMAT_ARGB8888) {
++        has_argb8888 = true;
++        break;
++      }
++    }
++    const bool compatible = (plane->possible_crtcs & (1U << crtc_index)) != 0;
++    const bool belongs_to_external = plane->crtc_id == crtc_id;
++    const bool idle = plane->crtc_id == 0 && plane->fb_id == 0;
++    if (is_overlay && has_zpos && has_argb8888 && compatible &&
++        (belongs_to_external || idle)) {
++      uint32_t *candidate = belongs_to_external ? &external_candidate : &idle_candidate;
++      uint64_t *candidate_zpos = belongs_to_external ? &external_zpos : &idle_zpos;
++      if (*candidate == 0 || zpos > *candidate_zpos ||
++          (zpos == *candidate_zpos && plane->plane_id < *candidate)) {
++        *candidate = plane->plane_id;
++        *candidate_zpos = zpos;
++      }
++    }
++    drmModeFreePlane(plane);
++  }
++  drmModeFreePlaneResources(resources);
++
++  *plane_id = external_candidate ? external_candidate : idle_candidate;
++  if (!*plane_id) {
++    DLOGW("hdmi-los: no idle ARGB8888 overlay is compatible with external CRTC %u",
++          crtc_id);
++    return kErrorNotSupported;
++  }
++  DLOGI("hdmi-los: selected cursor overlay %u for external CRTC %u (zpos=%" PRIu64
++        " source=%s)", *plane_id, crtc_id,
++        external_candidate ? external_zpos : idle_zpos,
++        external_candidate ? "external" : "idle");
++  return kErrorNone;
++}
++
+ struct PlanePropertyReset {
+   const char *name;
+   uint64_t value;
+@@ -232,15 +303,16 @@ struct PlaneSanitizeState {
+   std::vector<PlanePropertyReset> resets;
+ };
+ 
+-DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
+-                                            uint32_t crtc_id) {
++DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t primary_plane_id,
++                                            uint32_t cursor_plane_id, uint32_t crtc_id) {
+   drmModePlaneResPtr resources = drmModeGetPlaneResources(fd);
+   if (!resources) {
+     DLOGE("hdmi-los: cannot enumerate planes before lease: %s", strerror(errno));
+     return kErrorHardware;
+   }
+ 
+-  bool found_leased_plane = false;
++  bool found_primary_plane = false;
++  bool found_cursor_plane = cursor_plane_id == 0;
+   std::vector<PlaneSanitizeState> planes;
+   for (uint32_t i = 0; i < resources->count_planes; ++i) {
+     drmModePlanePtr plane = drmModeGetPlane(fd, resources->planes[i]);
+@@ -251,12 +323,15 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
+       return kErrorHardware;
+     }
+ 
+-    const bool is_leased_plane = plane->plane_id == leased_plane_id;
++    const bool is_primary_plane = plane->plane_id == primary_plane_id;
++    const bool is_cursor_plane = cursor_plane_id != 0 && plane->plane_id == cursor_plane_id;
++    const bool is_leased_plane = is_primary_plane || is_cursor_plane;
+     const bool is_external_plane = plane->crtc_id == crtc_id;
+-    if (is_leased_plane) found_leased_plane = true;
++    if (is_primary_plane) found_primary_plane = true;
++    if (is_cursor_plane) found_cursor_plane = true;
+     if (is_leased_plane && plane->crtc_id != 0 && !is_external_plane) {
+-      DLOGE("hdmi-los: fixed primary plane %u belongs to CRTC %u before sanitize "
+-            "(external CRTC %u)",
+-            plane->plane_id, plane->crtc_id, crtc_id);
++      DLOGE("hdmi-los: leased %s plane %u belongs to CRTC %u before sanitize "
++            "(external CRTC %u)", is_cursor_plane ? "cursor-overlay" : "primary",
++            plane->plane_id, plane->crtc_id, crtc_id);
+       drmModeFreePlane(plane);
+       drmModeFreePlaneResources(resources);
+@@ -280,9 +355,10 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
+     drmModeFreePlane(plane);
+   }
+   drmModeFreePlaneResources(resources);
+-  if (!found_leased_plane) {
+-    DLOGE("hdmi-los: fixed primary plane %u disappeared before sanitize",
+-          leased_plane_id);
++  if (!found_primary_plane || !found_cursor_plane) {
++    DLOGE("hdmi-los: leased plane disappeared before sanitize "
++          "(primary=%u found=%d cursor=%u found=%d)", primary_plane_id,
++          found_primary_plane, cursor_plane_id, found_cursor_plane);
+     return kErrorResources;
+   }
+ 
+@@ -358,9 +434,9 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
+   }
+ 
+   DLOGI("hdmi-los: atomically sanitized %zu planes for external CRTC %u before "
+-        "lease (active=%zu primary=%u private-scalers=%zu)",
+-        planes.size(), crtc_id, active_plane_count, leased_plane_id,
+-        scaler_reset_count);
++        "lease (active=%zu primary=%u cursor-overlay=%u private-scalers=%zu)",
++        planes.size(), crtc_id, active_plane_count, primary_plane_id,
++        cursor_plane_id, scaler_reset_count);
+   return kErrorNone;
+ }
+ 
+@@ -2899,14 +2975,26 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+           state.plane_id, plane_crtc_id, token_.crtc_id);
+     return kErrorResources;
+   }
+-  error = SanitizeExternalPlanesForLease(dev_fd_, state.plane_id, token_.crtc_id);
++
++  uint32_t cursor_plane_id = 0;
++  error = GetCursorOverlayPlane(dev_fd_, crtc_index, token_.crtc_id, &cursor_plane_id);
++  if (error != kErrorNone && error != kErrorNotSupported) {
++    return error;
++  }
++  state.cursor_plane_id = cursor_plane_id;
++
++  error = SanitizeExternalPlanesForLease(dev_fd_, state.plane_id, state.cursor_plane_id,
++                                         token_.crtc_id);
+   if (error != kErrorNone) {
+     return error;
+   }
+ 
+-  uint32_t objects[] = {token_.conn_id, token_.crtc_id, state.plane_id};
++  std::vector<uint32_t> objects = {token_.conn_id, token_.crtc_id, state.plane_id};
++  if (state.cursor_plane_id != 0) {
++    objects.push_back(state.cursor_plane_id);
++  }
+   uint32_t lessee_id = 0;
+-  int fd = drmModeCreateLease(dev_fd_, objects, 3, O_CLOEXEC, &lessee_id);
++  int fd = drmModeCreateLease(dev_fd_, objects.data(), objects.size(), O_CLOEXEC, &lessee_id);
+   if (fd < 0) {
+     DLOGE("hdmi-los: drmModeCreateLease failed: %s", strerror(errno));
+     return kErrorHardware;
+@@ -2919,7 +3007,8 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+   lease->crtc_id = token_.crtc_id;
+   lease->plane_id = state.plane_id;
+   lease->lessee_id = lessee_id;
+-  DLOGI("hdmi-los: created DRM lease %u", lessee_id);
++  DLOGI("hdmi-los: created DRM lease %u with %zu objects (cursor-overlay=%u)",
++        lessee_id, objects.size(), state.cursor_plane_id);
+   return kErrorNone;
+ }
+ 
+@@ -2960,29 +3049,13 @@ DisplayError HWDeviceDRM::ResetExternalDisplayLease() {
+     return result;
+   }
+   const uint32_t plane_id = state_it->second.plane_id;
++  const uint32_t cursor_plane_id = state_it->second.cursor_plane_id;
+   const uint32_t lessee_id = state_it->second.lessee_id;
+ 
+   if (lessee_id != 0 && plane_id != 0) {
+-    uint32_t crtc_property = 0;
+-    uint32_t fb_property = 0;
+-    if (GetDrmProperty(dev_fd_, plane_id, DRM_MODE_OBJECT_PLANE, "CRTC_ID",
+-                       &crtc_property, nullptr) &&
+-        GetDrmProperty(dev_fd_, plane_id, DRM_MODE_OBJECT_PLANE, "FB_ID",
+-                       &fb_property, nullptr)) {
+-      drmModeAtomicReqPtr request = drmModeAtomicAlloc();
+-      if (!request || drmModeAtomicAddProperty(request, plane_id, crtc_property, 0) < 0 ||
+-          drmModeAtomicAddProperty(request, plane_id, fb_property, 0) < 0 ||
+-          drmModeAtomicCommit(dev_fd_, request,
+-                              DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_TEST_ONLY,
+-                              nullptr) < 0 ||
+-          drmModeAtomicCommit(dev_fd_, request, DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr) < 0) {
+-        DLOGE("hdmi-los: failed to detach leased plane %u: %s", plane_id, strerror(errno));
+-        result = kErrorHardware;
+-      }
+-      if (request) drmModeAtomicFree(request);
+-    } else {
+-      result = kErrorHardware;
+-    }
++    DisplayError sanitize =
++        SanitizeExternalPlanesForLease(dev_fd_, plane_id, cursor_plane_id, token_.crtc_id);
++    if (sanitize != kErrorNone) result = sanitize;
+   }
+ 
+   bool connected = false;
+-- 
+2.53.0

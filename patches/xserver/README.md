@@ -24,6 +24,7 @@ chroot. Install only these private files in the HDMI runtime:
 ```text
 libexec/Xorg
 lib/xorg/modules/libglamoregl.so
+lib/xorg/modules/drivers/modesetting_drv.so
 ```
 
 The agent launches the private binary only for `kgsl-kms-bridge` and gives it
@@ -33,3 +34,6 @@ ShadowFB mode continues to launch `/usr/lib/Xorg`.
 Patch 1 fixes the wait-fence callback lifetime used by the KGSL native-fence
 path. Patch 2 backports current upstream glamor behavior: give DRI3 clients the
 render node when one is available and use the primary node only as a fallback.
+Patch 3 adds the opt-in `OverlayCursor` path. It reserves only an idle,
+CRTC-compatible, ARGB8888 DRM overlay and drives it through `drmModeSetPlane`;
+the normal cursor API remains the fallback.

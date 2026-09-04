@@ -1,0 +1,367 @@
+From aa0ba67702476627c8d39ab61962b08bc6fd68e3 Mon Sep 17 00:00:00 2001
+From: KiralyCraft <alexucu@gmail.com>
+Date: Fri, 4 Sep 2026 10:12:09 +0300
+Subject: [PATCH] modesetting: support an overlay-plane cursor
+
+---
+ hw/xfree86/drivers/modesetting/driver.c       |   8 +
+ hw/xfree86/drivers/modesetting/driver.h       |   1 +
+ .../drivers/modesetting/drmmode_display.c     | 216 +++++++++++++++++-
+ .../drivers/modesetting/drmmode_display.h     |   5 +
+ .../drivers/modesetting/modesetting.man       |   7 +
+ 5 files changed, 234 insertions(+), 3 deletions(-)
+
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+index fe3315a..504fe37 100644
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -135,6 +135,7 @@ static SymTabRec Chipsets[] = {
+ 
+ static const OptionInfoRec Options[] = {
+     {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
++    {OPTION_OVERLAY_CURSOR, "OverlayCursor", OPTV_BOOLEAN, {0}, FALSE},
+     {OPTION_DEVICE_PATH, "kmsdev", OPTV_STRING, {0}, FALSE},
+     {OPTION_SHADOW_FB, "ShadowFB", OPTV_BOOLEAN, {0}, FALSE},
+     {OPTION_ACCEL_METHOD, "AccelMethod", OPTV_STRING, {0}, FALSE},
+@@ -1196,6 +1197,13 @@ PreInit(ScrnInfoPtr pScrn, int flags)
+     if (xf86ReturnOptValBool(ms->drmmode.Options, OPTION_SW_CURSOR, FALSE)) {
+         ms->drmmode.sw_cursor = TRUE;
+     }
++    ms->drmmode.overlay_cursor =
++        xf86ReturnOptValBool(ms->drmmode.Options, OPTION_OVERLAY_CURSOR, FALSE);
++    if (ms->drmmode.overlay_cursor && ms->drmmode.sw_cursor) {
++        xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                   "OverlayCursor ignored while SWcursor is enabled\n");
++        ms->drmmode.overlay_cursor = FALSE;
++    }
+ 
+     ms->cursor_width = 64;
+     ms->cursor_height = 64;
+diff --git a/hw/xfree86/drivers/modesetting/driver.h b/hw/xfree86/drivers/modesetting/driver.h
+index 71aa873..6c9e865 100644
+--- a/hw/xfree86/drivers/modesetting/driver.h
++++ b/hw/xfree86/drivers/modesetting/driver.h
+@@ -51,6 +51,7 @@ struct ms_vrr_priv {
+ 
+ typedef enum {
+     OPTION_SW_CURSOR,
++    OPTION_OVERLAY_CURSOR,
+     OPTION_DEVICE_PATH,
+     OPTION_SHADOW_FB,
+     OPTION_ACCEL_METHOD,
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.c b/hw/xfree86/drivers/modesetting/drmmode_display.c
+index 21c9222..021c4e6 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -1638,13 +1638,86 @@ drmmode_set_cursor_colors(xf86CrtcPtr crtc, int bg, int fg)
+ 
+ }
+ 
++static Bool drmmode_set_cursor(xf86CrtcPtr crtc);
++
+ static void
+ drmmode_set_cursor_position(xf86CrtcPtr crtc, int x, int y)
+ {
+     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+     drmmode_ptr drmmode = drmmode_crtc->drmmode;
+ 
+-    drmModeMoveCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id, x, y);
++    if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id) {
++        drmmode_crtc->cursor_x = x;
++        drmmode_crtc->cursor_y = y;
++        if (drmmode_crtc->cursor_up)
++            drmmode_set_cursor(crtc);
++    }
++    else {
++        drmModeMoveCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id,
++                          x, y);
++    }
++}
++
++static Bool
++drmmode_set_overlay_cursor(xf86CrtcPtr crtc)
++{
++    modesettingPtr ms = modesettingPTR(crtc->scrn);
++    drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
++    drmmode_ptr drmmode = drmmode_crtc->drmmode;
++    CursorPtr cursor = xf86CurrentCursor(crtc->scrn->pScreen);
++    int x = drmmode_crtc->cursor_x;
++    int y = drmmode_crtc->cursor_y;
++    int src_x = 0;
++    int src_y = 0;
++    int width = ms->cursor_width;
++    int height = ms->cursor_height;
++    int ret;
++
++    /* drmModeSetCursor2 stores the hotspot in the kernel.  A generic plane
++     * has no equivalent property, so apply it to the destination here.  The
++     * rotated-coordinate path has already incorporated the transformed
++     * hotspot in xf86_crtc_transform_cursor_position(). */
++    if (cursor != NullCursor && crtc->rotation == RR_Rotate_0) {
++        x -= cursor->bits->xhot;
++        y -= cursor->bits->yhot;
++    }
++
++    if (x < 0) {
++        src_x = -x;
++        width += x;
++        x = 0;
++    }
++    if (y < 0) {
++        src_y = -y;
++        height += y;
++        y = 0;
++    }
++    if (x + width > crtc->mode.HDisplay)
++        width = crtc->mode.HDisplay - x;
++    if (y + height > crtc->mode.VDisplay)
++        height = crtc->mode.VDisplay - y;
++
++    if (width <= 0 || height <= 0) {
++        ret = drmModeSetPlane(drmmode->fd, drmmode_crtc->cursor_plane_id,
++                              drmmode_crtc->mode_crtc->crtc_id, 0, 0,
++                              0, 0, 0, 0, 0, 0, 0, 0);
++    }
++    else {
++        ret = drmModeSetPlane(drmmode->fd, drmmode_crtc->cursor_plane_id,
++                              drmmode_crtc->mode_crtc->crtc_id,
++                              drmmode_crtc->cursor_fb_id, 0,
++                              x, y, width, height,
++                              src_x << 16, src_y << 16,
++                              width << 16, height << 16);
++    }
++
++    if (ret) {
++        xf86DrvMsg(crtc->scrn->scrnIndex, X_WARNING,
++                   "Overlay cursor plane %u update failed: %s\n",
++                   drmmode_crtc->cursor_plane_id, strerror(errno));
++        return FALSE;
++    }
++    return TRUE;
+ }
+ 
+ static Bool
+@@ -1660,6 +1733,10 @@ drmmode_set_cursor(xf86CrtcPtr crtc)
+     if (cursor == NullCursor)
+ 	    return TRUE;
+ 
++    if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id &&
++        drmmode_crtc->cursor_fb_id)
++        return drmmode_set_overlay_cursor(crtc);
++
+     ret = drmModeSetCursor2(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id,
+                             handle, ms->cursor_width, ms->cursor_height,
+                             cursor->bits->xhot, cursor->bits->yhot);
+@@ -1723,8 +1800,15 @@ drmmode_hide_cursor(xf86CrtcPtr crtc)
+     drmmode_ptr drmmode = drmmode_crtc->drmmode;
+ 
+     drmmode_crtc->cursor_up = FALSE;
+-    drmModeSetCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id, 0,
+-                     ms->cursor_width, ms->cursor_height);
++    if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id) {
++        drmModeSetPlane(drmmode->fd, drmmode_crtc->cursor_plane_id,
++                        drmmode_crtc->mode_crtc->crtc_id, 0, 0,
++                        0, 0, 0, 0, 0, 0, 0, 0);
++    }
++    else {
++        drmModeSetCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id, 0,
++                         ms->cursor_width, ms->cursor_height);
++    }
+ }
+ 
+ static Bool
+@@ -2355,6 +2439,106 @@ drmmode_crtc_vrr_init(int drm_fd, xf86CrtcPtr crtc)
+     drmModeFreeObjectProperties(drm_props);
+ }
+ 
++static Bool
++drmmode_cursor_plane_reserved(ScrnInfoPtr pScrn, uint32_t plane_id)
++{
++    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(pScrn);
++    int i;
++
++    for (i = 0; i < config->num_crtc; i++) {
++        drmmode_crtc_private_ptr drmmode_crtc =
++            config->crtc[i]->driver_private;
++
++        if (drmmode_crtc && drmmode_crtc->cursor_plane_id == plane_id)
++            return TRUE;
++    }
++    return FALSE;
++}
++
++static Bool
++drmmode_plane_is_overlay(int drm_fd, uint32_t plane_id)
++{
++    drmModeObjectPropertiesPtr props;
++    Bool result = FALSE;
++    uint32_t i;
++
++    props = drmModeObjectGetProperties(drm_fd, plane_id,
++                                       DRM_MODE_OBJECT_PLANE);
++    if (!props)
++        return FALSE;
++
++    for (i = 0; i < props->count_props; i++) {
++        drmModePropertyPtr prop = drmModeGetProperty(drm_fd,
++                                                     props->props[i]);
++
++        if (prop && !strcmp(prop->name, "type")) {
++            result = props->prop_values[i] == DRM_PLANE_TYPE_OVERLAY;
++            drmModeFreeProperty(prop);
++            break;
++        }
++        if (prop)
++            drmModeFreeProperty(prop);
++    }
++    drmModeFreeObjectProperties(props);
++    return result;
++}
++
++static uint32_t
++drmmode_find_overlay_cursor_plane(ScrnInfoPtr pScrn, drmmode_ptr drmmode,
++                                  unsigned int crtc_index)
++{
++    drmModePlaneResPtr resources = drmModeGetPlaneResources(drmmode->fd);
++    uint32_t result = 0;
++    uint32_t i;
++
++    if (!resources) {
++        xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                   "Cannot enumerate overlay cursor planes: %s\n",
++                   strerror(errno));
++        return 0;
++    }
++
++    for (i = 0; i < resources->count_planes; i++) {
++        drmModePlanePtr plane = drmModeGetPlane(drmmode->fd,
++                                                resources->planes[i]);
++        uint32_t format_index;
++
++        if (!plane)
++            continue;
++        if (!drmmode_plane_is_overlay(drmmode->fd, plane->plane_id) ||
++            plane->crtc_id || plane->fb_id ||
++            !(plane->possible_crtcs & (1U << crtc_index)) ||
++            drmmode_cursor_plane_reserved(pScrn, plane->plane_id)) {
++            drmModeFreePlane(plane);
++            continue;
++        }
++
++        for (format_index = 0; format_index < plane->count_formats;
++             format_index++) {
++            if (plane->formats[format_index] == DRM_FORMAT_ARGB8888) {
++                result = plane->plane_id;
++                break;
++            }
++        }
++        drmModeFreePlane(plane);
++        if (result)
++            break;
++    }
++
++    drmModeFreePlaneResources(resources);
++    if (result) {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO,
++                   "Reserved idle overlay plane %u for CRTC %u cursor\n",
++                   result, crtc_index);
++    }
++    else {
++        xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                   "No idle ARGB8888 overlay plane available for CRTC %u cursor\n",
++                   crtc_index);
++    }
++    return result;
++}
++
+ static unsigned int
+ drmmode_crtc_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, drmModeResPtr mode_res, int num)
+ {
+@@ -2379,6 +2563,9 @@ drmmode_crtc_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, drmModeResPtr mode_res
+         drmModeGetCrtc(drmmode->fd, mode_res->crtcs[num]);
+     drmmode_crtc->drmmode = drmmode;
+     drmmode_crtc->vblank_pipe = drmmode_crtc_vblank_pipe(num);
++    if (drmmode->overlay_cursor)
++        drmmode_crtc->cursor_plane_id =
++            drmmode_find_overlay_cursor_plane(pScrn, drmmode, num);
+     xorg_list_init(&drmmode_crtc->mode_list);
+ 
+     props = drmModeObjectGetProperties(drmmode->fd, mode_res->crtcs[num],
+@@ -4182,6 +4369,23 @@ drmmode_create_initial_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
+ 
+         drmmode_crtc->cursor_bo =
+             dumb_bo_create(drmmode->fd, width, height, bpp);
++        if (!drmmode_crtc->cursor_bo)
++            return FALSE;
++
++        if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id) {
++            uint32_t handles[4] = { drmmode_crtc->cursor_bo->handle };
++            uint32_t pitches[4] = { drmmode_crtc->cursor_bo->pitch };
++            uint32_t offsets[4] = { 0 };
++
++            if (drmModeAddFB2(drmmode->fd, width, height,
++                              DRM_FORMAT_ARGB8888, handles, pitches, offsets,
++                              &drmmode_crtc->cursor_fb_id, 0)) {
++                xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                           "Cannot create overlay cursor framebuffer: %s\n",
++                           strerror(errno));
++                drmmode_crtc->cursor_plane_id = 0;
++            }
++        }
+     }
+     return TRUE;
+ }
+@@ -4241,6 +4445,12 @@ drmmode_free_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
+         xf86CrtcPtr crtc = xf86_config->crtc[i];
+         drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+ 
++        if (drmmode_crtc->cursor_plane_id)
++            drmModeSetPlane(drmmode->fd, drmmode_crtc->cursor_plane_id,
++                            drmmode_crtc->mode_crtc->crtc_id, 0, 0,
++                            0, 0, 0, 0, 0, 0, 0, 0);
++        if (drmmode_crtc->cursor_fb_id)
++            drmModeRmFB(drmmode->fd, drmmode_crtc->cursor_fb_id);
+         dumb_bo_destroy(drmmode->fd, drmmode_crtc->cursor_bo);
+     }
+ }
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.h b/hw/xfree86/drivers/modesetting/drmmode_display.h
+index 2a9a915..e4f4098 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.h
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.h
+@@ -102,6 +102,7 @@ typedef struct {
+     drmEventContext event_context;
+     drmmode_bo front_bo;
+     Bool sw_cursor;
++    Bool overlay_cursor;
+ 
+     /* Broken-out options. */
+     OptionInfoPtr Options;
+@@ -172,6 +173,10 @@ typedef struct {
+     uint32_t vblank_pipe;
+     int dpms_mode;
+     struct dumb_bo *cursor_bo;
++    uint32_t cursor_plane_id;
++    uint32_t cursor_fb_id;
++    int cursor_x;
++    int cursor_y;
+     Bool cursor_up;
+     uint16_t lut_r[256], lut_g[256], lut_b[256];
+ 
+diff --git a/hw/xfree86/drivers/modesetting/modesetting.man b/hw/xfree86/drivers/modesetting/modesetting.man
+index 7179001..dbdc540 100644
+--- a/hw/xfree86/drivers/modesetting/modesetting.man
++++ b/hw/xfree86/drivers/modesetting/modesetting.man
+@@ -48,6 +48,13 @@ are supported:
+ Selects software cursor.  The default is
+ .B off.
+ .TP
++.BI "Option \*qOverlayCursor\*q \*q" boolean \*q
++Use an otherwise idle, compatible KMS overlay plane for the hardware cursor
++when the kernel does not expose a cursor plane. The plane must support ARGB8888
++and must not be attached to a CRTC when the X server starts. This option is
++disabled when SWcursor is enabled. The default is
++.B off.
++.TP
+ .BI "Option \*qkmsdev\*q \*q" string \*q
+ The framebuffer device to use. Default: /dev/dri/card0.
+ .TP
