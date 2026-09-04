@@ -74,7 +74,7 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
             esac
         else
             case "$changed" in
-                native/*|android/tile/*|module/*|docs/*|tests/*|README.md|\
+                .gitmodules|native/*|android/tile/*|module/*|docs/*|tests/*|README.md|\
                 release.json|Makefile|scripts/remote-build.sh|scripts/verify-dist.sh|\
                 scripts/collect-crash-evidence.sh|build-support/remote-entry.sh|\
                 build-support/package.sh|build-support/build-native.sh|\
