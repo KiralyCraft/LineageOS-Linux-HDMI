@@ -410,6 +410,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("patches/xserver/*", composer_reuse)
         self.assertIn("build-support/package-gpu-stack.sh", composer_reuse)
         self.assertIn("patches/qcom-display/v1/README.md", composer_reuse)
+        self.assertIn("patches/qcom-display/v1/optional/*", composer_reuse)
         self.assertIn("third_party/xserver", composer_reuse)
         self.assertIn(".gitmodules", composer_reuse)
         self.assertNotIn("patches/qcom-display/v1/series", composer_reuse)
