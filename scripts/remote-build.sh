@@ -85,7 +85,8 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
                 build-support/verify-reused-build.py|\
                 patches/qcom-display/v1/README.md|\
                 patches/qcom-display/v1/optional/*|\
-                patches/xserver/*|third_party/mesa-for-android-container)
+                patches/xserver/*|scripts/analyze-cadence.py|\
+                scripts/capture-loop.sh|third_party/mesa-for-android-container)
                     ;;
                 *)
                     printf 'Refusing composer reuse: composer-producing path changed: %s\n' \
