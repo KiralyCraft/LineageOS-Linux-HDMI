@@ -3,8 +3,8 @@
 Release `0.2.8-candidate.14` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
-binary and glamor module plus `libgallium`, `libGLX_mesa`, and `libEGL_mesa`
-carrying ABI 5. The launcher refuses a partial or stale set.
+binary and modules plus the matched private Gallium, GLX, EGL, DRI loader, and
+GBM stack carrying ABI 5. The launcher refuses a partial, stale, or mixed set.
 
 Candidate 10 also serializes the final DRM-lease handoff with Qualcomm
 composer command processing. It refreshes and validates the CRTC's fixed
@@ -27,14 +27,15 @@ atomic commit. It verifies each standard and supported Qualcomm private reset
 before creating the lease. This directly fixes the measured composition state
 without a delay, retry, or hard-coded plane id.
 
-Candidate 14 addresses the measured pointer-motion bottleneck. The Sony SDE
-kernel exposes overlays but no cursor plane or CRTC cursor callbacks, so Xorg's
-software cursor damaged the primary framebuffer on every move. Composer now
-selects one compatible external-or-idle ARGB8888 overlay during the serialized
-handoff, rejects any plane assigned to another CRTC, sanitizes it with the
-primary, and adds it to the lease. The matched private modesetting driver uses
-that plane only when `OverlayCursor` is enabled. Release cleanup sanitizes both
-leased planes before Android resumes.
+Candidate 14 tested a cursor on a separately leased overlay after software
+cursor motion exposed a severe cadence loss. The experiment rendered the cursor
+correctly, but did not fix the problem: a 120 Hz pointer trace reduced
+`glxgears` from 57-59 FPS to 27-31 FPS and synchronous plane submissions stalled
+for as long as 2.85 seconds. The paired composer and Xorg cursor patches now
+live under `optional/`, are absent from the default patch series, and require
+the explicit `--overlay-cursor` diagnostic flag. Normal builds lease only the
+external connector, CRTC, and fixed primary plane and use Xorg's software
+cursor.
 
 The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
 images, queues a same-context GPU resolve into persistent linear renderonly

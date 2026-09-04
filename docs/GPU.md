@@ -226,16 +226,18 @@ timer, private X connection, per-frame allocation, CPU readback, or global
 full-surface resolve; damage-aware resolves require proven buffer-age handling
 and are deferred.
 
-Three Xorg 21.1.24 backports are required and are stored under
+Two Xorg 21.1.24 backports are required and are stored under
 [`patches/xserver`](../patches/xserver):
 
 - glamor chooses the DRM render node for DRI3 clients, matching current
   upstream Xorg, rather than reopening the primary node and attempting legacy
   DRM authentication through a lease;
 - the Present wait-fence callback is disarmed before re-execution, matching the
-  lifetime fix already used by Termux:X11;
-- `OverlayCursor` uses a leased idle ARGB8888 overlay plane for pointer updates
-  on Qualcomm SDE kernels that expose no DRM cursor plane.
+  lifetime fix already used by Termux:X11.
+
+The third patch under `patches/xserver/optional/` is an experiment, not a
+required backport. It must be paired with the optional Qualcomm composer cursor
+patch and explicitly enabled with `run-agent.sh --overlay-cursor`.
 
 ## Cursor-motion presentation bottleneck
 
@@ -243,19 +245,24 @@ A deterministic XTest probe separated raw input, window-manager behavior, and
 cursor composition. With the adaptive GPU bridge and a visible Xorg software
 cursor, stationary `glxgears` held about 58 FPS but 120 Hz cursor motion reduced
 it to 32-35 FPS. The same motion with the cursor hidden recovered to 58-59 FPS,
-while injection submit time remained below 3.1 ms. The CPU bridge was slower
-both stationary and moving, and Present completion traces reported copy mode in
-both cases. The cost is therefore Xorg's software-cursor save/restore damage,
-not event injection, Openbox, or a flip-versus-copy choice.
+while injection submit time remained below 3.1 ms. This established that the
+cursor-dependent Xorg path triggers the slowdown, but it did not prove that
+software composition alone was the root cause.
 
 The downstream SM8550 SDE driver registers Primary and Overlay planes only and
 does not implement legacy `cursor_set`, `cursor_set2`, or `cursor_move` CRTC
-callbacks. Candidate 14 keeps `SWcursor` enabled for the safe ShadowFB path but
-sets `SWcursor false` plus `OverlayCursor true` for the matched accelerated
-runtime. Composer grants one vetted overlay in the external lease; private
-Xorg updates that plane through the standard KMS plane API. If either half is
-missing or no compatible overlay is available, it falls back to software
-rather than borrowing a plane from Android's internal CRTC.
+callbacks. Candidate 14 tested an opt-in cursor on a separately leased overlay.
+It rendered correctly, yet 120 Hz pointer motion reduced `glxgears` further to
+27-31 FPS. A nominal 15-second cursor trace took 36.9 seconds to submit and one
+synchronous `drmModeSetPlane` call stalled for 2.85 seconds. A distinct plane
+therefore does not by itself fix the cursor-motion presentation problem.
+
+The default is again `SWcursor true`, with no cursor overlay in the composer
+lease. The paired patches remain under `optional/` and `--overlay-cursor` exists
+only for diagnosis. Nonblocking atomic plane updates would normally avoid
+waiting in a legacy plane ioctl, but this downstream kernel rejects Xorg's
+atomic-client capability request, so forcing `Atomic true` is not a validated
+solution on this device.
 
 Bridge clients ask `x11_dri3_open()` for KGSL because their completed images
 are copied independently. Shadow and direct clients retain Xorg's DRI3 DRM fd,
@@ -584,7 +591,7 @@ GBM backend from resolving to the chroot's system Mesa. Candidate 14 first
 exposed the missing DRIL target; after adding it, the core showed that system
 `dri_gbm.so` still loaded system Gallium alongside the private Gallium. That
 mixed process crashed in Mesa state-tracker context creation before Xorg could
-reserve its leased cursor overlay.
+initialize the display.
 Accelerated mode additionally requires the matched private Xorg at
 `libexec/Xorg` and its glamor module at
 `lib/xorg/modules/libglamoregl.so`. The system Xorg remains available to the

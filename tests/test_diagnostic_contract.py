@@ -292,8 +292,17 @@ class DiagnosticContractTests(unittest.TestCase):
             ROOT / "patches/xserver/0001-present-disarm-wait-fence-callback.patch"
         ).read_text()
         cursor_patch = (
-            ROOT / "patches/xserver/0003-modesetting-support-an-overlay-plane-cursor.patch"
+            ROOT / "patches/xserver/optional/0003-modesetting-support-an-overlay-plane-cursor.patch"
         ).read_text()
+        xserver_series = (ROOT / "patches/xserver/series").read_text().splitlines()
+        self.assertEqual(xserver_series, [
+            "0001-present-disarm-wait-fence-callback.patch",
+            "0002-glamor-prefer-render-node-for-dri3.patch",
+        ])
+        self.assertNotIn(
+            "0003-modesetting-support-an-overlay-plane-cursor.patch",
+            xserver_series,
+        )
         self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
         self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)
         self.assertIn('"OverlayCursor"', cursor_patch)
@@ -302,7 +311,10 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("x -= cursor->bits->xhot", cursor_patch)
         self.assertIn("y -= cursor->bits->yhot", cursor_patch)
         self.assertIn('Option \\"SWcursor\\" \\"%s\\"', agent)
-        self.assertIn('Option \\"OverlayCursor\\" \\"%s\\"', agent)
+        self.assertIn('g_overlay_cursor ? "  Option \\\"OverlayCursor\\\" \\\"true\\\"', agent)
+        self.assertIn("bool g_overlay_cursor = false", agent)
+        self.assertIn('strcmp(argv[i], "--overlay-cursor")', agent)
+        self.assertIn("--overlay-cursor", runner)
 
         xorg_spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)[1]
         xorg_spawn = xorg_spawn.split("pid_t spawn_lxde()", 1)[0]
@@ -476,15 +488,15 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
 
-    def test_composer_leases_only_a_safe_cursor_overlay(self):
+    def test_optional_composer_cursor_overlay_is_not_in_default_series(self):
         patch_name = "0015-composer-lease-an-overlay-plane-for-the-xorg-cursor.patch"
-        patch = (ROOT / "patches/qcom-display/v1" / patch_name).read_text()
+        patch = (ROOT / "patches/qcom-display/v1/optional" / patch_name).read_text()
         series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
         added = "\n".join(
             line[1:] for line in patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
         )
-        self.assertEqual(series[-1], patch_name)
+        self.assertNotIn(patch_name, series)
         self.assertIn("DRM_PLANE_TYPE_OVERLAY", added)
         self.assertIn("DRM_FORMAT_ARGB8888", added)
         self.assertIn("plane->crtc_id == 0 && plane->fb_id == 0", added)

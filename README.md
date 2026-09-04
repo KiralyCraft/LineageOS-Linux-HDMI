@@ -26,8 +26,8 @@ Android desktop-mode application.
    tile to arm the broker. Then connect HDMI and accept Android's **Mirror**
    prompt.
 4. Once Android has established a stable external mode, the patched Qualcomm
-   composer leases the external connector, CRTC, fixed primary plane, and one
-   compatible overlay reserved for the cursor to the chroot agent. It never
+   composer leases the external connector, CRTC, and fixed primary plane to the
+   chroot agent after detaching every Android plane on that CRTC. It never
    leases a plane assigned to Android's internal CRTC. Android continues using
    the phone's internal display.
 5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
@@ -43,9 +43,8 @@ Android desktop-mode application.
 
 During a takeover, Android keeps rendering the internal DSI panel while every
 Android plane on the external CRTC is detached and the external connector,
-CRTC, fixed primary plane, and a compatible cursor overlay are leased to an X
-server running inside a Linux chroot. LXDE, a mouse, and a keyboard can then
-use the connected monitor.
+CRTC, and fixed primary plane are leased to an X server running inside a Linux
+chroot. LXDE, a mouse, and a keyboard can then use the connected monitor.
 Stopping the session returns the same display to Android mirroring.
 
 The project consists of:
@@ -121,9 +120,12 @@ The Sony SDE kernel exposes no cursor-type plane and no legacy CRTC cursor
 callbacks. Moving Xorg's software cursor forced save/restore damage through
 the presentation path: a deterministic 120 Hz pointer test reduced otherwise
 steady 58-59 FPS rendering to 32-35 FPS, while hiding the cursor restored
-58-59 FPS. The accelerated runtime therefore uses its private modesetting
-driver to place the cursor on the extra leased overlay. If no safe compatible
-overlay exists, Xorg falls back to its ordinary software cursor.
+58-59 FPS. An experiment rendered the cursor on a separately leased overlay,
+but its synchronous plane updates still reduced rendering to 27-31 FPS and
+stalled pointer submission for seconds. The paired composer/Xorg overlay
+patches are therefore optional diagnostics, not part of the default patch
+series, and the runtime defaults to Xorg's software cursor while the actual
+cursor-motion synchronization problem is investigated.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
@@ -142,7 +144,7 @@ patched composer pauses only the external HWC display
                   |
                   v
 composer atomically clears all external CRTC planes, then leases
-connector + CRTC + fixed primary + one safe cursor overlay
+connector + CRTC + fixed primary
                   |
                   v
 root broker passes the lease to the chroot agent and Xorg :1
@@ -205,8 +207,8 @@ That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
 The Xorg 21.1.24 backports used with it are kept as reviewable patches under
 [`patches/xserver`](patches/xserver). They select a render node for DRI3, fix
-the Present wait-fence callback lifetime, and provide the opt-in overlay-plane
-cursor used by the leased display.
+the Present wait-fence callback lifetime, and keep the unsuccessful
+overlay-plane cursor experiment explicitly optional.
 The HDMI build does not compile the graphics stack automatically. Place the
 matched private Xorg binary at `libexec/Xorg`, its glamor and modesetting
 modules at `lib/xorg/modules/libglamoregl.so` and

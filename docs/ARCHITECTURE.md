@@ -15,14 +15,10 @@ one connected pluggable display it performs this staged sequence:
    its negotiated CRTC timing. The internal DSI display is never part of the
    lease.
 4. Under Qualcomm's global SurfaceFlinger command-sequence lock, refresh the
-   CRTC-fixed primary selection and select one ARGB8888 overlay compatible with
-   the external CRTC. Prefer an overlay already used by that external display,
-   then an idle overlay, and reject every plane assigned to another CRTC.
-   Atomically detach and sanitize the external planes, then create a DRM lease
-   containing the connector, CRTC, detached primary, and selected cursor
-   overlay. If no suitable overlay exists, retain the three-object lease and
-   software-cursor fallback.
-5. On release, revoke the lease, detach both lessee planes, reset the DAL's
+   CRTC-fixed primary selection. Atomically detach and sanitize every plane on
+   the external CRTC, then create a DRM lease containing the connector, CRTC,
+   and detached fixed primary plane.
+5. On release, revoke the lease, detach the lessee primary plane, reset the DAL's
    cached CRTC/plane state, and resume the same `HWCDisplay` object.
 
 The broker fsyncs a persistent transition breadcrumb before and after agent
@@ -83,12 +79,16 @@ plus every plane still assigned to the external CRTC. One atomic request
 detaches those planes, clears their source/destination geometry, and resets
 supported Qualcomm scaler and exclusion-rectangle state. Composer submits the
 request with `TEST_ONLY`, commits it synchronously, and reads every property
-back before creating the lease. One compatible external-or-idle overlay is
-included so private Xorg can use it as a cursor plane without modifying the
-primary framebuffer; a plane owned by the internal CRTC is never eligible. The
-connector and CRTC timing remain active. This prevents both stale Android
-overlays above Xorg and inherited private scaler state without a delay, retry,
-or hard-coded object id.
+back before creating the lease. The connector and CRTC timing remain active.
+This prevents both stale Android overlays above Xorg and inherited private
+scaler state without a delay, retry, or hard-coded object id.
+
+The default lease deliberately contains no cursor overlay. The paired optional
+composer and Xorg cursor patches can lease and drive an idle compatible overlay
+for diagnosis, but live testing showed that synchronous plane updates still
+stall presentation during pointer motion. They are omitted from the normal
+patch series and do not fix the cadence problem merely by rendering the cursor
+on a distinct plane.
 
 The composer independently revokes after 65 seconds or when its broker
 disconnects. In an explicitly registered continuous session, the broker omits

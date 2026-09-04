@@ -220,14 +220,19 @@ Do not replace `msm_drm.ko`, suppress cursor calls, or backport that null check
 without a trace, pstore record, or Qualcomm display recovery dump that
 identifies the corresponding path.
 
-Subsequent deterministic testing isolated one justified extra leased object.
+Subsequent deterministic testing identified a cursor-dependent bottleneck, but
+did not justify an extra leased object in the production path.
 With native KGSL presentation otherwise holding 58-59 FPS, moving Xorg's
 visible software cursor at 120 Hz reduced the client to 32-35 FPS; hiding that
 same cursor restored 58-59 FPS. The input injector itself stayed below 3.1 ms,
 and the CPU presentation bridge was slower, so input and flip selection were
 not the bottleneck. This kernel creates only Primary and Overlay planes and has
-neither a Cursor plane nor legacy CRTC cursor callbacks. Candidate 14 therefore
-leases one compatible ARGB8888 overlay for an opt-in private-Xorg cursor path.
-Selection occurs inside the serialized final handoff, rejects planes assigned
-to any other CRTC, and is followed by the same atomic sanitize and readback
-gate as the primary plane.
+neither a Cursor plane nor legacy CRTC cursor callbacks.
+
+Candidate 14 therefore tried one compatible ARGB8888 overlay with an opt-in
+private-Xorg cursor path. The cursor was visible, but the legacy synchronous
+`drmModeSetPlane` update on every move reduced `glxgears` to 27-31 FPS; a
+nominal 15-second 120 Hz trace took 36.9 seconds to submit and its worst plane
+update blocked for 2.85 seconds. Rendering the cursor on a distinct plane alone
+does not solve the issue. The paired Xorg and composer patches are now optional
+diagnostics and are excluded from both default patch series.

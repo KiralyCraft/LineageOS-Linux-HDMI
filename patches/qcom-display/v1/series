@@ -12,4 +12,3 @@
 0012-composer-synchronize-power-state-after-lease.patch
 0013-composer-serialize-final-lease-handoff.patch
 0014-composer-detach-active-primary-before-lease.patch
-0015-composer-lease-an-overlay-plane-for-the-xorg-cursor.patch

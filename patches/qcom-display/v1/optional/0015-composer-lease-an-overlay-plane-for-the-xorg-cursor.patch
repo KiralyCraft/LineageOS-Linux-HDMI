@@ -3,6 +3,10 @@ From: hdmi-los-builder <hdmi-los@localhost>
 Date: Thu, 3 Sep 2026 17:28:00 +0300
 Subject: [PATCH] composer: lease an overlay plane for the Xorg cursor
 
+Optional experiment paired with the optional Xserver OverlayCursor patch.
+Leasing a distinct plane rendered the pointer correctly, but did not fix the
+measured pointer-motion cadence and is therefore not in the default series.
+
 Qualcomm SDE exposes primary and overlay planes but no DRM cursor plane and no
 legacy CRTC cursor callbacks.  Consequently, upstream modesetting falls back
 to a software cursor whose save/restore damage serializes the full KGSL-to-KMS
@@ -29,7 +33,7 @@ index 78c12ee..5a80bbb 100644
 --- a/sdm/libs/dal/hw_device_drm.cpp
 +++ b/sdm/libs/dal/hw_device_drm.cpp
 @@ -126,6 +126,7 @@ namespace {
- 
+
  struct ExternalDisplayLeaseState {
    uint32_t plane_id = 0;
 +  uint32_t cursor_plane_id = 0;
@@ -39,7 +43,7 @@ index 78c12ee..5a80bbb 100644
 @@ -218,6 +219,76 @@ DisplayError GetFixedPrimaryPlane(int fd, uint32_t crtc_id, uint32_t *crtc_index
    return kErrorNone;
  }
- 
+
 +DisplayError GetCursorOverlayPlane(int fd, uint32_t crtc_index, uint32_t crtc_id,
 +                                   uint32_t *plane_id) {
 +  if (!plane_id || crtc_index >= 32) {
@@ -116,7 +120,7 @@ index 78c12ee..5a80bbb 100644
 @@ -232,15 +303,16 @@ struct PlaneSanitizeState {
    std::vector<PlanePropertyReset> resets;
  };
- 
+
 -DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
 -                                            uint32_t crtc_id) {
 +DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t primary_plane_id,
@@ -126,7 +130,7 @@ index 78c12ee..5a80bbb 100644
      DLOGE("hdmi-los: cannot enumerate planes before lease: %s", strerror(errno));
      return kErrorHardware;
    }
- 
+
 -  bool found_leased_plane = false;
 +  bool found_primary_plane = false;
 +  bool found_cursor_plane = cursor_plane_id == 0;
@@ -136,7 +140,7 @@ index 78c12ee..5a80bbb 100644
 @@ -251,12 +323,15 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
        return kErrorHardware;
      }
- 
+
 -    const bool is_leased_plane = plane->plane_id == leased_plane_id;
 +    const bool is_primary_plane = plane->plane_id == primary_plane_id;
 +    const bool is_cursor_plane = cursor_plane_id != 0 && plane->plane_id == cursor_plane_id;
@@ -167,10 +171,10 @@ index 78c12ee..5a80bbb 100644
 +          found_primary_plane, cursor_plane_id, found_cursor_plane);
      return kErrorResources;
    }
- 
+
 @@ -358,9 +434,9 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
    }
- 
+
    DLOGI("hdmi-los: atomically sanitized %zu planes for external CRTC %u before "
 -        "lease (active=%zu primary=%u private-scalers=%zu)",
 -        planes.size(), crtc_id, active_plane_count, leased_plane_id,
@@ -180,7 +184,7 @@ index 78c12ee..5a80bbb 100644
 +        cursor_plane_id, scaler_reset_count);
    return kErrorNone;
  }
- 
+
 @@ -2899,14 +2975,26 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
            state.plane_id, plane_crtc_id, token_.crtc_id);
      return kErrorResources;
@@ -199,7 +203,7 @@ index 78c12ee..5a80bbb 100644
    if (error != kErrorNone) {
      return error;
    }
- 
+
 -  uint32_t objects[] = {token_.conn_id, token_.crtc_id, state.plane_id};
 +  std::vector<uint32_t> objects = {token_.conn_id, token_.crtc_id, state.plane_id};
 +  if (state.cursor_plane_id != 0) {
@@ -220,14 +224,14 @@ index 78c12ee..5a80bbb 100644
 +        lessee_id, objects.size(), state.cursor_plane_id);
    return kErrorNone;
  }
- 
+
 @@ -2960,29 +3049,13 @@ DisplayError HWDeviceDRM::ResetExternalDisplayLease() {
      return result;
    }
    const uint32_t plane_id = state_it->second.plane_id;
 +  const uint32_t cursor_plane_id = state_it->second.cursor_plane_id;
    const uint32_t lessee_id = state_it->second.lessee_id;
- 
+
    if (lessee_id != 0 && plane_id != 0) {
 -    uint32_t crtc_property = 0;
 -    uint32_t fb_property = 0;
@@ -253,7 +257,7 @@ index 78c12ee..5a80bbb 100644
 +        SanitizeExternalPlanesForLease(dev_fd_, plane_id, cursor_plane_id, token_.crtc_id);
 +    if (sanitize != kErrorNone) result = sanitize;
    }
- 
+
    bool connected = false;
--- 
+--
 2.53.0

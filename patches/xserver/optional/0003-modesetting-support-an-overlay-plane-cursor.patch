@@ -3,6 +3,10 @@ From: KiralyCraft <alexucu@gmail.com>
 Date: Fri, 4 Sep 2026 10:12:09 +0300
 Subject: [PATCH] modesetting: support an overlay-plane cursor
 
+Optional experiment: this renders the pointer through a distinct plane, but
+live testing on the target Qualcomm device showed that synchronous plane
+updates still stall Xorg and do not fix pointer-motion presentation cadence.
+
 ---
  hw/xfree86/drivers/modesetting/driver.c       |   8 +
  hw/xfree86/drivers/modesetting/driver.h       |   1 +
@@ -16,7 +20,7 @@ index fe3315a..504fe37 100644
 --- a/hw/xfree86/drivers/modesetting/driver.c
 +++ b/hw/xfree86/drivers/modesetting/driver.c
 @@ -135,6 +135,7 @@ static SymTabRec Chipsets[] = {
- 
+
  static const OptionInfoRec Options[] = {
      {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
 +    {OPTION_OVERLAY_CURSOR, "OverlayCursor", OPTV_BOOLEAN, {0}, FALSE},
@@ -34,7 +38,7 @@ index fe3315a..504fe37 100644
 +                   "OverlayCursor ignored while SWcursor is enabled\n");
 +        ms->drmmode.overlay_cursor = FALSE;
 +    }
- 
+
      ms->cursor_width = 64;
      ms->cursor_height = 64;
 diff --git a/hw/xfree86/drivers/modesetting/driver.h b/hw/xfree86/drivers/modesetting/driver.h
@@ -42,7 +46,7 @@ index 71aa873..6c9e865 100644
 --- a/hw/xfree86/drivers/modesetting/driver.h
 +++ b/hw/xfree86/drivers/modesetting/driver.h
 @@ -51,6 +51,7 @@ struct ms_vrr_priv {
- 
+
  typedef enum {
      OPTION_SW_CURSOR,
 +    OPTION_OVERLAY_CURSOR,
@@ -54,9 +58,9 @@ index 21c9222..021c4e6 100644
 --- a/hw/xfree86/drivers/modesetting/drmmode_display.c
 +++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
 @@ -1638,13 +1638,86 @@ drmmode_set_cursor_colors(xf86CrtcPtr crtc, int bg, int fg)
- 
+
  }
- 
+
 +static Bool drmmode_set_cursor(xf86CrtcPtr crtc);
 +
  static void
@@ -64,7 +68,7 @@ index 21c9222..021c4e6 100644
  {
      drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
      drmmode_ptr drmmode = drmmode_crtc->drmmode;
- 
+
 -    drmModeMoveCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id, x, y);
 +    if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id) {
 +        drmmode_crtc->cursor_x = x;
@@ -139,12 +143,12 @@ index 21c9222..021c4e6 100644
 +    }
 +    return TRUE;
  }
- 
+
  static Bool
 @@ -1660,6 +1733,10 @@ drmmode_set_cursor(xf86CrtcPtr crtc)
      if (cursor == NullCursor)
  	    return TRUE;
- 
+
 +    if (drmmode->overlay_cursor && drmmode_crtc->cursor_plane_id &&
 +        drmmode_crtc->cursor_fb_id)
 +        return drmmode_set_overlay_cursor(crtc);
@@ -154,7 +158,7 @@ index 21c9222..021c4e6 100644
                              cursor->bits->xhot, cursor->bits->yhot);
 @@ -1723,8 +1800,15 @@ drmmode_hide_cursor(xf86CrtcPtr crtc)
      drmmode_ptr drmmode = drmmode_crtc->drmmode;
- 
+
      drmmode_crtc->cursor_up = FALSE;
 -    drmModeSetCursor(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id, 0,
 -                     ms->cursor_width, ms->cursor_height);
@@ -168,12 +172,12 @@ index 21c9222..021c4e6 100644
 +                         ms->cursor_width, ms->cursor_height);
 +    }
  }
- 
+
  static Bool
 @@ -2355,6 +2439,106 @@ drmmode_crtc_vrr_init(int drm_fd, xf86CrtcPtr crtc)
      drmModeFreeObjectProperties(drm_props);
  }
- 
+
 +static Bool
 +drmmode_cursor_plane_reserved(ScrnInfoPtr pScrn, uint32_t plane_id)
 +{
@@ -285,10 +289,10 @@ index 21c9222..021c4e6 100644
 +        drmmode_crtc->cursor_plane_id =
 +            drmmode_find_overlay_cursor_plane(pScrn, drmmode, num);
      xorg_list_init(&drmmode_crtc->mode_list);
- 
+
      props = drmModeObjectGetProperties(drmmode->fd, mode_res->crtcs[num],
 @@ -4182,6 +4369,23 @@ drmmode_create_initial_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
- 
+
          drmmode_crtc->cursor_bo =
              dumb_bo_create(drmmode->fd, width, height, bpp);
 +        if (!drmmode_crtc->cursor_bo)
@@ -314,7 +318,7 @@ index 21c9222..021c4e6 100644
 @@ -4241,6 +4445,12 @@ drmmode_free_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
          xf86CrtcPtr crtc = xf86_config->crtc[i];
          drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
- 
+
 +        if (drmmode_crtc->cursor_plane_id)
 +            drmModeSetPlane(drmmode->fd, drmmode_crtc->cursor_plane_id,
 +                            drmmode_crtc->mode_crtc->crtc_id, 0, 0,
@@ -333,7 +337,7 @@ index 2a9a915..e4f4098 100644
      drmmode_bo front_bo;
      Bool sw_cursor;
 +    Bool overlay_cursor;
- 
+
      /* Broken-out options. */
      OptionInfoPtr Options;
 @@ -172,6 +173,10 @@ typedef struct {
@@ -346,7 +350,7 @@ index 2a9a915..e4f4098 100644
 +    int cursor_y;
      Bool cursor_up;
      uint16_t lut_r[256], lut_g[256], lut_b[256];
- 
+
 diff --git a/hw/xfree86/drivers/modesetting/modesetting.man b/hw/xfree86/drivers/modesetting/modesetting.man
 index 7179001..dbdc540 100644
 --- a/hw/xfree86/drivers/modesetting/modesetting.man

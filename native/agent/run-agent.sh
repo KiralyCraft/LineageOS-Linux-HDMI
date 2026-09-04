@@ -10,9 +10,10 @@ XORG_ACCEL=kgsl-kms-bridge
 CLIENT_PRESENT=bridge
 SESSION=lxde
 NO_TIMEOUT=1
+OVERLAY_CURSOR=0
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--overlay-cursor] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -45,6 +46,10 @@ while (($#)); do
             NO_TIMEOUT=0
             shift
             ;;
+        --overlay-cursor)
+            OVERLAY_CURSOR=1
+            shift
+            ;;
         *)
             usage
             exit 2
@@ -62,6 +67,10 @@ if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
         "--client-present $CLIENT_PRESENT" >&2
     exit 2
 fi
+if ((OVERLAY_CURSOR)) && [[ $XORG_ACCEL != kgsl-kms-bridge ]]; then
+    printf '%s requires --xorg-accel kgsl-kms-bridge\n' '--overlay-cursor' >&2
+    exit 2
+fi
 
 if ((EUID != 0)); then
     args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
@@ -71,6 +80,7 @@ if ((EUID != 0)); then
     else
         args+=(--timeout)
     fi
+    ((OVERLAY_CURSOR)) && args+=(--overlay-cursor)
     exec sudo -n -- "$0" "${args[@]}"
 fi
 
@@ -254,6 +264,14 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
     }
     printf 'Using matched private Xorg renderonly scanout with client presentation mode: %s\n' \
         "$CLIENT_PRESENT" >&2
+    if ((OVERLAY_CURSOR)); then
+        LC_ALL=C grep -aFq -- 'OverlayCursor' \
+            "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so" || {
+            printf 'The optional Xorg overlay-cursor patch is not installed\n' >&2
+            exit 1
+        }
+        printf 'WARNING: experimental overlay cursor does not improve pointer-motion cadence\n' >&2
+    fi
 fi
 
 if ((NO_TIMEOUT)); then
@@ -263,6 +281,7 @@ fi
 
 agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
             --client-present "$CLIENT_PRESENT" --session "$SESSION")
+((OVERLAY_CURSOR)) && agent_args+=(--overlay-cursor)
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!
