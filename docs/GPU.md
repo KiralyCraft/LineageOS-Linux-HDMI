@@ -566,12 +566,20 @@ The runtime therefore requires this complete set from one Mesa build:
 lib/mesa/libgallium-<matching-version>.so
 lib/mesa/libGLX_mesa.so.0
 lib/mesa/libEGL_mesa.so.0
+lib/mesa/libdril_dri.so
+lib/mesa/kgsl_dri.so -> libdril_dri.so
 ```
 
-All three current libraries carry `HDMI_LOS_MESA_BRIDGE_ABI=5`. `run-agent.sh`
-checks every file before starting accelerated mode and refuses a missing,
-stale, or mixed set. Accelerated mode additionally requires the matched
-private Xorg at `libexec/Xorg` and its glamor module at
+The frontend/Gallium trio carries `HDMI_LOS_MESA_BRIDGE_ABI=5`; the DRIL target
+exports `__driDriverGetExtensions_kgsl`. `run-agent.sh` checks both contracts
+before starting accelerated mode and refuses a missing, stale, or mixed set.
+The agent sets Mesa's standard `LIBGL_DRIVERS_PATH` to the private directory so
+the KGSL driver name cannot resolve to the chroot's system DRIL target. Without
+that final piece, candidate 14 loaded the system `libdril_dri.so` and system
+`libgallium` during `eglCreateContext`, then crashed in Mesa state-tracker
+context creation before Xorg could reserve its leased cursor overlay.
+Accelerated mode additionally requires the matched private Xorg at
+`libexec/Xorg` and its glamor module at
 `lib/xorg/modules/libglamoregl.so`. The system Xorg remains available to the
 `safe` diagnostic mode.
 

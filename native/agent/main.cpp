@@ -360,6 +360,7 @@ bool trace_preflight() {
   std::string glamor_module = g_bundle + "/lib/xorg/modules/libglamoregl.so";
   std::string modesetting_module =
       g_bundle + "/lib/xorg/modules/drivers/modesetting_drv.so";
+  std::string kgsl_dri = g_bundle + "/lib/mesa/kgsl_dri.so";
   struct stat xorg = {};
   if (stat(xorg_path.c_str(), &xorg) != 0 || !S_ISREG(xorg.st_mode) ||
       access(xorg_path.c_str(), X_OK) != 0 ||
@@ -369,8 +370,9 @@ bool trace_preflight() {
   }
   if (g_kgsl_kms_bridge &&
       (access(glamor_module.c_str(), R_OK) != 0 ||
-       access(modesetting_module.c_str(), R_OK) != 0)) {
-    log_message("error", "a matched private Xorg module is missing");
+       access(modesetting_module.c_str(), R_OK) != 0 ||
+       access(kgsl_dri.c_str(), R_OK) != 0)) {
+    log_message("error", "a matched private Xorg or Mesa DRI module is missing");
     return false;
   }
 
@@ -660,6 +662,7 @@ void configure_gpu_environment(bool kms_scanout_server) {
   if (g_kgsl_kms_bridge) {
     std::string mesa = g_bundle + "/lib/mesa";
     setenv("LD_LIBRARY_PATH", mesa.c_str(), 1);
+    setenv("LIBGL_DRIVERS_PATH", mesa.c_str(), 1);
     if (kms_scanout_server) {
       // Xorg owns the leased display.  Its renderonly screen allocates exact
       // KMS scanout resources and imports them into KGSL for glamor.

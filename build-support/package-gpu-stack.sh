@@ -18,11 +18,12 @@ mesa_files=(
     "$MESA_BUILD/src/glx/libGLX_mesa.so.0.0.0"
     "$MESA_BUILD/src/egl/libEGL_mesa.so.0.0.0"
 )
+dril="$MESA_BUILD/src/gallium/targets/dril/libdril_dri.so"
 xorg="$XSERVER_BUILD/hw/xfree86/Xorg"
 glamor="$XSERVER_BUILD/hw/xfree86/glamor_egl/libglamoregl.so"
 modesetting="$XSERVER_BUILD/hw/xfree86/drivers/modesetting/modesetting_drv.so"
 
-for file in "${mesa_files[@]}" "$xorg" "$glamor" "$modesetting"; do
+for file in "${mesa_files[@]}" "$dril" "$xorg" "$glamor" "$modesetting"; do
     [[ -f $file ]] || { printf 'missing GPU stack component: %s\n' "$file" >&2; exit 1; }
     readelf -h "$file" | grep -q 'AArch64' || {
         printf 'GPU stack component is not AArch64: %s\n' "$file" >&2
@@ -35,11 +36,17 @@ for file in "${mesa_files[@]}"; do
         exit 1
     }
 done
+LC_ALL=C grep -aFq '__driDriverGetExtensions_kgsl' "$dril" || {
+    printf 'Mesa DRIL target does not export the KGSL driver entry point: %s\n' "$dril" >&2
+    exit 1
+}
 
 install -d "$STAGE/lib/mesa" "$STAGE/lib/xorg/modules/drivers" "$STAGE/libexec"
 install -m 0644 "${gallium[0]}" "$STAGE/lib/mesa/${gallium[0]##*/}"
 install -m 0644 "${mesa_files[1]}" "$STAGE/lib/mesa/libGLX_mesa.so.0"
 install -m 0644 "${mesa_files[2]}" "$STAGE/lib/mesa/libEGL_mesa.so.0"
+install -m 0644 "$dril" "$STAGE/lib/mesa/libdril_dri.so"
+ln -s libdril_dri.so "$STAGE/lib/mesa/kgsl_dri.so"
 install -m 0755 "$xorg" "$STAGE/libexec/Xorg"
 install -m 0644 "$glamor" "$STAGE/lib/xorg/modules/libglamoregl.so"
 install -m 0644 "$modesetting" \

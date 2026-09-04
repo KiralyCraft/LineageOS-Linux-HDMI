@@ -202,6 +202,29 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
             exit 1
         fi
     done
+    dri_loader="$BUNDLE/lib/mesa/libdril_dri.so"
+    dri_driver="$BUNDLE/lib/mesa/kgsl_dri.so"
+    for dri_component in "$dri_loader" "$dri_driver"; do
+        [[ -f $dri_component ]] || {
+            printf 'Required private Mesa DRI component is missing: %s\n' \
+                "$dri_component" >&2
+            exit 1
+        }
+        if ! runuser -u kiraly -- test -r "$dri_component"; then
+            printf 'Private Mesa DRI component is not accessible to user kiraly: %s\n' \
+                "$dri_component" >&2
+            exit 1
+        fi
+    done
+    [[ $dri_driver -ef $dri_loader ]] || {
+        printf 'Private KGSL DRI loader does not resolve to the matched libdril_dri.so\n' >&2
+        exit 1
+    }
+    LC_ALL=C grep -aFq -- '__driDriverGetExtensions_kgsl' "$dri_loader" || {
+        printf 'Private Mesa DRI loader does not export the KGSL driver entry point: %s\n' \
+            "$dri_loader" >&2
+        exit 1
+    }
     printf 'Using matched private Xorg renderonly scanout with client presentation mode: %s\n' \
         "$CLIENT_PRESENT" >&2
 fi

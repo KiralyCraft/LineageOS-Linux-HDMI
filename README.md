@@ -211,11 +211,14 @@ The HDMI build does not compile the graphics stack automatically. Place the
 matched private Xorg binary at `libexec/Xorg`, its glamor and modesetting
 modules at `lib/xorg/modules/libglamoregl.so` and
 `lib/xorg/modules/drivers/modesetting_drv.so`, and the private `libgallium-*.so`,
-`libGLX_mesa.so.0`, and `libEGL_mesa.so.0` below `lib/mesa/` in the chroot
-runtime bundle. All three Mesa libraries must come from the same completed
-build. Do not replace only `libgallium`: GLX, EGL, and the DRI target share
-private loader structures, so a mixed set can corrupt memory. The launcher
-checks the ABI marker in all three files and fails closed.
+`libGLX_mesa.so.0`, `libEGL_mesa.so.0`, and `libdril_dri.so` below `lib/mesa/`
+in the chroot runtime bundle. `kgsl_dri.so` is a relative link to that private
+DRIL target. All four Mesa binaries must come from the same completed build.
+Do not replace only `libgallium`: GLX, EGL, and the DRI target share private
+loader structures, so a mixed set can corrupt memory. The launcher uses
+Mesa's standard `LIBGL_DRIVERS_PATH` to select the private KGSL target, checks
+the bridge ABI marker in the frontend/Gallium files and the KGSL export in the
+DRIL target, and fails closed if the set is incomplete.
 
 After both trees have been built for AArch64, assemble the overlay without
 mixing components:
