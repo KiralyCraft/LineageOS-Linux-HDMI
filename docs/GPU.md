@@ -568,16 +568,23 @@ lib/mesa/libGLX_mesa.so.0
 lib/mesa/libEGL_mesa.so.0
 lib/mesa/libdril_dri.so
 lib/mesa/kgsl_dri.so -> libdril_dri.so
+lib/mesa/libgbm.so.1
+lib/mesa/gbm/dri_gbm.so
 ```
 
 The frontend/Gallium trio carries `HDMI_LOS_MESA_BRIDGE_ABI=5`; the DRIL target
-exports `__driDriverGetExtensions_kgsl`. `run-agent.sh` checks both contracts
+exports `__driDriverGetExtensions_kgsl`; and the GBM backend has a direct
+dependency on the same uniquely named Gallium build. `run-agent.sh` checks
+these contracts
 before starting accelerated mode and refuses a missing, stale, or mixed set.
-The agent sets Mesa's standard `LIBGL_DRIVERS_PATH` to the private directory so
-the KGSL driver name cannot resolve to the chroot's system DRIL target. Without
-that final piece, candidate 14 loaded the system `libdril_dri.so` and system
-`libgallium` during `eglCreateContext`, then crashed in Mesa state-tracker
-context creation before Xorg could reserve its leased cursor overlay.
+The agent sets Mesa's standard `LIBGL_DRIVERS_PATH` and `GBM_BACKENDS_PATH` to
+the private directories. The private `libgbm.so.1` is selected through
+`LD_LIBRARY_PATH`, preventing either the KGSL driver or the dynamically loaded
+GBM backend from resolving to the chroot's system Mesa. Candidate 14 first
+exposed the missing DRIL target; after adding it, the core showed that system
+`dri_gbm.so` still loaded system Gallium alongside the private Gallium. That
+mixed process crashed in Mesa state-tracker context creation before Xorg could
+reserve its leased cursor overlay.
 Accelerated mode additionally requires the matched private Xorg at
 `libexec/Xorg` and its glamor module at
 `lib/xorg/modules/libglamoregl.so`. The system Xorg remains available to the

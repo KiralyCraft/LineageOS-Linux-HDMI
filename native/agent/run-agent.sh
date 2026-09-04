@@ -225,6 +225,33 @@ elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
             "$dri_loader" >&2
         exit 1
     }
+    gbm_library="$BUNDLE/lib/mesa/libgbm.so.1"
+    gbm_backend="$BUNDLE/lib/mesa/gbm/dri_gbm.so"
+    for gbm_component in "$gbm_library" "$gbm_backend"; do
+        [[ -f $gbm_component ]] || {
+            printf 'Required private Mesa GBM component is missing: %s\n' \
+                "$gbm_component" >&2
+            exit 1
+        }
+        if ! runuser -u kiraly -- test -r "$gbm_component"; then
+            printf 'Private Mesa GBM component is not accessible to user kiraly: %s\n' \
+                "$gbm_component" >&2
+            exit 1
+        fi
+    done
+    LC_ALL=C grep -aFq -- 'gbm_create_device' "$gbm_library" || {
+        printf 'Private Mesa GBM library has no GBM entry point: %s\n' "$gbm_library" >&2
+        exit 1
+    }
+    LC_ALL=C grep -aFq -- 'gbmint_get_backend' "$gbm_backend" || {
+        printf 'Private Mesa GBM backend has no backend entry point: %s\n' "$gbm_backend" >&2
+        exit 1
+    }
+    LC_ALL=C grep -aFq -- "${gallium_libraries[0]##*/}" "$gbm_backend" || {
+        printf 'Private Mesa GBM backend does not require the matched Gallium build: %s\n' \
+            "$gbm_backend" >&2
+        exit 1
+    }
     printf 'Using matched private Xorg renderonly scanout with client presentation mode: %s\n' \
         "$CLIENT_PRESENT" >&2
 fi
