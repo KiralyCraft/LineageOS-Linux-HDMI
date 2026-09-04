@@ -5,17 +5,20 @@ the same Xorg 21.1.24 tree. Keeping the pair private avoids changing the
 chroot's package-managed Xorg installation and guarantees that the Present
 core and glamor DRI3 behavior match.
 
-The pinned base is Xorg commit
-`65d790bd208ec380b196eb98f144abb0b32e334d` (`xorg-server-21.1.24`). Apply the
-default series in its declared order:
+The `third_party/xserver` submodule pins Xorg commit
+`65d790bd208ec380b196eb98f144abb0b32e334d` (`xorg-server-21.1.24`). Keep the
+submodule pristine and apply the default series in its declared order to a
+disposable worktree:
 
 ```sh
-git clone --branch xorg-server-21.1.24 --depth 1 \
-  https://gitlab.freedesktop.org/xorg/xserver.git xserver-hdmi
-cd xserver-hdmi
+git submodule update --init --depth 1 third_party/xserver
+repo=$(pwd)
+git -C third_party/xserver worktree add --detach \
+  "$repo/.local/xserver-hdmi" 65d790bd208ec380b196eb98f144abb0b32e334d
+cd "$repo/.local/xserver-hdmi"
 while IFS= read -r patch; do
-  git apply "../LineageOS-Linux-HDMI/patches/xserver/$patch"
-done < ../LineageOS-Linux-HDMI/patches/xserver/series
+  git apply "$repo/patches/xserver/$patch"
+done < "$repo/patches/xserver/series"
 meson setup build --prefix=/usr -Dxorg=true -Dglamor=true
 ninja -C build \
   hw/xfree86/Xorg \
@@ -44,11 +47,3 @@ correctness series. TearFree keeps two shadow scanout buffers per CRTC, copies
 accumulated damage into the next buffer, and flips it at vblank. This restores
 coherent output cadence when Xorg's visible software cursor makes direct
 Present flips ineligible; it does not suppress `DIRTYFB` or add a timer.
-
-`optional/0003-modesetting-support-an-overlay-plane-cursor.patch` is not in
-the default series. It must be paired with the Qualcomm composer patch under
-`patches/qcom-display/v1/optional/` and selected with `--overlay-cursor`. The
-experiment rendered the cursor on a distinct plane, but synchronous legacy
-plane updates still reduced 120 Hz pointer-motion rendering to 27-31 FPS and
-caused multi-second stalls. It is retained for diagnosis, not recommended as a
-performance fix.

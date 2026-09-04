@@ -99,9 +99,9 @@ swapchain. `LIBGL_KOPPER_DISABLE=true` still leaves the client area black. Do
 not add `MESA_LOADER_DRIVER_OVERRIDE=kgsl` to the `safe` ShadowFB mode: that
 override is valid only with the matched accelerated Xorg/renderonly stack.
 
-The installed Mesa source is pinned by the optional
+The installed Mesa source is pinned by the
 [`third_party/mesa-for-android-container`](../third_party/mesa-for-android-container)
-submodule at commit `64b6af2f` on the
+submodule at commit `99c6bd35` on the
 [`fix/kgsl-leased-screen`](https://github.com/KiralyCraft/mesa-for-android-container/tree/fix/kgsl-leased-screen)
 branch. Its relevant custom commits are:
 
@@ -237,10 +237,9 @@ Three Xorg 21.1.24 backports are required and are stored under
 - upstream modesetting TearFree and its complete follow-up correctness series
   coalesce root damage into alternating scanout buffers and flip at vblank.
 
-The similarly numbered patch under `patches/xserver/optional/` is an
-experiment, not a required backport. It must be paired with the optional
-Qualcomm composer cursor patch and explicitly enabled with
-`run-agent.sh --overlay-cursor`.
+The unmodified base for those patches is pinned by the
+[`third_party/xserver`](../third_party/xserver) submodule at commit
+`65d790bd` (`xorg-server-21.1.24`).
 
 ## Cursor-motion presentation bottleneck
 
@@ -253,20 +252,9 @@ below 3.1 ms. This established that the cursor-dependent Xorg path triggers the
 slowdown, but the later startup-only trace test below supersedes those client
 FPS numbers.
 
-The downstream SM8550 SDE driver registers Primary and Overlay planes only and
-does not implement legacy `cursor_set`, `cursor_set2`, or `cursor_move` CRTC
-callbacks. Candidate 14 tested an opt-in cursor on a separately leased overlay.
-It rendered correctly, yet 120 Hz pointer motion reduced `glxgears` further to
-27-31 FPS. A nominal 15-second cursor trace took 36.9 seconds to submit. The
-2.85-second outlier was later localized to client-side `XFlush` backpressure,
-not one kernel `drmModeSetPlane` call; direct syscall timings were generally a
-few milliseconds. A distinct plane therefore does not by itself fix the
-cursor-motion presentation problem.
-
-The default is again `SWcursor true`, with no cursor overlay in the composer
-lease. The paired patches remain under `optional/` and `--overlay-cursor` exists
-only for diagnosis. Nonblocking atomic plane updates would normally avoid
-waiting in a legacy plane ioctl, but this downstream kernel rejects Xorg's
+The downstream SM8550 SDE driver does not implement legacy `cursor_set`,
+`cursor_set2`, or `cursor_move` CRTC callbacks, so the production path uses
+Xorg's software cursor. This downstream kernel also rejects Xorg's
 atomic-client capability request, so forcing `Atomic true` is not a validated
 solution on this device.
 
@@ -293,8 +281,8 @@ cursor, or adding a timer would trade correctness for benchmark numbers.
 The startup tracer was also a separate multiplier. Full tracing performs two
 agent/broker round trips and two durable log syncs around every DRM ioctl. A
 same-session A/B changed uncapped `glxgears` from roughly 52-79 FPS to
-503-609 FPS when that relay was disabled, but did not make the synchronous
-overlay cursor smooth. The default is therefore `--drm-trace startup`: trace
+503-609 FPS when that relay was disabled, but did not fix cursor-motion
+presentation. The default is therefore `--drm-trace startup`: trace
 fail-closed until scanout is verified, then bypass routine steady-state ioctls
 while retaining compatibility shims and tracing every later `SETCRTC`.
 `--drm-trace full` remains a diagnostic mode whose timing results are invalid.
@@ -339,8 +327,7 @@ skips, no discontinuities, and no torn frames. Cursor submission remained
 nonblocking at 1.860 ms worst case.
 
 This fixes the measured presentation-cadence problem without changing the
-private Mesa bridge. The optional overlay-plane cursor remains a diagnostic
-only; it is neither enabled nor required by TearFree.
+private Mesa bridge.
 
 Bridge clients ask `x11_dri3_open()` for KGSL because their completed images
 are copied independently. Shadow and direct clients retain Xorg's DRI3 DRM fd,

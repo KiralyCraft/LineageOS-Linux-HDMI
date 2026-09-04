@@ -137,10 +137,6 @@ active updates/s, zero source skips, zero discontinuities, zero torn frames,
 and two duplicate capture frames. The hidden control measured 60.022 active
 updates/s with no duplicates, skips, discontinuities, or tearing.
 
-The paired composer/Xorg overlay-plane cursor patches remain optional
-diagnostics. That experiment rendered the cursor separately but synchronous
-plane updates backpressured pointer submission and did not fix cadence.
-
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
 combination is safe.
@@ -206,25 +202,25 @@ git clone https://github.com/KiralyCraft/LineageOS-Linux-HDMI.git
 cd LineageOS-Linux-HDMI
 ```
 
-The optional submodule at
-`third_party/mesa-for-android-container` documents and pins the Mesa source
-used by `kgsl-kms-bridge`. Initialize it when reproducing or changing the
-accelerated path:
+The submodules under `third_party/` pin both source trees used by the
+accelerated path. Initialize them before reproducing or changing the graphics
+stack:
 
 ```sh
-git submodule update --init --depth 1 third_party/mesa-for-android-container
+git submodule update --init --depth 1
 ```
 
-It tracks the `fix/kgsl-leased-screen` update line and is pinned by this
-repository to commit
+The Mesa submodule tracks the `fix/kgsl-leased-screen` update line and is
+pinned by this repository to commit
 [`99c6bd35`](https://github.com/KiralyCraft/mesa-for-android-container/commit/99c6bd35433a08d39e2044daecad448eb181f394).
 That branch alone contains the leased-screen renderonly/PRIME work; the separate
 `fix/kgsl-present-wait-fence` pull-request branch does not.
-The Xorg 21.1.24 backports used with it are kept as reviewable patches under
-[`patches/xserver`](patches/xserver). They select a render node for DRI3, fix
-the Present wait-fence callback lifetime, and backport upstream modesetting
-TearFree plus its correctness follow-ups. The unsuccessful overlay-plane
-cursor experiment remains explicitly optional.
+The Xorg submodule pins upstream tag `xorg-server-21.1.24` at commit
+[`65d790bd`](https://gitlab.freedesktop.org/xorg/xserver/-/commit/65d790bd208ec380b196eb98f144abb0b32e334d).
+The production changes remain an ordered, reviewable patch series under
+[`patches/xserver`](patches/xserver): render-node selection for DRI3, the
+Present wait-fence lifetime fix, and upstream modesetting TearFree with its
+correctness follow-ups.
 The HDMI build does not compile the graphics stack automatically. Place the
 matched private Xorg binary at `libexec/Xorg`, its glamor and modesetting
 modules at `lib/xorg/modules/libglamoregl.so` and

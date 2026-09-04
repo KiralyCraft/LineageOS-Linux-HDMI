@@ -49,7 +49,6 @@ uint32_t g_probe_mode = HDMI_LOS_PROBE_NONE;
 std::string g_bundle;
 bool g_kgsl_glamor = false;
 bool g_kgsl_kms_bridge = false;
-bool g_overlay_cursor = false;
 enum class ClientPresentMode { kBridge, kShadow, kDirect };
 ClientPresentMode g_client_present = ClientPresentMode::kBridge;
 bool g_start_lxde = true;
@@ -575,8 +574,6 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
                        uint32_t probe_mode, const drm_mode_modeinfo &mode) {
   constexpr const char *kModeName = "hdmi-los-android-current";
   std::string mode_flags = xorg_mode_flags(mode.flags);
-  const char *overlay_cursor_option =
-      g_overlay_cursor ? "  Option \"OverlayCursor\" \"true\"\n" : "";
   std::string path = std::string(kRuntime) + "/xorg.conf";
   FILE *file = fopen(path.c_str(), "we");
   if (!file) return false;
@@ -619,7 +616,6 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Option \"ShadowFB\" \"%s\"\n"
       "  Option \"Atomic\" \"%s\"\n"
       "  Option \"SWcursor\" \"%s\"\n"
-      "%s"
       "  Option \"Monitor-DP-1\" \"HDMI Monitor\"\n"
       "EndSection\n"
       "Section \"Screen\"\n"
@@ -646,8 +642,7 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       g_kgsl_glamor ? "true" : "false",
       g_kgsl_glamor ? "false" : "true",
       probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false",
-      g_overlay_cursor ? "false" : "true",
-      overlay_cursor_option, kModeName);
+      "true", kModeName);
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
   if (fclose(file) != 0) ok = false;
@@ -1177,8 +1172,6 @@ int main(int argc, char **argv) {
       }
     } else if (strcmp(argv[i], "--no-timeout") == 0) {
       g_no_timeout = true;
-    } else if (strcmp(argv[i], "--overlay-cursor") == 0) {
-      g_overlay_cursor = true;
     } else if (strcmp(argv[i], "--drm-trace") == 0 && i + 1 < argc) {
       const char *value = argv[++i];
       if (strcmp(value, "startup") == 0)
@@ -1193,7 +1186,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
                       "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
                       "[--client-present bridge|shadow|direct] "
-                      "[--session lxde|none] [--overlay-cursor] "
+                      "[--session lxde|none] "
                       "[--drm-trace startup|full] "
                       "[--no-timeout]\n");
       return 2;
@@ -1201,10 +1194,6 @@ int main(int argc, char **argv) {
   }
   if (!g_kgsl_kms_bridge && g_client_present != ClientPresentMode::kBridge) {
     fprintf(stderr, "--client-present shadow/direct requires --xorg-accel kgsl-kms-bridge\n");
-    return 2;
-  }
-  if (g_overlay_cursor && !g_kgsl_kms_bridge) {
-    fprintf(stderr, "--overlay-cursor requires --xorg-accel kgsl-kms-bridge\n");
     return 2;
   }
   if (g_kgsl_kms_bridge) {

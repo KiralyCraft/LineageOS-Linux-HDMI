@@ -92,13 +92,6 @@ back before creating the lease. The connector and CRTC timing remain active.
 This prevents both stale Android overlays above Xorg and inherited private
 scaler state without a delay, retry, or hard-coded object id.
 
-The default lease deliberately contains no cursor overlay. The paired optional
-composer and Xorg cursor patches can lease and drive an idle compatible overlay
-for diagnosis, but live testing showed that synchronous plane updates still
-stall presentation during pointer motion. They are omitted from the normal
-patch series and do not fix the cadence problem merely by rendering the cursor
-on a distinct plane.
-
 The software-cursor slowdown in candidate 15 was an interaction between Xorg
 21.1.24 and this downstream DRM implementation. Xorg probes `DIRTYFB`,
 registers root-pixmap damage when the probe succeeds, and calls
@@ -109,11 +102,6 @@ pixmap. Sony's SM8550 framebuffer installs `drm_atomic_helper_dirtyfb` as its
 dirty callback; the kernel documents that helper as deliberately blocking and
 implements each call as a synchronous atomic commit. Pointer motion therefore
 removed the direct flip path while adding blocking KMS work.
-
-This also explains why the optional overlay is not the solution. Direct
-syscall tracing found its individual legacy plane ioctls completing in a few
-milliseconds; the seconds-long delay was client-side `XFlush` backpressure over
-many synchronous updates, not one 2.85-second `drmModeSetPlane()` syscall.
 
 A candidate-15 capture confirmed the consequence at the physical output. With
 the FD740 bridge and identical 120 Hz pointer motion, hiding the cursor produced

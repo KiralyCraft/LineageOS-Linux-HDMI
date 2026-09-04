@@ -1,10 +1,12 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.16` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.17` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and modules plus the matched private Gallium, GLX, EGL, DRI loader, and
 GBM stack carrying ABI 5. The launcher refuses a partial, stale, or mixed set.
+The upstream Xorg base is pinned as a submodule, and candidate 17 removes the
+abandoned cursor-plane experiment from the source and command-line interface.
 
 Candidate 16 adds Xorg's upstream modesetting TearFree implementation and its
 complete follow-up correctness series to the required private Xorg build. On
@@ -38,18 +40,6 @@ CRTC and resets all of them together with the fixed primary in one tested
 atomic commit. It verifies each standard and supported Qualcomm private reset
 before creating the lease. This directly fixes the measured composition state
 without a delay, retry, or hard-coded plane id.
-
-Candidate 14 tested a cursor on a separately leased overlay after software
-cursor motion exposed a severe cadence loss. The experiment rendered the cursor
-correctly, but did not fix the problem: a 120 Hz pointer trace reduced
-`glxgears` from 57-59 FPS to 27-31 FPS. The 2.85-second outlier measured at the
-X client was `XFlush` backpressure while many synchronous plane updates were in
-flight; direct syscall tracing later showed individual `SETPLANE` calls taking
-only a few milliseconds. The paired composer and Xorg cursor patches now live
-under `optional/`, are absent from the default patch series, and require the
-explicit `--overlay-cursor` diagnostic flag. Normal builds lease only the
-external connector, CRTC, and fixed primary plane and use Xorg's software
-cursor.
 
 The current source defaults to `--drm-trace startup`. It retains the durable
 fail-closed trace through Xorg's first independently verified scanout, then

@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.16")
-        self.assertEqual(release["version_code"], 20260926)
+        self.assertEqual(release["version"], "0.2.8-candidate.17")
+        self.assertEqual(release["version_code"], 20260927)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -304,19 +304,17 @@ class DiagnosticContractTests(unittest.TestCase):
         tearfree_patch = (
             ROOT / "patches/xserver/0003-modesetting-backport-upstream-tearfree.patch"
         ).read_text()
-        cursor_patch = (
-            ROOT / "patches/xserver/optional/0003-modesetting-support-an-overlay-plane-cursor.patch"
-        ).read_text()
+        gitmodules = (ROOT / ".gitmodules").read_text()
+        xserver_meson = (ROOT / "third_party/xserver/meson.build").read_text()
         xserver_series = (ROOT / "patches/xserver/series").read_text().splitlines()
+        self.assertIn('[submodule "third_party/xserver"]', gitmodules)
+        self.assertIn("url = https://gitlab.freedesktop.org/xorg/xserver.git", gitmodules)
+        self.assertIn("version: '21.1.24'", xserver_meson)
         self.assertEqual(xserver_series, [
             "0001-present-disarm-wait-fence-callback.patch",
             "0002-glamor-prefer-render-node-for-dri3.patch",
             "0003-modesetting-backport-upstream-tearfree.patch",
         ])
-        self.assertNotIn(
-            "0003-modesetting-support-an-overlay-plane-cursor.patch",
-            xserver_series,
-        )
         self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
         self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)
         self.assertIn('"TearFree", OPTV_BOOLEAN', tearfree_patch)
@@ -324,16 +322,11 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("ms_tearfree_dri_notify", tearfree_patch)
         self.assertIn("ms_tearfree_update_damages", tearfree_patch)
         self.assertIn("ms_tearfree_do_flips", tearfree_patch)
-        self.assertIn('"OverlayCursor"', cursor_patch)
-        self.assertIn("DRM_PLANE_TYPE_OVERLAY", cursor_patch)
-        self.assertIn("drmModeSetPlane", cursor_patch)
-        self.assertIn("x -= cursor->bits->xhot", cursor_patch)
-        self.assertIn("y -= cursor->bits->yhot", cursor_patch)
         self.assertIn('Option \\"SWcursor\\" \\"%s\\"', agent)
-        self.assertIn('g_overlay_cursor ? "  Option \\\"OverlayCursor\\\" \\\"true\\\"', agent)
-        self.assertIn("bool g_overlay_cursor = false", agent)
-        self.assertIn('strcmp(argv[i], "--overlay-cursor")', agent)
-        self.assertIn("--overlay-cursor", runner)
+        self.assertNotIn("OverlayCursor", agent)
+        self.assertNotIn("--overlay-cursor", agent)
+        self.assertNotIn("--overlay-cursor", runner)
+        self.assertFalse((ROOT / "patches/xserver/optional").exists())
 
         xorg_spawn = agent.split("pid_t spawn_xorg(int lease_fd)", 1)[1]
         xorg_spawn = xorg_spawn.split("pid_t spawn_lxde()", 1)[0]
@@ -403,7 +396,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("patches/xserver/*", composer_reuse)
         self.assertIn("build-support/package-gpu-stack.sh", composer_reuse)
         self.assertIn("patches/qcom-display/v1/README.md", composer_reuse)
-        self.assertIn("patches/qcom-display/v1/optional/*", composer_reuse)
+        self.assertIn("third_party/xserver", composer_reuse)
         self.assertNotIn("patches/qcom-display/v1/series", composer_reuse)
         self.assertIn("scripts/analyze-cadence.py", composer_reuse)
         self.assertIn("scripts/capture-loop.sh", composer_reuse)
@@ -512,24 +505,9 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("sleep", added.lower())
         self.assertNotIn("retry", added.lower())
 
-    def test_optional_composer_cursor_overlay_is_not_in_default_series(self):
-        patch_name = "0015-composer-lease-an-overlay-plane-for-the-xorg-cursor.patch"
-        patch = (ROOT / "patches/qcom-display/v1/optional" / patch_name).read_text()
-        series = (ROOT / "patches/qcom-display/v1/series").read_text().splitlines()
-        added = "\n".join(
-            line[1:] for line in patch.splitlines()
-            if line.startswith("+") and not line.startswith("+++")
-        )
-        self.assertNotIn(patch_name, series)
-        self.assertIn("DRM_PLANE_TYPE_OVERLAY", added)
-        self.assertIn("DRM_FORMAT_ARGB8888", added)
-        self.assertIn("plane->crtc_id == 0 && plane->fb_id == 0", added)
-        self.assertIn("plane->crtc_id == crtc_id", added)
-        self.assertIn("objects.push_back(state.cursor_plane_id)", added)
-        self.assertIn("SanitizeExternalPlanesForLease", added)
-        self.assertIn("state_it->second.cursor_plane_id", added)
-        self.assertNotIn("sleep", added.lower())
-        self.assertNotIn("retry", added.lower())
+    def test_failed_cursor_plane_experiment_is_removed(self):
+        self.assertFalse((ROOT / "patches/qcom-display/v1/optional").exists())
+        self.assertFalse((ROOT / "patches/xserver/optional").exists())
 
     def test_composer_abi_comparison_has_deterministic_collation(self):
         verifier = (ROOT / "build-support/verify-composer-abi.sh").read_text()

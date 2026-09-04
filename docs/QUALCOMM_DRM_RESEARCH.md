@@ -231,17 +231,6 @@ physical output skips and tears; those HDMI results are the current baseline.
 This kernel creates only Primary and Overlay planes and has neither a Cursor
 plane nor legacy CRTC cursor callbacks.
 
-Candidate 14 therefore tried one compatible ARGB8888 overlay with an opt-in
-private-Xorg cursor path. The cursor was visible, but the legacy synchronous
-`drmModeSetPlane` update on every move reduced `glxgears` to 27-31 FPS; a
-nominal 15-second 120 Hz trace took 36.9 seconds to submit. The previously
-reported 2.85-second "plane update" was the X client's `XFlush` latency while
-requests backed up. Direct syscall tracing later showed the individual legacy
-plane ioctls completing in a few milliseconds. Rendering the cursor on a
-distinct plane alone still does not solve the issue because the synchronous
-update stream backpressures the X server. The paired Xorg and composer patches
-are now optional diagnostics and are excluded from both default patch series.
-
 Exact-source inspection identified the software path too. Xorg modesetting
 enables root-pixmap damage after a successful `drmModeDirtyFB()` probe and
 dispatches each damage region through another `DIRTYFB`. Its Present flip check
