@@ -420,6 +420,7 @@ class DiagnosticContractTests(unittest.TestCase):
             "if [[ $MODE == repackage ]]", 1
         )[1].split("else", 1)
         self.assertNotIn("third_party/mesa-for-android-container", repackage)
+        self.assertIn("native/agent/run-agent.sh", repackage)
         self.assertIn("third_party/mesa-for-android-container", composer_reuse)
         self.assertIn("patches/xserver/*", composer_reuse)
         self.assertIn("build-support/package-gpu-stack.sh", composer_reuse)

@@ -59,7 +59,8 @@ if [[ $MODE == repackage || $MODE == reuse-composer ]]; then
     while IFS= read -r changed; do
         if [[ $MODE == repackage ]]; then
             case "$changed" in
-                module/*|docs/*|tests/*|README.md|release.json|Makefile|\
+                module/*|native/agent/run-agent.sh|docs/*|tests/*|README.md|\
+                release.json|Makefile|\
                 scripts/remote-build.sh|scripts/verify-dist.sh|\
                 scripts/collect-crash-evidence.sh|\
                 build-support/remote-entry.sh|build-support/package.sh|\
