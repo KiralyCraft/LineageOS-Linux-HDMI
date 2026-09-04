@@ -242,20 +242,23 @@ patch and explicitly enabled with `run-agent.sh --overlay-cursor`.
 ## Cursor-motion presentation bottleneck
 
 A deterministic XTest probe separated raw input, window-manager behavior, and
-cursor composition. With the adaptive GPU bridge and a visible Xorg software
-cursor, stationary `glxgears` held about 58 FPS but 120 Hz cursor motion reduced
-it to 32-35 FPS. The same motion with the cursor hidden recovered to 58-59 FPS,
-while injection submit time remained below 3.1 ms. This established that the
-cursor-dependent Xorg path triggers the slowdown, but it did not prove that
-software composition alone was the root cause.
+cursor composition. Under the original full-session trace, the adaptive GPU
+bridge with a visible Xorg software cursor held about 58 FPS while stationary,
+but 120 Hz cursor motion reduced it to 32-35 FPS. The same motion with the
+cursor hidden recovered to 58-59 FPS, while injection submit time remained
+below 3.1 ms. This established that the cursor-dependent Xorg path triggers the
+slowdown, but the later startup-only trace test below supersedes those client
+FPS numbers.
 
 The downstream SM8550 SDE driver registers Primary and Overlay planes only and
 does not implement legacy `cursor_set`, `cursor_set2`, or `cursor_move` CRTC
 callbacks. Candidate 14 tested an opt-in cursor on a separately leased overlay.
 It rendered correctly, yet 120 Hz pointer motion reduced `glxgears` further to
-27-31 FPS. A nominal 15-second cursor trace took 36.9 seconds to submit and one
-synchronous `drmModeSetPlane` call stalled for 2.85 seconds. A distinct plane
-therefore does not by itself fix the cursor-motion presentation problem.
+27-31 FPS. A nominal 15-second cursor trace took 36.9 seconds to submit. The
+2.85-second outlier was later localized to client-side `XFlush` backpressure,
+not one kernel `drmModeSetPlane` call; direct syscall timings were generally a
+few milliseconds. A distinct plane therefore does not by itself fix the
+cursor-motion presentation problem.
 
 The default is again `SWcursor true`, with no cursor overlay in the composer
 lease. The paired patches remain under `optional/` and `--overlay-cursor` exists
@@ -263,6 +266,47 @@ only for diagnosis. Nonblocking atomic plane updates would normally avoid
 waiting in a legacy plane ioctl, but this downstream kernel rejects Xorg's
 atomic-client capability request, so forcing `Atomic true` is not a validated
 solution on this device.
+
+The exact Xorg and kernel sources expose the remaining mechanism. Modesetting
+probes `drmModeDirtyFB()` at screen initialization and, when supported,
+registers a Damage object on the root pixmap. Every accumulated root damage is
+then sent through `DIRTYFB`. A visible software cursor also makes
+`ms_present_check_flip()` return false through `sprites_visible`, converting a
+fullscreen Present flip into a copy to the root pixmap. Sony's `msm_fb.c`
+assigns `drm_atomic_helper_dirtyfb` to the framebuffer dirty callback, and the
+exact Lineage 5.15 helper is explicitly blocking and finishes with a
+synchronous atomic commit. Cursor save/restore damage therefore competes with
+the application's presentation and rate-limits the X server.
+
+Termux:X11 is a useful architectural comparison rather than a drop-in patch.
+Its cursor sprite callbacks update separate shared cursor state and wake its
+renderer; the renderer samples the root buffer, blends the cursor texture, and
+swaps the combined result. That keeps cursor motion out of Xorg root damage and
+ties it to one output render cadence. Reproducing that property for leased KMS
+requires a real output compositor or an equivalent coalesced host-owned cursor
+commit. Simply suppressing `DIRTYFB`, allowing flips beneath an uncomposited
+cursor, or adding a timer would trade correctness for benchmark numbers.
+
+The startup tracer was also a separate multiplier. Full tracing performs two
+agent/broker round trips and two durable log syncs around every DRM ioctl. A
+same-session A/B changed uncapped `glxgears` from roughly 52-79 FPS to
+503-609 FPS when that relay was disabled, but did not make the synchronous
+overlay cursor smooth. The default is therefore `--drm-trace startup`: trace
+fail-closed until scanout is verified, then bypass routine steady-state ioctls
+while retaining compatibility shims and tracing every later `SETCRTC`.
+`--drm-trace full` remains a diagnostic mode whose timing results are invalid.
+
+Candidate 15 then repeated the controlled fullscreen test with the exact
+agent-provided FD740 bridge environment and a continuously open 60 FPS capture
+path. Hidden-cursor pointer motion produced 59.994 client FPS and 60.034 active
+HDMI updates per second with zero skips, discontinuities, or top/bottom counter
+disagreement. Making the cursor visible did not reduce average client
+throughput (60.055 FPS), but p99 client frame time rose from 18.402 to
+33.382 ms. HDMI showed 56.637 active updates per second, 114 skipped source
+frames, 16 discontinuities, 36 ms p99 holds, and 1,135 torn updates out of
+1,135 decoded updates. This replaces the earlier full-trace FPS number as the
+performance baseline: cursor visibility primarily breaks flip eligibility and
+scanout cadence, while full tracing had additionally throttled the client.
 
 Bridge clients ask `x11_dri3_open()` for KGSL because their completed images
 are copied independently. Shadow and direct clients retain Xorg's DRI3 DRM fd,

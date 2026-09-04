@@ -54,6 +54,7 @@ enum class ClientPresentMode { kBridge, kShadow, kDirect };
 ClientPresentMode g_client_present = ClientPresentMode::kBridge;
 bool g_start_lxde = true;
 bool g_no_timeout = false;
+bool g_trace_startup_only = true;
 std::string g_mouse;
 std::string g_keyboard;
 drm_mode_modeinfo g_android_mode = {};
@@ -65,6 +66,7 @@ uint32_t g_scanout_fb = 0;
 bool g_scanout_connector_seen = false;
 bool g_scanout_confirmed = false;
 bool g_scanout_failed = false;
+bool g_trace_steady = false;
 std::string g_scanout_failure;
 
 bool relay_trace_record(int timeout_ms);
@@ -233,6 +235,7 @@ bool acknowledge_trace_record(int fd, uint32_t sequence) {
   acknowledgement.version = HDMI_LOS_TRACE_VERSION;
   acknowledgement.phase = HDMI_LOS_TRACE_ACK;
   acknowledgement.sequence = sequence;
+  if (g_trace_steady) acknowledgement.flags = HDMI_LOS_TRACE_ACK_STEADY;
   ssize_t result;
   do {
     result = send(fd, &acknowledgement, sizeof(acknowledgement), MSG_NOSIGNAL);
@@ -715,6 +718,7 @@ bool prepare_session(uint32_t probe_mode) {
   g_scanout_connector_seen = false;
   g_scanout_confirmed = false;
   g_scanout_failed = false;
+  g_trace_steady = false;
   g_scanout_failure.clear();
   passwd *user = getpwnam("kiraly");
   if (!user) return false;
@@ -964,6 +968,10 @@ bool start_xorg(int lease_fd, uint32_t connector_id, uint32_t crtc_id) {
         continue;
       }
       if (!verify_scanout() || !verify_xorg()) return false;
+      if (g_trace_startup_only) {
+        g_trace_steady = true;
+        log_message("info", "verified startup; routine DRM ioctl tracing is now bypassed");
+      }
       if (!g_start_lxde) return true;
       g_session = spawn_lxde();
       return g_session > 0;
@@ -980,6 +988,7 @@ void cleanup_session() {
   g_trace = -1;
   if (g_verify_lease >= 0) close(g_verify_lease);
   g_verify_lease = -1;
+  g_trace_steady = false;
   terminate_group(&g_bridge);
   unlink((std::string(kRuntime) + "/input.env").c_str());
 }
@@ -1170,11 +1179,22 @@ int main(int argc, char **argv) {
       g_no_timeout = true;
     } else if (strcmp(argv[i], "--overlay-cursor") == 0) {
       g_overlay_cursor = true;
+    } else if (strcmp(argv[i], "--drm-trace") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "startup") == 0)
+        g_trace_startup_only = true;
+      else if (strcmp(value, "full") == 0)
+        g_trace_startup_only = false;
+      else {
+        fprintf(stderr, "invalid DRM trace mode: %s\n", value);
+        return 2;
+      }
     } else {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
                       "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
                       "[--client-present bridge|shadow|direct] "
                       "[--session lxde|none] [--overlay-cursor] "
+                      "[--drm-trace startup|full] "
                       "[--no-timeout]\n");
       return 2;
     }

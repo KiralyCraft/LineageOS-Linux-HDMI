@@ -118,14 +118,19 @@ lease. There is no timing delay or retry in this handoff.
 
 The Sony SDE kernel exposes no cursor-type plane and no legacy CRTC cursor
 callbacks. Moving Xorg's software cursor forced save/restore damage through
-the presentation path: a deterministic 120 Hz pointer test reduced otherwise
-steady 58-59 FPS rendering to 32-35 FPS, while hiding the cursor restored
-58-59 FPS. An experiment rendered the cursor on a separately leased overlay,
-but its synchronous plane updates still reduced rendering to 27-31 FPS and
-stalled pointer submission for seconds. The paired composer/Xorg overlay
-patches are therefore optional diagnostics, not part of the default patch
-series, and the runtime defaults to Xorg's software cursor while the actual
-cursor-motion synchronization problem is investigated.
+the presentation path. With full-session tracing removed from the benchmark,
+both hidden- and visible-cursor clients sustain about 60 FPS, but physical HDMI
+does not: the hidden-cursor run delivered 60.034 coherent updates per second,
+while the visible-cursor run delivered 56.637, skipped 114 source frames, and
+tore every decoded updated frame. An experiment rendered the cursor on a
+separately leased overlay, but its synchronous plane updates also backpressured
+pointer submission. Exact-source inspection found the shared cause: a visible
+Xorg cursor disables Present flips and damages the root pixmap; Xorg forwards
+that damage through `DIRTYFB`, which this Sony kernel implements with a blocking
+atomic commit. The paired composer/Xorg overlay patches are therefore optional
+diagnostics, not part of the default patch series. The next cursor
+implementation must compose separately at the output cadence, as Termux:X11
+does, instead of issuing one synchronous KMS operation per pointer event.
 
 This remains research-quality software. A successful source build does not
 prove that another phone, ROM build, dock, display, or proprietary composer
@@ -157,9 +162,10 @@ composer revokes the lease, repairs cached state, and resumes Android
 ```
 
 The Android composer remains the DRM master. The broker journals Android's old
-preferred-mode setting, records each takeover boundary durably, and Xorg's DRM
-ioctls are traced before execution. The internal display is never included in
-the lease. See
+preferred-mode setting and records each takeover boundary durably. Xorg's DRM
+ioctls are traced before execution until the agent independently verifies the
+first scanout; routine calls then bypass the broker while later modesets remain
+traced. The internal display is never included in the lease. See
 [Architecture and invariants](docs/ARCHITECTURE.md) for the full design.
 
 The tile and diagnostics activity are deliberately ordinary, unprivileged

@@ -221,18 +221,48 @@ without a trace, pstore record, or Qualcomm display recovery dump that
 identifies the corresponding path.
 
 Subsequent deterministic testing identified a cursor-dependent bottleneck, but
-did not justify an extra leased object in the production path.
-With native KGSL presentation otherwise holding 58-59 FPS, moving Xorg's
-visible software cursor at 120 Hz reduced the client to 32-35 FPS; hiding that
-same cursor restored 58-59 FPS. The input injector itself stayed below 3.1 ms,
-and the CPU presentation bridge was slower, so input and flip selection were
-not the bottleneck. This kernel creates only Primary and Overlay planes and has
-neither a Cursor plane nor legacy CRTC cursor callbacks.
+did not justify an extra leased object in the production path. Under the
+original full-session trace, native KGSL presentation otherwise held 58-59 FPS,
+moving Xorg's visible software cursor at 120 Hz reduced the client to 32-35
+FPS, and hiding that same cursor restored 58-59 FPS. The input injector itself
+stayed below 3.1 ms. Candidate-15 testing without the steady-state trace later
+showed that both clients average about 60 FPS, while only the cursor-visible
+physical output skips and tears; those HDMI results are the current baseline.
+This kernel creates only Primary and Overlay planes and has neither a Cursor
+plane nor legacy CRTC cursor callbacks.
 
 Candidate 14 therefore tried one compatible ARGB8888 overlay with an opt-in
 private-Xorg cursor path. The cursor was visible, but the legacy synchronous
 `drmModeSetPlane` update on every move reduced `glxgears` to 27-31 FPS; a
-nominal 15-second 120 Hz trace took 36.9 seconds to submit and its worst plane
-update blocked for 2.85 seconds. Rendering the cursor on a distinct plane alone
-does not solve the issue. The paired Xorg and composer patches are now optional
-diagnostics and are excluded from both default patch series.
+nominal 15-second 120 Hz trace took 36.9 seconds to submit. The previously
+reported 2.85-second "plane update" was the X client's `XFlush` latency while
+requests backed up. Direct syscall tracing later showed the individual legacy
+plane ioctls completing in a few milliseconds. Rendering the cursor on a
+distinct plane alone still does not solve the issue because the synchronous
+update stream backpressures the X server. The paired Xorg and composer patches
+are now optional diagnostics and are excluded from both default patch series.
+
+Exact-source inspection identified the software path too. Xorg modesetting
+enables root-pixmap damage after a successful `drmModeDirtyFB()` probe and
+dispatches each damage region through another `DIRTYFB`. Its Present flip check
+returns false while `sprites_visible` is nonzero, so a visible software cursor
+forces client frames through a root-pixmap copy. On the exact Sony SM8550
+display module, `msm_fb_funcs.dirty` is `drm_atomic_helper_dirtyfb`; the exact
+5.15 kernel describes this helper as blocking and performs a synchronous atomic
+commit. Cursor motion consequently combines Present-copy fallback with a
+blocking atomic damage commit.
+
+Termux:X11 avoids that coupling: its cursor hooks publish cursor position and
+image separately, signal the renderer, and the renderer blends the cursor
+texture with the root image before swapping. The next production design should
+follow that output-cadence composition model (or an equivalent coalesced,
+nonblocking host-owned cursor commit), not suppress synchronization blindly.
+
+Primary source references:
+
+- [Xorg modesetting driver 21.1.24](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/driver.c)
+- [Xorg modesetting Present 21.1.24](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/present.c)
+- [Sony SM8550 framebuffer](https://github.com/LineageOS/android_kernel_sony_sm8550-modules/blob/ec2e039129f2b8f93fdfe62a8c6a595efb63d496/qcom/opensource/display-drivers/msm/msm_fb.c)
+- [Lineage SM8550 DRM damage helper](https://github.com/LineageOS/android_kernel_sony_sm8550/blob/d00ba216ccda5d4fcc0d864729ae69d5b63d860c/drivers/gpu/drm/drm_damage_helper.c)
+- [Termux:X11 cursor hooks](https://github.com/termux/termux-x11/blob/9df8b767645aa0d0a2f2576767449df55b41962f/lorie/src/main/cpp/lorie/InitOutput.c)
+- [Termux:X11 renderer](https://github.com/termux/termux-x11/blob/9df8b767645aa0d0a2f2576767449df55b41962f/lorie/src/main/cpp/lorie/renderer.cpp)

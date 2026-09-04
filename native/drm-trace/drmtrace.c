@@ -43,6 +43,7 @@ enum {
 
 static int g_trace_fd = -1;
 static _Atomic uint32_t g_sequence = 1;
+static _Atomic int g_trace_steady;
 static struct hdmi_los_property_cache g_connector_properties;
 static atomic_flag g_connector_properties_lock = ATOMIC_FLAG_INIT;
 static int g_suppress_connector_property_noops;
@@ -98,9 +99,17 @@ static int exchange_record(const struct hdmi_los_trace_record *record) {
   do {
     received = recv(g_trace_fd, &ack, sizeof(ack), MSG_WAITALL);
   } while (received < 0 && errno == EINTR);
-  return received == (ssize_t)sizeof(ack) && ack.magic == HDMI_LOS_TRACE_MAGIC &&
-         ack.version == HDMI_LOS_TRACE_VERSION && ack.phase == HDMI_LOS_TRACE_ACK &&
-         ack.sequence == record->sequence;
+  int valid = received == (ssize_t)sizeof(ack) && ack.magic == HDMI_LOS_TRACE_MAGIC &&
+              ack.version == HDMI_LOS_TRACE_VERSION && ack.phase == HDMI_LOS_TRACE_ACK &&
+              ack.sequence == record->sequence;
+  if (valid && (ack.flags & HDMI_LOS_TRACE_ACK_STEADY))
+    atomic_store_explicit(&g_trace_steady, 1, memory_order_release);
+  return valid;
+}
+
+static int should_trace_request(unsigned long request) {
+  return !atomic_load_explicit(&g_trace_steady, memory_order_acquire) ||
+         request == DRM_IOCTL_MODE_SETCRTC;
 }
 
 static void initialize_record(struct hdmi_los_trace_record *record, uint16_t phase,
@@ -165,6 +174,9 @@ static const char *request_name(unsigned long request) {
     case DRM_IOCTL_MODE_ATOMIC: return "MODE_ATOMIC";
     case DRM_IOCTL_MODE_CREATEPROPBLOB: return "MODE_CREATEPROPBLOB";
     case DRM_IOCTL_MODE_DESTROYPROPBLOB: return "MODE_DESTROYPROPBLOB";
+    case DRM_IOCTL_WAIT_VBLANK: return "WAIT_VBLANK";
+    case DRM_IOCTL_CRTC_GET_SEQUENCE: return "CRTC_GET_SEQUENCE";
+    case DRM_IOCTL_CRTC_QUEUE_SEQUENCE: return "CRTC_QUEUE_SEQUENCE";
     default: return "DRM_IOCTL";
   }
 }
@@ -183,6 +195,38 @@ static void decode_record(struct hdmi_los_trace_record *record, const void *argu
       record->argument[1] = value.value;
       snprintf(record->detail, sizeof(record->detail), "cap=%llu value=%llu",
                (unsigned long long)value.capability, (unsigned long long)value.value);
+    }
+  } else if (record->request == DRM_IOCTL_WAIT_VBLANK) {
+    union drm_wait_vblank value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.request.type;
+      record->argument[1] = value.request.sequence;
+      record->argument[2] = value.request.signal;
+      snprintf(record->detail, sizeof(record->detail),
+               "type=0x%x sequence=%u signal=%lu", value.request.type,
+               value.request.sequence, value.request.signal);
+    }
+  } else if (record->request == DRM_IOCTL_CRTC_GET_SEQUENCE) {
+    struct drm_crtc_get_sequence value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.crtc_id;
+      record->argument[1] = value.active;
+      record->argument[2] = value.sequence;
+      record->argument[3] = value.sequence_ns;
+      snprintf(record->detail, sizeof(record->detail),
+               "crtc=%u active=%u sequence=%llu", value.crtc_id,
+               value.active, (unsigned long long)value.sequence);
+    }
+  } else if (record->request == DRM_IOCTL_CRTC_QUEUE_SEQUENCE) {
+    struct drm_crtc_queue_sequence value;
+    if (safe_copy(&value, address, sizeof(value))) {
+      record->argument[0] = value.crtc_id;
+      record->argument[1] = value.flags;
+      record->argument[2] = value.sequence;
+      record->argument[3] = value.user_data;
+      snprintf(record->detail, sizeof(record->detail),
+               "crtc=%u flags=0x%x sequence=%llu", value.crtc_id,
+               value.flags, (unsigned long long)value.sequence);
     }
   } else if (record->request == DRM_IOCTL_SET_CLIENT_CAP) {
     struct drm_set_client_cap value;
@@ -674,7 +718,7 @@ struct hdmi_los_drm_mode_property *drmModeGetProperty(int fd, uint32_t property_
     return property;
   }
 
-  if (g_trace_fd >= 0 && !g_in_trace) {
+  if (g_trace_fd >= 0 && !g_in_trace && should_trace_request(DRM_IOCTL_MODE_GETPROPERTY)) {
     g_in_trace = 1;
     uint32_t sequence = atomic_fetch_add(&g_sequence, 1);
     char detail[64];
@@ -704,35 +748,41 @@ int ioctl(int fd, unsigned long request, ...) {
   }
 
   g_in_trace = 1;
-  uint32_t sequence = atomic_fetch_add(&g_sequence, 1);
-  struct hdmi_los_trace_record before;
-  initialize_record(&before, HDMI_LOS_TRACE_BEFORE, sequence, fd, request,
-                    request_name(request));
-  decode_record(&before, argument);
-  if (!exchange_record(&before)) _exit(125);
-  if (request == DRM_IOCTL_MODE_SETCRTC) {
-    emit_setcrtc_details(sequence, fd, request, argument);
-  } else if (request == DRM_IOCTL_MODE_ATOMIC) {
-    emit_atomic_details(sequence, fd, request, argument);
+  int trace_request = should_trace_request(request);
+  uint32_t sequence = 0;
+  if (trace_request) {
+    sequence = atomic_fetch_add(&g_sequence, 1);
+    struct hdmi_los_trace_record before;
+    initialize_record(&before, HDMI_LOS_TRACE_BEFORE, sequence, fd, request,
+                      request_name(request));
+    decode_record(&before, argument);
+    if (!exchange_record(&before)) _exit(125);
+    if (request == DRM_IOCTL_MODE_SETCRTC) {
+      emit_setcrtc_details(sequence, fd, request, argument);
+    } else if (request == DRM_IOCTL_MODE_ATOMIC) {
+      emit_atomic_details(sequence, fd, request, argument);
+    }
   }
 
   struct drm_mode_connector_set_property suppressed = {0};
   if (request == DRM_IOCTL_MODE_SETPROPERTY &&
       should_suppress_connector_property_noop(argument, &suppressed)) {
-    char detail[64];
-    snprintf(detail, sizeof(detail), "connector=%u prop=%u value=%llu",
-             suppressed.connector_id, suppressed.prop_id,
-             (unsigned long long)suppressed.value);
-    emit_detail(sequence, fd, request, "SUPPRESSED_CONNECTOR_NOOP",
-                suppressed.connector_id, suppressed.prop_id, suppressed.value, 0,
-                detail);
+    if (trace_request) {
+      char detail[64];
+      snprintf(detail, sizeof(detail), "connector=%u prop=%u value=%llu",
+               suppressed.connector_id, suppressed.prop_id,
+               (unsigned long long)suppressed.value);
+      emit_detail(sequence, fd, request, "SUPPRESSED_CONNECTOR_NOOP",
+                  suppressed.connector_id, suppressed.prop_id, suppressed.value, 0,
+                  detail);
 
-    struct hdmi_los_trace_record after;
-    initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
-                      request_name(request));
-    after.result = 0;
-    decode_record(&after, argument);
-    if (!exchange_record(&after)) _exit(125);
+      struct hdmi_los_trace_record after;
+      initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
+                        request_name(request));
+      after.result = 0;
+      decode_record(&after, argument);
+      if (!exchange_record(&after)) _exit(125);
+    }
     g_in_trace = 0;
     errno = 0;
     return 0;
@@ -751,15 +801,17 @@ int ioctl(int fd, unsigned long request, ...) {
     }
   }
 
-  struct hdmi_los_trace_record after;
-  initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
-                    request_name(request));
-  after.result = result;
-  after.error = result < 0 ? saved_errno : 0;
-  decode_record(&after, argument);
-  if (!exchange_record(&after)) _exit(125);
-  if (result >= 0 && request == DRM_IOCTL_MODE_OBJ_GETPROPERTIES) {
-    emit_object_property_details(sequence, fd, request, argument);
+  if (trace_request) {
+    struct hdmi_los_trace_record after;
+    initialize_record(&after, HDMI_LOS_TRACE_AFTER, sequence, fd, request,
+                      request_name(request));
+    after.result = result;
+    after.error = result < 0 ? saved_errno : 0;
+    decode_record(&after, argument);
+    if (!exchange_record(&after)) _exit(125);
+    if (result >= 0 && request == DRM_IOCTL_MODE_OBJ_GETPROPERTIES) {
+      emit_object_property_details(sequence, fd, request, argument);
+    }
   }
   g_in_trace = 0;
   errno = saved_errno;

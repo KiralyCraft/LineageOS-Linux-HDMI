@@ -48,6 +48,7 @@ usage(const char *program)
     fprintf(stderr,
             "usage: %s [--swap-interval -1|0|1] [--seconds N | --frames N]\n"
             "          [--pace-hz N] [--csv PATH] [--window WxH | --fullscreen]\n"
+            "          [--show-cursor]\n"
             "\n"
             "Defaults: fullscreen, swap interval 1, 65 seconds, no software "
             "pacing.\n",
@@ -226,6 +227,7 @@ main(int argc, char **argv)
     int width = 960;
     int height = 540;
     bool fullscreen = true;
+    bool show_cursor = false;
     const char *csv_path = NULL;
 
     for (int i = 1; i < argc; ++i) {
@@ -262,6 +264,8 @@ main(int argc, char **argv)
             fullscreen = false;
         } else if (!strcmp(argv[i], "--fullscreen")) {
             fullscreen = true;
+        } else if (!strcmp(argv[i], "--show-cursor")) {
+            show_cursor = true;
         } else if (!strcmp(argv[i], "--help")) {
             usage(argv[0]);
             return 0;
@@ -316,7 +320,7 @@ main(int argc, char **argv)
     int effective_interval = SDL_GL_GetSwapInterval();
 
     SDL_GL_GetDrawableSize(window, &width, &height);
-    SDL_ShowCursor(SDL_DISABLE);
+    SDL_ShowCursor(show_cursor ? SDL_ENABLE : SDL_DISABLE);
     glViewport(0, 0, width, height);
     fprintf(stderr,
             "renderer=%s version=%s drawable=%dx%d requested_interval=%d "

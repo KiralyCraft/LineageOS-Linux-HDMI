@@ -1,10 +1,16 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.14` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.15` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and modules plus the matched private Gallium, GLX, EGL, DRI loader, and
 GBM stack carrying ABI 5. The launcher refuses a partial, stale, or mixed set.
+
+Candidate 15 changes the DRM interposer's default from full-session tracing to
+startup tracing. Startup remains fail-closed and durably recorded through the
+independently verified first scanout. Routine ioctls bypass the broker after
+that boundary, while compatibility rules and later `SETCRTC` tracing remain in
+force. The full trace remains available explicitly for fault diagnosis.
 
 Candidate 10 also serializes the final DRM-lease handoff with Qualcomm
 composer command processing. It refreshes and validates the CRTC's fixed
@@ -30,12 +36,32 @@ without a delay, retry, or hard-coded plane id.
 Candidate 14 tested a cursor on a separately leased overlay after software
 cursor motion exposed a severe cadence loss. The experiment rendered the cursor
 correctly, but did not fix the problem: a 120 Hz pointer trace reduced
-`glxgears` from 57-59 FPS to 27-31 FPS and synchronous plane submissions stalled
-for as long as 2.85 seconds. The paired composer and Xorg cursor patches now
-live under `optional/`, are absent from the default patch series, and require
-the explicit `--overlay-cursor` diagnostic flag. Normal builds lease only the
+`glxgears` from 57-59 FPS to 27-31 FPS. The 2.85-second outlier measured at the
+X client was `XFlush` backpressure while many synchronous plane updates were in
+flight; direct syscall tracing later showed individual `SETPLANE` calls taking
+only a few milliseconds. The paired composer and Xorg cursor patches now live
+under `optional/`, are absent from the default patch series, and require the
+explicit `--overlay-cursor` diagnostic flag. Normal builds lease only the
 external connector, CRTC, and fixed primary plane and use Xorg's software
 cursor.
+
+The current source defaults to `--drm-trace startup`. It retains the durable
+fail-closed trace through Xorg's first independently verified scanout, then
+bypasses the broker for routine steady-state ioctls. This removes the tracer's
+two synchronous socket round trips and durable syncs per ioctl from performance
+tests without removing the compatibility interposer or later `SETCRTC` checks.
+Use `--drm-trace full` only when collecting a complete DRM trace.
+
+The candidate-15 1280x720@60 live A/B used the FD740 GPU bridge and the same
+120 Hz deterministic pointer path for both runs. With the cursor hidden, the
+client ran at 59.994 FPS and HDMI delivered 60.034 unique updates per second,
+with no source skips, discontinuities, or torn frames. With the cursor visible,
+the client still ran at 60.055 FPS, but its p99 frame interval rose to 33.382 ms
+and the captured output delivered only 56.637 active updates per second. It
+skipped 114 source frames, had 16 counter discontinuities, and every one of
+1,135 decoded updates disagreed between the top and bottom counters. The
+remaining defect is therefore output cadence and tearing, not KGSL rendering
+throughput or input submission.
 
 The new opt-in `--client-present shadow` mode renders into private tiled/UBWC
 images, queues a same-context GPU resolve into persistent linear renderonly
@@ -156,12 +182,13 @@ mode, the tile deliberately waits for an unplug before applying the preference;
 it never changes a live external mode while arming.
 
 Every DRM ioctl is synced to `/data/adb/hdmi-los/logs/broker.log` before it is
-issued. If LXDE appears, verify the internal Android display, mouse, and
-keyboard. Confirm that `/run/hdmi-los/xrandr.txt` reports 1920x1080 and that
-the agent log contains `verified Xorg framebuffer`. Readiness requires both a
+issued during startup. If LXDE appears, verify the internal Android display,
+mouse, and keyboard. Confirm that `/run/hdmi-los/xrandr.txt` reports 1920x1080
+and that the agent log contains both `verified Xorg framebuffer` and `verified
+startup; routine DRM ioctl tracing is now bypassed`. Readiness requires both a
 successful traced `SETCRTC` and a leased `GETCRTC` showing Xorg's framebuffer
-at Android's exact timing. Hold both volume buttons for three seconds to
-restore Android.
+at Android's exact timing. Later `SETCRTC` requests remain traced. Hold both
+volume buttons for three seconds to restore Android.
 
 If the phone resets, do not retry. In Lineage Recovery, capture evidence with:
 
@@ -178,6 +205,14 @@ module logs, `/data/misc/recovery`, and Qualcomm display recovery dumps.
 The armed production path uses legacy Xorg KMS. This Sony kernel intentionally
 rejects Xorg's atomic client-capability request, so `Atomic true` is not a
 workaround. `probe xorg-atomic` remains only for collecting a comparison trace.
+
+Run a full per-ioctl diagnostic session only when its overhead is acceptable:
+
+```sh
+./run-agent.sh --capture none --drm-trace full
+```
+
+Do not use FPS or frame-time results from that mode as performance evidence.
 
 The production tracer has one narrow compatibility fallback. If the first
 legacy `SETCRTC` returns `EINVAL`, it substitutes a page flip only when the
@@ -225,6 +260,18 @@ at 60 displayed frames per second. Decode the counter sequence from a 60 FPS
 capture to measure repeated frames, skipped source frames, and the median,
 p95, and p99 visual hold durations. The CSV independently reports each
 `SDL_GL_SwapWindow` duration and frame-completion interval.
+
+The normal probe hides the pointer so the presentation path can be measured
+without cursor damage. Add `--show-cursor` for the paired cursor-visible run:
+
+```sh
+./sdl-frame-pacing --show-cursor \
+  --csv /home/kiraly/Downloads/pacing-vsync-cursor.csv
+```
+
+Move the pointer with `x11-cursor-stress` during that run, then repeat with the
+same probe arguments except `--show-cursor`. Keep display timing, window state,
+and thermal conditions unchanged.
 
 The controlled asynchronous comparison is:
 

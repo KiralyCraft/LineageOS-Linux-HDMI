@@ -11,9 +11,10 @@ CLIENT_PRESENT=bridge
 SESSION=lxde
 NO_TIMEOUT=1
 OVERLAY_CURSOR=0
+DRM_TRACE=startup
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--overlay-cursor] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--overlay-cursor] [--drm-trace startup|full] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -50,6 +51,11 @@ while (($#)); do
             OVERLAY_CURSOR=1
             shift
             ;;
+        --drm-trace)
+            (($# >= 2)) || { usage; exit 2; }
+            DRM_TRACE=$2
+            shift 2
+            ;;
         *)
             usage
             exit 2
@@ -62,6 +68,7 @@ done
 [[ $SESSION == lxde || $SESSION == none ]] || { usage; exit 2; }
 [[ $CLIENT_PRESENT == bridge || $CLIENT_PRESENT == shadow || \
    $CLIENT_PRESENT == direct ]] || { usage; exit 2; }
+[[ $DRM_TRACE == startup || $DRM_TRACE == full ]] || { usage; exit 2; }
 if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
     printf '%s requires --xorg-accel kgsl-kms-bridge\n' \
         "--client-present $CLIENT_PRESENT" >&2
@@ -74,7 +81,8 @@ fi
 
 if ((EUID != 0)); then
     args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
-          --client-present "$CLIENT_PRESENT" --session "$SESSION")
+          --client-present "$CLIENT_PRESENT" --session "$SESSION" \
+          --drm-trace "$DRM_TRACE")
     if ((NO_TIMEOUT)); then
         args+=(--no-timeout)
     else
@@ -280,7 +288,8 @@ if ((NO_TIMEOUT)); then
 fi
 
 agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
-            --client-present "$CLIENT_PRESENT" --session "$SESSION")
+            --client-present "$CLIENT_PRESENT" --session "$SESSION" \
+            --drm-trace "$DRM_TRACE")
 ((OVERLAY_CURSOR)) && agent_args+=(--overlay-cursor)
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &

@@ -4,7 +4,14 @@
 #include <stdint.h>
 
 #define HDMI_LOS_TRACE_MAGIC 0x54524345u
-#define HDMI_LOS_TRACE_VERSION 1u
+#define HDMI_LOS_TRACE_VERSION 2u
+
+enum hdmi_los_trace_flags {
+  /* The agent has independently verified Xorg's scanout.  The interposer may
+   * stop relaying routine ioctls, while retaining its compatibility shims and
+   * full tracing for later MODE_SETCRTC requests. */
+  HDMI_LOS_TRACE_ACK_STEADY = 1u << 0
+};
 
 enum hdmi_los_trace_phase {
   HDMI_LOS_TRACE_LOADED = 1,
@@ -23,6 +30,7 @@ struct hdmi_los_trace_record {
   int32_t tid;
   int32_t fd;
   int32_t error;
+  uint32_t flags;
   uint64_t request;
   int64_t result;
   uint64_t argument[4];

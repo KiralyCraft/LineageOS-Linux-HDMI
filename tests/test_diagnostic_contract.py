@@ -28,8 +28,8 @@ class DiagnosticContractTests(unittest.TestCase):
 
     def test_candidate_release_arms_a_legacy_takeover(self):
         release = json.loads((ROOT / "release.json").read_text())
-        self.assertEqual(release["version"], "0.2.8-candidate.14")
-        self.assertEqual(release["version_code"], 20260924)
+        self.assertEqual(release["version"], "0.2.8-candidate.15")
+        self.assertEqual(release["version_code"], 20260925)
         self.assertFalse((ROOT / "module/diagnostic-only").exists())
         broker = (ROOT / "native/broker/main.cpp").read_text()
         toggle = broker.split("if (request.opcode == HDMI_LOS_OP_TOGGLE)", 1)[1]
@@ -68,6 +68,7 @@ class DiagnosticContractTests(unittest.TestCase):
     def test_agent_requires_a_real_scanout_commit(self):
         agent = (ROOT / "native/agent/main.cpp").read_text()
         tracer = (ROOT / "native/drm-trace/drmtrace.c").read_text()
+        trace_protocol = (ROOT / "native/common/hdmi_los_trace.h").read_text()
         self.assertIn("observe_scanout_record", agent)
         self.assertIn("g_scanout_connector_seen", agent)
         self.assertIn("verify_scanout()", agent)
@@ -78,6 +79,15 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("DRM_IOCTL_MODE_PAGE_FLIP", tracer)
         self.assertIn('"SETCRTC_PAGEFLIP_FALLBACK"', tracer)
         self.assertIn("saved_errno == EINVAL", tracer)
+        self.assertIn("#define HDMI_LOS_TRACE_VERSION 2u", trace_protocol)
+        self.assertIn("HDMI_LOS_TRACE_ACK_STEADY", trace_protocol)
+        self.assertIn("if (g_trace_steady)", agent)
+        self.assertIn("if (g_trace_startup_only)", agent)
+        self.assertIn("should_trace_request", tracer)
+        self.assertIn("request == DRM_IOCTL_MODE_SETCRTC", tracer)
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        self.assertIn("DRM_TRACE=startup", runner)
+        self.assertIn("--drm-trace startup|full", runner)
 
     def test_composer_unplug_is_not_torn_down_on_the_uevent_thread(self):
         patch = (

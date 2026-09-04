@@ -50,18 +50,27 @@ presence. If HDMI was already connected at the wrong timing it requests a
 replug instead of changing the live display. Disarm, release, failure, and
 broker startup all replay the recovery journal.
 
-Diagnostic Xorg loads `libhdmi-los-drmtrace.so`. Before every DRM ioctl, the
-library sends a structured record through the agent to the Android broker.
-The broker appends and `fdatasync`s that record before acknowledging both hops;
-the ioctl is not issued without that acknowledgement. Atomic object/property
-tuples and legacy CRTC connector ids are recorded separately. Xorg is first
-executed with `-version` and the same preload before composer is paused, so a
-setuid or suppressed-preload configuration fails closed without touching the
-external display. The agent does not accept RandR dimensions as proof of
-scanout: it correlates the first enabling `SETCRTC` for the leased objects,
-keeps a duplicate lease fd, and requires `GETCRTC` to report Xorg's framebuffer
-at Android's exact timing before starting LXDE. Any later qualifying commit
-failure terminates the session.
+Xorg loads `libhdmi-los-drmtrace.so` as a compatibility and startup-verification
+interposer. Until takeover is independently verified, every DRM ioctl is sent
+as a structured record through the agent to the Android broker. The broker
+appends and `fdatasync`s each record before acknowledging both hops; the ioctl
+is not issued without that acknowledgement. Atomic object/property tuples and
+legacy CRTC connector ids are recorded separately. Xorg is first executed with
+`-version` and the same preload before composer is paused, so a setuid or
+suppressed-preload configuration fails closed without touching the external
+display. The agent does not accept RandR dimensions as proof of scanout: it
+correlates the first enabling `SETCRTC` for the leased objects, keeps a
+duplicate lease fd, and requires `GETCRTC` to report Xorg's framebuffer at
+Android's exact timing before starting LXDE.
+
+After that proof and an independent Xorg process check, the default
+`--drm-trace startup` acknowledgement moves the interposer into steady state.
+Routine page-flip, vblank, dirty-framebuffer, and cursor ioctls then go directly
+to DRM without two broker round trips and two durable log syncs per call. The
+interposer remains loaded, its connector-property and same-mode compatibility
+rules remain active, and every later `SETCRTC` remains durably traced and
+fail-closed. `--drm-trace full` retains per-ioctl tracing for diagnosis, but its
+synchronous logging overhead invalidates performance measurements.
 
 The tracer's only modeset compatibility substitution is an exact same-mode
 fallback. After a legacy `SETCRTC` returns `EINVAL`, and only when connector,
@@ -89,6 +98,45 @@ for diagnosis, but live testing showed that synchronous plane updates still
 stall presentation during pointer motion. They are omitted from the normal
 patch series and do not fix the cadence problem merely by rendering the cursor
 on a distinct plane.
+
+The remaining software-cursor slowdown is an interaction between upstream
+Xorg and this downstream DRM implementation. Xorg 21.1.24 probes `DIRTYFB`,
+registers root-pixmap damage when the probe succeeds, and calls
+`drmModeDirtyFB()` for every accumulated damaged region. A visible Xorg cursor
+also increments `sprites_visible`, which makes modesetting's Present path
+reject page flips and fall back to copying into that damaged root pixmap. Sony's
+SM8550 framebuffer installs `drm_atomic_helper_dirtyfb` as its dirty callback;
+the kernel documents that helper as deliberately blocking and implements each
+call as a synchronous atomic commit. Pointer motion therefore both removes the
+fast flip path and adds blocking KMS work.
+
+This also explains why the optional overlay is not the final design. Direct
+syscall tracing found its individual legacy plane ioctls completing in a few
+milliseconds; the seconds-long delay was client-side `XFlush` backpressure over
+many synchronous updates, not one 2.85-second `drmModeSetPlane()` syscall. A
+proper cursor path must coalesce cursor state and composite or commit it at the
+output cadence without damaging the root pixmap. Termux:X11 demonstrates the
+relevant architecture: its X cursor hooks update separate cursor state and wake
+the renderer, which blends a cursor texture into the rendered output before
+the swap. That is the model for the next implementation, rather than disabling
+kernel synchronization or adding timers.
+
+A candidate-15 capture confirms the consequence at the physical output. With
+the FD740 bridge and identical 120 Hz pointer motion, hiding the cursor produced
+60.034 active HDMI updates per second with no skipped or torn source frames.
+Showing it left the client near 60 FPS but reduced HDMI to 56.637 active updates
+per second, skipped 114 source frames, and made all 1,135 decoded updated frames
+disagree between the top and bottom Gray-code counters. The problem is thus
+presentation eligibility and scanout coherence, not raw application rendering
+or input-injection speed.
+
+Primary source references:
+
+- [Xorg modesetting root damage](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/driver.c)
+- [Xorg modesetting Present flip checks](https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.24/hw/xfree86/drivers/modesetting/present.c)
+- [pdx234 framebuffer dirty callback](https://github.com/LineageOS/android_kernel_sony_sm8550-modules/blob/ec2e039129f2b8f93fdfe62a8c6a595efb63d496/qcom/opensource/display-drivers/msm/msm_fb.c)
+- [exact Lineage kernel dirty helper](https://github.com/LineageOS/android_kernel_sony_sm8550/blob/d00ba216ccda5d4fcc0d864729ae69d5b63d860c/drivers/gpu/drm/drm_damage_helper.c)
+- [Termux:X11 cursor renderer](https://github.com/termux/termux-x11/blob/9df8b767645aa0d0a2f2576767449df55b41962f/lorie/src/main/cpp/lorie/renderer.cpp)
 
 The composer independently revokes after 65 seconds or when its broker
 disconnects. In an explicitly registered continuous session, the broker omits
