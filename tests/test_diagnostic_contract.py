@@ -237,6 +237,20 @@ class DiagnosticContractTests(unittest.TestCase):
         )
         self.assertIn("export PULSE_SERVER", runner)
 
+    def test_runner_applies_evdev_keymap_after_each_xorg_start(self):
+        runner = (ROOT / "native/agent/run-agent.sh").read_text()
+        self.assertIn("/usr/bin/setxkbmap", runner)
+        self.assertIn("configure_xorg_keymap()", runner)
+        self.assertIn('inode=$(stat -Lc %i "$socket"', runner)
+        self.assertIn(
+            "/usr/bin/setxkbmap -rules evdev -model pc105 -layout us",
+            runner,
+        )
+        self.assertLess(
+            runner.index("AGENT_PID=$!"),
+            runner.index("configure_xorg_keymap &"),
+        )
+
     def test_kgsl_bridge_is_default_and_safe_mode_remains_available(self):
         agent = (ROOT / "native/agent/main.cpp").read_text()
         runner = (ROOT / "native/agent/run-agent.sh").read_text()

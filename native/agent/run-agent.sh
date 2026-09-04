@@ -6,6 +6,7 @@ CAPTURE=none
 RUNTIME=/run/hdmi-los
 CAPTURE_PID=0
 AGENT_PID=0
+KEYMAP_PID=0
 XORG_ACCEL=kgsl-kms-bridge
 CLIENT_PRESENT=bridge
 SESSION=lxde
@@ -87,7 +88,8 @@ for required in \
     "$BUNDLE/bin/hdmi-los-agent" \
     "$BUNDLE/bin/hdmi-input-bridge" \
     /usr/lib/Xorg /usr/bin/xauth /usr/bin/xdpyinfo /usr/bin/xrandr \
-    /usr/bin/xinput /usr/bin/dbus-run-session /usr/bin/startlxde; do
+    /usr/bin/xinput /usr/bin/setxkbmap /usr/bin/dbus-run-session \
+    /usr/bin/startlxde; do
     [[ -x $required ]] || {
         printf 'Required executable is missing: %s\n' "$required" >&2
         exit 1
@@ -110,10 +112,35 @@ stop_child() {
 
 cleanup() {
     trap - EXIT INT TERM HUP
+    stop_child "$KEYMAP_PID"
     stop_child "$AGENT_PID"
     stop_child "$CAPTURE_PID"
 }
 trap cleanup EXIT INT TERM HUP
+
+configure_xorg_keymap() {
+    local socket=/tmp/.X11-unix/X1
+    local configured_inode=
+    local inode
+
+    # With device auto-add disabled, Xorg gives its core keyboard the legacy
+    # keycode table. Apply the evdev table once for every Xorg socket lifetime.
+    while kill -0 "$AGENT_PID" 2>/dev/null; do
+        inode=$(stat -Lc %i "$socket" 2>/dev/null || true)
+        if [[ -z $inode ]]; then
+            configured_inode=
+        elif [[ $inode != "$configured_inode" ]] &&
+             DISPLAY=:1 XAUTHORITY="$RUNTIME/Xauthority" \
+                 /usr/bin/xdpyinfo >/dev/null 2>&1; then
+            if DISPLAY=:1 XAUTHORITY="$RUNTIME/Xauthority" \
+                /usr/bin/setxkbmap -rules evdev -model pc105 -layout us; then
+                printf 'Applied evdev XKB map to Xorg :1\n' >&2
+                configured_inode=$inode
+            fi
+        fi
+        sleep 0.25
+    done
+}
 
 usb_id_for_video() {
     local node=$1 current
@@ -276,9 +303,13 @@ agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!
+configure_xorg_keymap &
+KEYMAP_PID=$!
 set +e
 wait "$AGENT_PID"
 status=$?
 set -e
 AGENT_PID=0
+stop_child "$KEYMAP_PID"
+KEYMAP_PID=0
 exit "$status"

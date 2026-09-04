@@ -310,6 +310,10 @@ The agent also starts Xorg with its core screen saver disabled (`-s 0`). The
 server's normal ten-minute saver calls the modesetting driver's output-power
 hook and would otherwise turn off the leased HDMI stream while leaving the
 broker and Xorg running.
+Because the isolated server disables automatic input discovery, Xorg initially
+gives its core keyboard the legacy `xfree86` keycode table. The launcher waits
+for each Xorg generation and applies the matching evdev XKB map before normal
+use, so the uinput bridge's Linux keycodes retain their intended meanings.
 
 That is equivalent to:
 
