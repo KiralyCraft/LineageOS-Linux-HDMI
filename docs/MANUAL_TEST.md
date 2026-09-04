@@ -148,10 +148,10 @@ a probe after a freeze or reset until all available evidence has been copied.
 5. Replace the complete prior chroot bundle with
    `dist/hdmi-los-current-install-chroot.tar.gz`. Do not mix an older agent
    with this module.
-6. For `kgsl-kms-bridge`, place the matched private Xorg at `libexec/Xorg`, its
-   glamor module at `lib/xorg/modules/libglamoregl.so`, and the three ABI-5
-   Mesa libraries below `lib/mesa/`. Do not reuse the system GLX/EGL frontends
-   with the private DRI target.
+6. For `kgsl-kms-bridge`, extract the matched GPU-stack archive over the
+   chroot runtime directory. It supplies the private Xorg server, glamor and
+   modesetting modules, and the complete six-binary Mesa set below `lib/mesa/`.
+   Do not reuse the system GLX/EGL frontends with the private DRI target.
 7. Verify `/data/adb/hdmi-los/logs/gate.log`, `compatible.ok`, and the three
    read-only executable composer bind mounts.
 
