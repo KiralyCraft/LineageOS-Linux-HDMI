@@ -288,12 +288,27 @@ ordinary-mirroring and unused-lease gates. In outline:
 
 1. Install the matching Magisk ZIP and reboot.
 2. Deploy the matching chroot bundle without mixing files from older builds.
-3. With HDMI unplugged, long-press **HDMI Xorg** to select a mode (1080p60 is
-   the default), then tap the tile to arm it.
+3. With HDMI unplugged, open **HDMI Xorg**, select a mode (1080p60 is the
+   default), and press **Arm HDMI Xorg**. The Quick Settings tile also arms it;
+   long-pressing the tile opens the app.
 4. Start the foreground agent inside the mounted chroot.
 5. Connect HDMI and accept Android's **Mirror** prompt. The broker starts Xorg
    automatically after three matching mode samples.
-6. End the session with the volume-key escape or by tapping the tile again.
+6. End the session with the volume-key escape, by tapping the tile again, or
+   with **Return to Android** in the app (confirmation required).
+
+The app shows live broker state, HDMI connection and selected/active modes,
+with updates every two seconds while visible. Mode buttons only save a preference;
+they do not arm takeover. While armed, use **Disarm HDMI Xorg** before changing
+the mode. Command errors remain visible instead of disappearing on refresh.
+Expandable diagnostics can be copied for troubleshooting. Unplugging or rebooting
+disarms takeover; explicitly arm again for the next session.
+
+The redesigned app uses an adaptive vector launcher icon with a monochrome layer
+for themed icons. The Quick Settings icon remains monochrome. APK-only updates
+can be installed over the existing app when signed with the same project key;
+this UI change does not require a composer, Mesa or chroot rebuild, or a reboot.
+See [app controls and validation](docs/APP.md) for details.
 
 The tested accelerated LXDE session is now the launcher default:
 

@@ -1,0 +1,79 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/background">
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent"
+        android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="24dp">
+            <ImageView android:layout_width="56dp" android:layout_height="56dp"
+                android:src="@mipmap/ic_launcher" android:importantForAccessibility="no" />
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:layout_marginStart="14dp" android:orientation="vertical">
+                <TextView style="@style/Heading" android:text="HDMI Xorg" android:textSize="26sp" />
+                <TextView style="@style/Body" android:text="A desktop beyond your phone." android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/Card" android:background="@drawable/hero">
+            <TextView android:id="@+id/state_badge" style="@style/Label" android:layout_width="wrap_content"
+                android:background="@drawable/pill" android:textColor="@color/accent" android:text="CONNECTING" />
+            <TextView android:id="@+id/state_title" style="@style/Heading" android:layout_marginTop="18dp"
+                android:textSize="28sp" android:text="Connecting to broker" android:accessibilityLiveRegion="polite" />
+            <TextView android:id="@+id/guidance" style="@style/Body" android:layout_marginTop="10dp" />
+            <TextView android:id="@+id/connection" style="@style/Label" android:layout_marginTop="20dp"
+                android:text="Checking HDMI connection" />
+            <TextView android:id="@+id/broker_detail" style="@style/Body" android:textSize="12sp"
+                android:layout_marginTop="6dp" android:textIsSelectable="true" />
+            <ProgressBar android:id="@+id/progress" style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="3dp" android:layout_marginTop="18dp"
+                android:indeterminate="true" android:indeterminateTint="@color/accent" />
+            <Button android:id="@+id/action" style="@style/PrimaryButton" android:layout_marginTop="12dp"
+                android:text="Arm HDMI Xorg" android:enabled="false" />
+        </LinearLayout>
+        <TextView android:id="@+id/notice" style="@style/Body" android:layout_marginBottom="18dp"
+            android:padding="8dp" android:visibility="gone" android:accessibilityLiveRegion="polite" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/Heading" android:text="Display mode" />
+            <TextView style="@style/Body" android:layout_marginTop="6dp"
+                android:text="Choose first, then arm. Mode changes never start a takeover." />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginTop="18dp">
+                <Button android:id="@+id/mode_native" style="@style/ModeButton" android:text="Native\nauto" />
+                <Space android:layout_width="8dp" android:layout_height="1dp" />
+                <Button android:id="@+id/mode_1080" style="@style/ModeButton" android:text="1080p\n60 Hz" />
+                <Space android:layout_width="8dp" android:layout_height="1dp" />
+                <Button android:id="@+id/mode_4k" style="@style/ModeButton" android:text="4K\n60 Hz" />
+            </LinearLayout>
+            <TextView android:id="@+id/selected_mode" style="@style/Body" android:layout_marginTop="14dp" />
+            <TextView android:id="@+id/active_mode" style="@style/Body" android:textSize="12sp" android:layout_marginTop="4dp" />
+            <TextView style="@style/Body" android:textSize="12sp" android:layout_marginTop="12dp"
+                android:text="Native and 4K are experimental. Disarm before changing modes." />
+        </LinearLayout>
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/Heading" android:text="From phone to desktop" />
+            <TextView style="@style/Body" android:layout_marginTop="12dp"
+                android:text="1.  Start run-agent.sh inside the chroot.\n2.  Arm HDMI Xorg with HDMI unplugged.\n3.  Connect your display and accept Mirror." />
+            <TextView style="@style/Body" android:textSize="12sp" android:layout_marginTop="12dp"
+                android:text="Unplugging restores Android and disarms takeover. Arm again for the next connection." />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/refresh" style="@style/SecondaryButton"
+                android:layout_width="0dp" android:layout_weight="1" android:text="Refresh" />
+            <Space android:layout_width="12dp" android:layout_height="1dp" />
+            <Button android:id="@+id/details_toggle" style="@style/SecondaryButton"
+                android:layout_width="0dp" android:layout_weight="1" android:text="Show diagnostics" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/details_panel" style="@style/Card"
+            android:layout_marginTop="16dp" android:visibility="gone">
+            <TextView android:id="@+id/diagnostics" style="@style/Body" android:fontFamily="monospace"
+                android:textSize="12sp" android:textIsSelectable="true" />
+            <Button android:id="@+id/copy" style="@style/SecondaryButton"
+                android:layout_marginTop="16dp" android:text="Copy diagnostics" />
+        </LinearLayout>
+        <TextView style="@style/Body" android:textSize="12sp" android:gravity="center"
+            android:layout_marginTop="20dp" android:text="Live status refreshes while this screen is open." />
+    </LinearLayout>
+    </ScrollView>
+</FrameLayout>
