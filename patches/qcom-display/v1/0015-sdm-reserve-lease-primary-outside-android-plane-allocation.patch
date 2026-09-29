@@ -1,13 +1,13 @@
-From 7cf17c5138fbe51d5da42da46f7add4d78e18374 Mon Sep 17 00:00:00 2001
+From 746e910c0a6df3dcf27f854ce7d781b427d60323 Mon Sep 17 00:00:00 2001
 From: hdmi-los-builder <hdmi-los@localhost>
-Date: Tue, 29 Sep 2026 16:26:38 +0300
+Date: Tue, 29 Sep 2026 17:40:52 +0300
 Subject: [PATCH] sdm: reserve lease primary outside Android plane allocation
 
 ---
- sdm/libs/dal/hdmi_lease_plane.h | 19 +++++++++++++
- sdm/libs/dal/hw_device_drm.cpp  | 17 ++++++++++++
- sdm/libs/dal/hw_info_drm.cpp    | 48 +++++++++++++++++++++++++++++++++
- 3 files changed, 84 insertions(+)
+ sdm/libs/dal/hdmi_lease_plane.h | 19 ++++++++++++
+ sdm/libs/dal/hw_device_drm.cpp  | 17 +++++++++++
+ sdm/libs/dal/hw_info_drm.cpp    | 51 +++++++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+)
  create mode 100644 sdm/libs/dal/hdmi_lease_plane.h
 
 diff --git a/sdm/libs/dal/hdmi_lease_plane.h b/sdm/libs/dal/hdmi_lease_plane.h
@@ -85,7 +85,7 @@ index 101331099..494806ee3 100644
      DLOGI("hdmi-los: refreshed fixed primary plane %u -> %u at final handoff",
            state.plane_id, selected);
 diff --git a/sdm/libs/dal/hw_info_drm.cpp b/sdm/libs/dal/hw_info_drm.cpp
-index fd46ad5df..5b33ba446 100644
+index fd46ad5df..e82dc9753 100644
 --- a/sdm/libs/dal/hw_info_drm.cpp
 +++ b/sdm/libs/dal/hw_info_drm.cpp
 @@ -70,6 +70,7 @@
@@ -127,7 +127,7 @@ index fd46ad5df..5b33ba446 100644
  static HWQseedStepVersion GetQseedStepVersion(sde_drm::QSEEDStepVersion drm_version) {
    HWQseedStepVersion sdm_version;
    switch (drm_version) {
-@@ -433,6 +444,37 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+@@ -433,6 +444,40 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
    DRMPlanesInfo planes;
    drm_mgr_intf_->GetPlanesInfo(&planes);
  
@@ -148,7 +148,10 @@ index fd46ad5df..5b33ba446 100644
 +        uint32_t plane_crtc_id = 0;
 +        if (ResolveHdmiFixedPrimaryPlane(fd, resources->crtcs[1], &crtc_index,
 +                                         &reserved_plane, &plane_crtc_id) != kErrorNone ||
-+            crtc_index != 1 || planes.find(reserved_plane) == planes.end()) {
++            crtc_index != 1 ||
++            std::none_of(planes.begin(), planes.end(), [reserved_plane](const auto &pipe) {
++              return pipe.first == reserved_plane;
++            })) {
 +          reserved_plane = 0;
 +        }
 +      }
@@ -165,7 +168,7 @@ index fd46ad5df..5b33ba446 100644
    // To simulate reduced config.
    uint32_t max_vig_pipes = 0;
    uint32_t max_dma_pipes = 0;
-@@ -447,6 +489,11 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+@@ -447,6 +492,11 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
    MapPlaneToConnector(hw_resource);
    GetInitialDemuraInfo(hw_resource);
    for (auto &pipe_obj : planes) {
@@ -177,7 +180,7 @@ index fd46ad5df..5b33ba446 100644
      if (max_vig_pipes && max_dma_pipes) {
        uint32_t master_plane_id = pipe_obj.second.master_plane_id;
        if ((pipe_obj.second.type == DRMPlaneType::DMA) && (dma_pipe_count < max_dma_pipes)
-@@ -560,6 +607,7 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+@@ -560,6 +610,7 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
      }
      hw_resource->hw_pipes.push_back(std::move(pipe_caps));
    }
