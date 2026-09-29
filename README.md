@@ -28,7 +28,9 @@ Android desktop-mode application.
 4. Once Android has established a stable external mode, the patched Qualcomm
    composer leases the external connector, CRTC, and fixed primary plane to the
    chroot agent after detaching every Android plane on that CRTC. It never
-   leases a plane assigned to Android's internal CRTC. Android continues using
+   leases a plane assigned to Android's internal CRTC. The leaseable fixed
+   primary is withheld from Android's plane allocator before composition
+   begins, so later internal frames cannot claim it. Android continues using
    the phone's internal display.
 5. The agent passes that DRM lease to Xorg, verifies real scanout, and starts
    LXDE. The accelerated path uses a matched private Xorg and Mesa set. Xorg

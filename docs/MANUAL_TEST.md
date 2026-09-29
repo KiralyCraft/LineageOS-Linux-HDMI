@@ -8,6 +8,14 @@ GBM stack carrying ABI 5. The launcher refuses a partial, stale, or mixed set.
 The upstream Xorg base is pinned as a submodule, and candidate 17 removes the
 abandoned cursor-plane experiment from the source and command-line interface.
 
+The next composer patch withholds the leaseable fixed primary from Android's
+plane allocator at startup, and refuses a lease unless the external CRTC's
+fixed primary matches that reservation at both acquisition phases. This has
+only been source/remote-build validated so far; the current running lease is
+intentionally untouched. A future live test must check that the internal home
+screen, lock screen, and apps stay visible while the HDMI desktop is active,
+then confirm both displays recover after release.
+
 Candidate 16 adds Xorg's upstream modesetting TearFree implementation and its
 complete follow-up correctness series to the required private Xorg build. On
 the target lease, Xorg must log `TearFree: enabled` while Glamor and `PageFlip`

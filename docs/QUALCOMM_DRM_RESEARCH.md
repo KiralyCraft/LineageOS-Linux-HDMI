@@ -100,6 +100,18 @@ index in `drmModeGetPlaneResources()`. It still rejects the transition if that
 fixed plane has been reassigned to another CRTC. This is derived from the
 driver's construction contract and does not hardcode runtime DRM object ids.
 
+The same plane must also be absent from Android's cached pipe allocator. A
+later internal frame was observed to select fixed primary plane 112 while Xorg
+held its lease; the kernel rejected the internal atomic commit with `EINVAL`,
+leaving some Android surfaces black. The new composer patch reserves the
+second CRTC's fixed primary when its hardware resource list is built and omits
+that pipe and virtual children before the proprietary allocator sees them.
+`PREPARE` and `CREATE` both require the external CRTC's current fixed primary
+to equal the reserved plane. If the CRTC assignment changes or reservation
+fails, HDMI takeover fails closed instead of allowing concurrent allocation.
+The rule uses the kernel's CRTC and primary ordering, not a hard-coded plane
+number; it does withhold one hardware pipe from Android even with HDMI idle.
+
 The initial implementation resolved that plane during the `PREPARE` phase,
 before Android external-display updates were quiesced. A live failure showed
 that a later SurfaceFlinger command batch could reassign it before `CREATE`,

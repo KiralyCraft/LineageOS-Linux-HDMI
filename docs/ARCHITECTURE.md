@@ -4,21 +4,26 @@ The Android composer remains the DRM master.  The patch adds a private,
 root-only control endpoint inside the existing Qualcomm composer process.  For
 one connected pluggable display it performs this staged sequence:
 
-1. Identify the connector and current CRTC. Resolve the CRTC's fixed primary
+1. At composer initialization, identify the second CRTC's fixed primary plane
+   from the kernel's CRTC/primary construction order and omit it, and any
+   virtual child pipes, from the resource list supplied to Qualcomm's plane
+   allocator. If that reservation cannot be made, HDMI leasing is disabled.
+2. Identify the connector and current CRTC. Resolve the CRTC's fixed primary
    plane by matching its DRM resource index to SDE's primary-plane construction
-   order; the primary-type plane Android currently scans out is not necessarily
-   the CRTC's `crtc->primary` object.
-2. Release the global pluggable-display handler lock. The non-Android takeover
+   order, and require it to match the plane withheld from Android. This device
+   normally assigns the second CRTC to DP; a different assignment refuses the
+   lease rather than sharing a plane with the internal display.
+3. Release the global pluggable-display handler lock. The non-Android takeover
    state defers hotplug teardown, while the per-display sequence lock pins each
    short operation without blocking a driver callback on the global lock.
-3. Pause updates on the existing external `HWCDisplay` without powering off
+4. Pause updates on the existing external `HWCDisplay` without powering off
    its negotiated CRTC timing. The internal DSI display is never part of the
    lease.
-4. Under Qualcomm's global SurfaceFlinger command-sequence lock, refresh the
+5. Under Qualcomm's global SurfaceFlinger command-sequence lock, refresh the
    CRTC-fixed primary selection. Atomically detach and sanitize every plane on
    the external CRTC, then create a DRM lease containing the connector, CRTC,
    and detached fixed primary plane.
-5. On release, revoke the lease, detach the lessee primary plane, reset the DAL's
+6. On release, revoke the lease, detach the lessee primary plane, reset the DAL's
    cached CRTC/plane state, and resume the same `HWCDisplay` object.
 
 The broker fsyncs a persistent transition breadcrumb before and after agent

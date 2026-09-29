@@ -65,6 +65,16 @@ grep -q 'SanitizeExternalPlanesForLease' <<<"$lease_create" || {
     printf 'patch-port check failed: external planes are not sanitized before leasing\n' >&2
     exit 1
 }
+if [ "$(grep -c 'selected != GetHdmiReservedPrimaryPlane()' "$lease_source")" -ne 2 ]; then
+    printf 'patch-port check failed: lease acquisition does not enforce plane reservation\n' >&2
+    exit 1
+fi
+resource_source=$DISPLAY/sdm/libs/dal/hw_info_drm.cpp
+grep -q 'pipe_obj.first == reserved_plane' "$resource_source" &&
+grep -q 'pipe_obj.second.master_plane_id == reserved_plane' "$resource_source" || {
+    printf 'patch-port check failed: leased primary remains in Android resource allocation\n' >&2
+    exit 1
+}
 lease_sanitize=$(sed -n '/DisplayError SanitizeExternalPlanesForLease/,/}  \/\/ namespace/p' \
     "$lease_source")
 grep -q 'drmModeGetPlaneResources' <<<"$lease_sanitize" || {

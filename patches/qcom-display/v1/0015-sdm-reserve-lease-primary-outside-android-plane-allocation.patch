@@ -1,0 +1,190 @@
+From 7cf17c5138fbe51d5da42da46f7add4d78e18374 Mon Sep 17 00:00:00 2001
+From: hdmi-los-builder <hdmi-los@localhost>
+Date: Tue, 29 Sep 2026 16:26:38 +0300
+Subject: [PATCH] sdm: reserve lease primary outside Android plane allocation
+
+---
+ sdm/libs/dal/hdmi_lease_plane.h | 19 +++++++++++++
+ sdm/libs/dal/hw_device_drm.cpp  | 17 ++++++++++++
+ sdm/libs/dal/hw_info_drm.cpp    | 48 +++++++++++++++++++++++++++++++++
+ 3 files changed, 84 insertions(+)
+ create mode 100644 sdm/libs/dal/hdmi_lease_plane.h
+
+diff --git a/sdm/libs/dal/hdmi_lease_plane.h b/sdm/libs/dal/hdmi_lease_plane.h
+new file mode 100644
+index 000000000..96b3117dd
+--- /dev/null
++++ b/sdm/libs/dal/hdmi_lease_plane.h
+@@ -0,0 +1,19 @@
++#ifndef __HDMI_LEASE_PLANE_H__
++#define __HDMI_LEASE_PLANE_H__
++
++#include <cstdint>
++#include <core/sdm_types.h>
++
++namespace sdm {
++
++DisplayError ResolveHdmiFixedPrimaryPlane(int fd, uint32_t crtc_id,
++                                          uint32_t *crtc_index, uint32_t *plane_id,
++                                          uint32_t *plane_crtc_id);
++
++// The plane omitted from the resource list before the vendor allocator is
++// created. Zero means that no plane was reserved and HDMI leasing is disabled.
++uint32_t GetHdmiReservedPrimaryPlane();
++
++}  // namespace sdm
++
++#endif  // __HDMI_LEASE_PLANE_H__
+diff --git a/sdm/libs/dal/hw_device_drm.cpp b/sdm/libs/dal/hw_device_drm.cpp
+index 101331099..494806ee3 100644
+--- a/sdm/libs/dal/hw_device_drm.cpp
++++ b/sdm/libs/dal/hw_device_drm.cpp
+@@ -74,6 +74,7 @@
+ #include <limits>
+ 
+ #include "hw_device_drm.h"
++#include "hdmi_lease_plane.h"
+ 
+ #define __CLASS__ "HWDeviceDRM"
+ 
+@@ -366,6 +367,12 @@ DisplayError SanitizeExternalPlanesForLease(int fd, uint32_t leased_plane_id,
+ 
+ }  // namespace
+ 
++DisplayError ResolveHdmiFixedPrimaryPlane(int fd, uint32_t crtc_id,
++                                          uint32_t *crtc_index, uint32_t *plane_id,
++                                          uint32_t *plane_crtc_id) {
++  return GetFixedPrimaryPlane(fd, crtc_id, crtc_index, plane_id, plane_crtc_id);
++}
++
+ std::atomic<uint32_t> HWDeviceDRM::hw_dest_scaler_blocks_used_(0);
+ HWCwbConfig HWDeviceDRM::cwb_config_ = {};
+ std::mutex HWDeviceDRM::cwb_state_lock_;
+@@ -2849,6 +2856,11 @@ DisplayError HWDeviceDRM::PrepareExternalDisplayLease(DisplayLeaseInfo *lease) {
+   DisplayError error =
+       GetFixedPrimaryPlane(dev_fd_, token_.crtc_id, &crtc_index, &selected, &plane_crtc_id);
+   if (error != kErrorNone) return error;
++  if (selected != GetHdmiReservedPrimaryPlane()) {
++    DLOGE("hdmi-los: fixed primary plane %u was not reserved from Android allocation",
++          selected);
++    return kErrorResources;
++  }
+ 
+   ExternalDisplayLeaseState &state = external_display_leases[this];
+   state.plane_id = selected;
+@@ -2888,6 +2900,11 @@ DisplayError HWDeviceDRM::CreateExternalDisplayLease(DisplayLeaseInfo *lease) {
+   DisplayError error =
+       GetFixedPrimaryPlane(dev_fd_, token_.crtc_id, &crtc_index, &selected, &plane_crtc_id);
+   if (error != kErrorNone) return error;
++  if (selected != GetHdmiReservedPrimaryPlane()) {
++    DLOGE("hdmi-los: fixed primary plane %u is not the reserved plane at handoff",
++          selected);
++    return kErrorResources;
++  }
+   if (state.plane_id != selected) {
+     DLOGI("hdmi-los: refreshed fixed primary plane %u -> %u at final handoff",
+           state.plane_id, selected);
+diff --git a/sdm/libs/dal/hw_info_drm.cpp b/sdm/libs/dal/hw_info_drm.cpp
+index fd46ad5df..5b33ba446 100644
+--- a/sdm/libs/dal/hw_info_drm.cpp
++++ b/sdm/libs/dal/hw_info_drm.cpp
+@@ -70,6 +70,7 @@
+ #include <drm_lib_loader.h>
+ #include <drm_master.h>
+ #include <drm_res_mgr.h>
++#include <xf86drmMode.h>
+ #include <fcntl.h>
+ #include <display/media/msm_sde_rotator.h>
+ #include <stdio.h>
+@@ -82,6 +83,7 @@
+ #include <utils/sys.h>
+ 
+ #include <algorithm>
++#include <atomic>
+ #include <fstream>
+ #include <iostream>
+ #include <map>
+@@ -91,6 +93,7 @@
+ #include <vector>
+ 
+ #include "hw_info_drm.h"
++#include "hdmi_lease_plane.h"
+ 
+ #ifndef DRM_FORMAT_MOD_QCOM_COMPRESSED
+ #define DRM_FORMAT_MOD_QCOM_COMPRESSED fourcc_mod_code(QCOM, 1)
+@@ -123,6 +126,14 @@ using std::to_string;
+ 
+ namespace sdm {
+ 
++namespace {
++std::atomic<uint32_t> hdmi_reserved_primary_plane{0};
++}  // namespace
++
++uint32_t GetHdmiReservedPrimaryPlane() {
++  return hdmi_reserved_primary_plane.load(std::memory_order_acquire);
++}
++
+ static HWQseedStepVersion GetQseedStepVersion(sde_drm::QSEEDStepVersion drm_version) {
+   HWQseedStepVersion sdm_version;
+   switch (drm_version) {
+@@ -433,6 +444,37 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+   DRMPlanesInfo planes;
+   drm_mgr_intf_->GetPlanesInfo(&planes);
+ 
++  // This device allocates the built-in display CRTC first and the pluggable
++  // display CRTC second. Reserve the second CRTC's fixed primary before the
++  // proprietary resource allocator receives its immutable pipe list. The
++  // lease path checks the actual external CRTC against this reservation and
++  // refuses a lease if hotplug assigned another CRTC or topology changed.
++  uint32_t reserved_plane = 0;
++  DRMMaster *master = nullptr;
++  if (DRMMaster::GetInstance(&master) == 0 && master) {
++    int fd = -1;
++    master->GetHandle(&fd);
++    drmModeResPtr resources = fd >= 0 ? drmModeGetResources(fd) : nullptr;
++    if (resources) {
++      if (resources->count_crtcs > 1) {
++        uint32_t crtc_index = UINT32_MAX;
++        uint32_t plane_crtc_id = 0;
++        if (ResolveHdmiFixedPrimaryPlane(fd, resources->crtcs[1], &crtc_index,
++                                         &reserved_plane, &plane_crtc_id) != kErrorNone ||
++            crtc_index != 1 || planes.find(reserved_plane) == planes.end()) {
++          reserved_plane = 0;
++        }
++      }
++      drmModeFreeResources(resources);
++    }
++  }
++  if (reserved_plane) {
++    DLOGI("hdmi-los: reserving fixed primary plane %u outside Android's pipe allocator",
++          reserved_plane);
++  } else {
++    DLOGW("hdmi-los: no fixed primary could be reserved; HDMI leasing disabled");
++  }
++
+   // To simulate reduced config.
+   uint32_t max_vig_pipes = 0;
+   uint32_t max_dma_pipes = 0;
+@@ -447,6 +489,11 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+   MapPlaneToConnector(hw_resource);
+   GetInitialDemuraInfo(hw_resource);
+   for (auto &pipe_obj : planes) {
++    if (reserved_plane &&
++        (pipe_obj.first == reserved_plane ||
++         pipe_obj.second.master_plane_id == reserved_plane)) {
++      continue;
++    }
+     if (max_vig_pipes && max_dma_pipes) {
+       uint32_t master_plane_id = pipe_obj.second.master_plane_id;
+       if ((pipe_obj.second.type == DRMPlaneType::DMA) && (dma_pipe_count < max_dma_pipes)
+@@ -560,6 +607,7 @@ void HWInfoDRM::GetHWPlanesInfo(HWResourceInfo *hw_resource) {
+     }
+     hw_resource->hw_pipes.push_back(std::move(pipe_caps));
+   }
++  hdmi_reserved_primary_plane.store(reserved_plane, std::memory_order_release);
+   hw_resource->has_excl_rect = planes[0].second.has_excl_rect;
+ }
+ 
+-- 
+2.55.0
+
