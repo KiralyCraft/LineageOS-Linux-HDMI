@@ -1,6 +1,6 @@
 # Mode-safe takeover candidate installation and test
 
-Release `0.2.8-candidate.17` keeps the Quick Settings tile as an arm/disarm
+Release `0.2.8-candidate.18` keeps the Quick Settings tile as an arm/disarm
 control and keeps the live-validated adaptive KGSL presentation bridge as the
 default. The accelerated runtime requires a matched private Xorg 21.1.24
 binary and modules plus the matched private Gallium, GLX, EGL, DRI loader, and
