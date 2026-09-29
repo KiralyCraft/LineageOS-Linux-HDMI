@@ -2,6 +2,10 @@ plugins {
     id("com.android.application")
 }
 
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
+
 val hdmiProfile = providers.gradleProperty("hdmiProfile").orElse("development")
 val hdmiLineage = providers.gradleProperty("hdmiLineage").orElse("unknown")
 val hdmiVersionName = providers.gradleProperty("hdmiVersionName").orElse("development")

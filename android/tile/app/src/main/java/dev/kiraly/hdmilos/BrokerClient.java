@@ -35,6 +35,8 @@ final class BrokerClient {
     private static final short OP_STATUS = 1;
     private static final short OP_TOGGLE = 5;
     private static final short OP_SET_MODE = 7;
+    private static final short OP_ARM = 8;
+    private static final short OP_DISARM = 9;
     private static final int MESSAGE_SIZE = 160;
     private static final String SOCKET = "hdmi-los-broker-v1";
     private static final AtomicInteger REQUEST = new AtomicInteger(1);
@@ -54,6 +56,14 @@ final class BrokerClient {
 
     static Status toggle() {
         return request(OP_TOGGLE, 0, 0, 0);
+    }
+
+    static Status arm() {
+        return request(OP_ARM, 0, 0, 0);
+    }
+
+    static Status disarm() {
+        return request(OP_DISARM, 0, 0, 0);
     }
 
     static Status setMode(int width, int height, int refreshMilliHz) {

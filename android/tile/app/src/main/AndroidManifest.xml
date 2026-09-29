@@ -3,7 +3,8 @@
     <application
         android:allowBackup="false"
         android:directBootAware="true"
-        android:icon="@drawable/ic_hdmi"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="HDMI Xorg"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
@@ -37,4 +38,3 @@
         </activity>
     </application>
 </manifest>
-
