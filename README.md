@@ -310,6 +310,11 @@ The agent also starts Xorg with its core screen saver disabled (`-s 0`). The
 server's normal ten-minute saver calls the modesetting driver's output-power
 hook and would otherwise turn off the leased HDMI stream while leaving the
 broker and Xorg running.
+During a lease, the input bridge grabs the named Bluetooth keyboard and mouse
+and any USB keyboard or relative mouse, then feeds one stable virtual pair to
+Xorg. It releases each grab when that device disconnects and releases all
+remaining grabs when the HDMI session ends. Phone controls and unrelated USB
+input classes are not selected.
 Because the isolated server disables automatic input discovery, Xorg initially
 gives its core keyboard the legacy `xfree86` keycode table. The launcher waits
 for each Xorg generation and applies the matching evdev XKB map before normal

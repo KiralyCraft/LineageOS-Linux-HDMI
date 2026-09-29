@@ -17,25 +17,35 @@
 #include <unistd.h>
 
 #define SCAN_MS 250
+#define ROLE_MOUSE 1U
+#define ROLE_KEYBOARD 2U
 
 struct physical_device {
-  const char *name;
   int fd;
   char path[PATH_MAX];
+  char name[256];
+  unsigned int roles;
+  bool pressed[KEY_CNT];
+  bool dropping;
+  bool pending_mouse;
+  bool pending_keyboard;
 };
 
 struct virtual_device {
   const char *name;
   int fd;
   char path[PATH_MAX];
-  bool pressed[KEY_CNT];
+  unsigned int holders[KEY_CNT];
+  bool hires_wheel;
+  bool hires_hwheel;
 };
 
 static volatile sig_atomic_t stop_requested;
-static struct physical_device mouse = {"ASUS MD100 Mouse", -1, ""};
-static struct physical_device keyboard = {"BT Keyboard", -1, ""};
-static struct virtual_device virtual_mouse = {"hdmi-los-mouse", -1, "", {false}};
-static struct virtual_device virtual_keyboard = {"hdmi-los-keyboard", -1, "", {false}};
+static struct physical_device **sources;
+static size_t source_count;
+static size_t source_capacity;
+static struct virtual_device virtual_mouse = {.name = "hdmi-los-mouse", .fd = -1};
+static struct virtual_device virtual_keyboard = {.name = "hdmi-los-keyboard", .fd = -1};
 
 static void on_signal(int signal_number) {
   (void)signal_number;
@@ -63,50 +73,80 @@ static bool has_capability(int fd, unsigned int event_type, unsigned int code,
   return result;
 }
 
-static bool physical_matches(int fd, const struct physical_device *device) {
-  char name[256] = {0};
-  struct input_id id;
-  if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) < 0 || ioctl(fd, EVIOCGID, &id) < 0 ||
-      id.bustype != BUS_BLUETOOTH || strcmp(name, device->name) != 0) {
-    return false;
+static unsigned int classify_device(unsigned short bus, const char *name,
+                                    bool mouse_capable, bool keyboard_capable) {
+  if (bus == BUS_BLUETOOTH) {
+    if (mouse_capable && strcmp(name, "ASUS MD100 Mouse") == 0) return ROLE_MOUSE;
+    if (keyboard_capable && strcmp(name, "BT Keyboard") == 0) return ROLE_KEYBOARD;
+    return 0;
   }
-  if (device == &mouse) {
-    return has_capability(fd, EV_REL, REL_X, REL_MAX) &&
-           has_capability(fd, EV_REL, REL_Y, REL_MAX) &&
-           has_capability(fd, EV_KEY, BTN_LEFT, KEY_MAX);
-  }
-  return has_capability(fd, EV_KEY, KEY_A, KEY_MAX) &&
-         has_capability(fd, EV_KEY, KEY_ENTER, KEY_MAX);
+  if (bus != BUS_USB) return 0;
+  return (mouse_capable ? ROLE_MOUSE : 0) |
+         (keyboard_capable ? ROLE_KEYBOARD : 0);
 }
 
-static void disconnect_physical(struct physical_device *device) {
-  if (device->fd >= 0) {
-    ioctl(device->fd, EVIOCGRAB, (void *)0);
-    close(device->fd);
-  }
-  device->fd = -1;
-  device->path[0] = '\0';
+static unsigned int physical_roles(int fd, char *name, size_t name_size) {
+  struct input_id id = {0};
+  if (ioctl(fd, EVIOCGNAME(name_size), name) < 0 || ioctl(fd, EVIOCGID, &id) < 0)
+    return 0;
+  name[name_size - 1] = '\0';
+  if (id.bustype != BUS_USB && id.bustype != BUS_BLUETOOTH) return 0;
+  bool mouse_capable = has_capability(fd, EV_REL, REL_X, REL_MAX) &&
+                       has_capability(fd, EV_REL, REL_Y, REL_MAX) &&
+                       has_capability(fd, EV_KEY, BTN_LEFT, KEY_MAX);
+  bool keyboard_capable = has_capability(fd, EV_KEY, KEY_A, KEY_MAX) &&
+                          has_capability(fd, EV_KEY, KEY_ENTER, KEY_MAX);
+  return classify_device(id.bustype, name, mouse_capable, keyboard_capable);
 }
 
-static bool connect_physical(struct physical_device *device) {
+static bool source_exists(const char *path) {
+  for (size_t i = 0; i < source_count; ++i)
+    if (strcmp(sources[i]->path, path) == 0) return true;
+  return false;
+}
+
+static void scan_physical(void) {
   glob_t paths = {0};
-  if (glob("/dev/input/event*", 0, NULL, &paths) != 0) return false;
+  if (glob("/dev/input/event*", 0, NULL, &paths) != 0) return;
   for (size_t i = 0; i < paths.gl_pathc; ++i) {
+    if (source_exists(paths.gl_pathv[i])) continue;
     int fd = open(paths.gl_pathv[i], O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
     if (fd < 0) continue;
-    if (physical_matches(fd, device) && ioctl(fd, EVIOCGRAB, (void *)1) == 0) {
-      device->fd = fd;
-      snprintf(device->path, sizeof(device->path), "%s", paths.gl_pathv[i]);
-      char message[PATH_MAX + 512];
-      snprintf(message, sizeof(message), "grabbed %s at %s", device->name, device->path);
-      log_message("info", message);
-      globfree(&paths);
-      return true;
+    char name[256] = {0};
+    unsigned int roles = physical_roles(fd, name, sizeof(name));
+    if (!roles || ioctl(fd, EVIOCGRAB, (void *)1) < 0) {
+      close(fd);
+      continue;
     }
-    close(fd);
+    struct physical_device *device = calloc(1, sizeof(*device));
+    if (!device) {
+      ioctl(fd, EVIOCGRAB, (void *)0);
+      close(fd);
+      continue;
+    }
+    if (source_count == source_capacity) {
+      size_t capacity = source_capacity ? source_capacity * 2 : 4;
+      struct physical_device **grown = realloc(sources, capacity * sizeof(*sources));
+      if (!grown) {
+        free(device);
+        ioctl(fd, EVIOCGRAB, (void *)0);
+        close(fd);
+        continue;
+      }
+      sources = grown;
+      source_capacity = capacity;
+    }
+    device->fd = fd;
+    device->roles = roles;
+    snprintf(device->path, sizeof(device->path), "%s", paths.gl_pathv[i]);
+    snprintf(device->name, sizeof(device->name), "%s", name);
+    sources[source_count++] = device;
+    char message[PATH_MAX + 512];
+    snprintf(message, sizeof(message), "grabbed %s at %s (roles=0x%x)",
+             device->name, device->path, roles);
+    log_message("info", message);
   }
   globfree(&paths);
-  return false;
 }
 
 static bool locate_virtual_event(int uinput_fd, char *path, size_t path_size) {
@@ -150,6 +190,10 @@ static int create_virtual(struct virtual_device *device, bool is_mouse) {
       close(fd);
       return -1;
     }
+#ifdef REL_WHEEL_HI_RES
+    device->hires_wheel = ioctl(fd, UI_SET_RELBIT, REL_WHEEL_HI_RES) == 0;
+    device->hires_hwheel = ioctl(fd, UI_SET_RELBIT, REL_HWHEEL_HI_RES) == 0;
+#endif
     for (int code = BTN_LEFT; code <= BTN_TASK; ++code) ioctl(fd, UI_SET_KEYBIT, code);
   } else {
     for (int code = 1; code < KEY_CNT; ++code) ioctl(fd, UI_SET_KEYBIT, code);
@@ -174,33 +218,30 @@ static int create_virtual(struct virtual_device *device, bool is_mouse) {
 }
 
 static void emit_event(struct virtual_device *device, const struct input_event *event) {
-  if (event->type == EV_KEY && event->code < KEY_CNT) {
-    if (event->value == 0) device->pressed[event->code] = false;
-    if (event->value == 1) device->pressed[event->code] = true;
-  }
   if (write(device->fd, event, sizeof(*event)) != (ssize_t)sizeof(*event) && errno != EAGAIN) {
     log_message("warning", "uinput write failed");
   }
 }
 
+static void emit_key(struct virtual_device *device, unsigned int code, int value) {
+  struct input_event event = {.type = EV_KEY, .code = (unsigned short)code, .value = value};
+  emit_event(device, &event);
+}
+
+static void emit_sync(struct virtual_device *device) {
+  struct input_event event = {.type = EV_SYN, .code = SYN_REPORT};
+  emit_event(device, &event);
+}
+
 static void release_keys(struct virtual_device *device) {
-  struct input_event event;
   bool changed = false;
-  memset(&event, 0, sizeof(event));
-  event.type = EV_KEY;
   for (int code = 0; code < KEY_CNT; ++code) {
-    if (!device->pressed[code]) continue;
-    event.code = (unsigned short)code;
-    event.value = 0;
-    emit_event(device, &event);
+    if (!device->holders[code]) continue;
+    device->holders[code] = 0;
+    emit_key(device, (unsigned int)code, 0);
     changed = true;
   }
-  if (changed) {
-    memset(&event, 0, sizeof(event));
-    event.type = EV_SYN;
-    event.code = SYN_REPORT;
-    emit_event(device, &event);
-  }
+  if (changed) emit_sync(device);
 }
 
 static void destroy_virtual(struct virtual_device *device) {
@@ -211,28 +252,131 @@ static void destroy_virtual(struct virtual_device *device) {
   device->fd = -1;
 }
 
-static bool event_allowed(bool is_mouse, const struct input_event *event) {
-  if (event->type == EV_SYN || event->type == EV_MSC) return true;
-  if (is_mouse) {
-    return event->type == EV_REL ||
-           (event->type == EV_KEY && event->code >= BTN_MOUSE && event->code <= BTN_TASK);
-  }
-  return event->type == EV_KEY;
+static struct virtual_device *key_target(const struct physical_device *source,
+                                         unsigned int code) {
+  if (code >= KEY_CNT) return NULL;
+  if (code >= BTN_MOUSE && code <= BTN_TASK)
+    return (source->roles & ROLE_MOUSE) ? &virtual_mouse : NULL;
+  return (source->roles & ROLE_KEYBOARD) ? &virtual_keyboard : NULL;
 }
 
-static bool forward_events(struct physical_device *physical, struct virtual_device *virtual,
-                           bool is_mouse, short poll_events) {
+static void flush_frame(struct physical_device *source) {
+  if (source->pending_mouse) emit_sync(&virtual_mouse);
+  if (source->pending_keyboard) emit_sync(&virtual_keyboard);
+  source->pending_mouse = false;
+  source->pending_keyboard = false;
+}
+
+static void change_key(struct physical_device *source, unsigned int code, int value) {
+  struct virtual_device *target = key_target(source, code);
+  if (!target) return;
+  bool *pending = target == &virtual_mouse ? &source->pending_mouse :
+                                              &source->pending_keyboard;
+  if (value == 2) {
+    if (source->pressed[code] && target->holders[code]) {
+      emit_key(target, code, 2);
+      *pending = true;
+    }
+  } else if (value == 1 && !source->pressed[code]) {
+    source->pressed[code] = true;
+    if (target->holders[code]++ == 0) {
+      emit_key(target, code, 1);
+      *pending = true;
+    }
+  } else if (value == 0 && source->pressed[code]) {
+    source->pressed[code] = false;
+    if (--target->holders[code] == 0) {
+      emit_key(target, code, 0);
+      *pending = true;
+    }
+  }
+}
+
+static void reconcile_key_bits(struct physical_device *source, const unsigned char *bits) {
+  for (unsigned int code = 0; code < KEY_CNT; ++code) {
+    if (!key_target(source, code)) continue;
+    bool down = (bits[code / 8] & (1U << (code % 8))) != 0;
+    if (down != source->pressed[code]) change_key(source, code, down ? 1 : 0);
+  }
+}
+
+static bool reconcile_keys(struct physical_device *source) {
+  unsigned char bits[(KEY_CNT + 7) / 8] = {0};
+  if (ioctl(source->fd, EVIOCGKEY(sizeof(bits)), bits) < 0) return false;
+  reconcile_key_bits(source, bits);
+  return true;
+}
+
+static bool relative_supported(unsigned int code) {
+  if (code == REL_X || code == REL_Y || code == REL_WHEEL || code == REL_HWHEEL)
+    return true;
+#ifdef REL_WHEEL_HI_RES
+  if (code == REL_WHEEL_HI_RES) return virtual_mouse.hires_wheel;
+  if (code == REL_HWHEEL_HI_RES) return virtual_mouse.hires_hwheel;
+#endif
+  return false;
+}
+
+static bool forward_events(struct physical_device *source, short poll_events) {
   if (poll_events & (POLLERR | POLLHUP | POLLNVAL)) return false;
   if (!(poll_events & POLLIN)) return true;
   struct input_event events[32];
   ssize_t size;
-  while ((size = read(physical->fd, events, sizeof(events))) > 0) {
+  while ((size = read(source->fd, events, sizeof(events))) > 0) {
     size_t count = (size_t)size / sizeof(events[0]);
     for (size_t i = 0; i < count; ++i) {
-      if (event_allowed(is_mouse, &events[i])) emit_event(virtual, &events[i]);
+      const struct input_event *event = &events[i];
+      if (event->type == EV_SYN && event->code == SYN_DROPPED) {
+        source->dropping = true;
+        continue;
+      }
+      if (event->type == EV_SYN && event->code == SYN_REPORT) {
+        if (source->dropping) {
+          if (!reconcile_keys(source)) return false;
+          source->dropping = false;
+        }
+        flush_frame(source);
+        continue;
+      }
+      if (source->dropping) continue;
+      if (event->type == EV_KEY) {
+        change_key(source, event->code, event->value);
+      } else if (event->type == EV_REL && (source->roles & ROLE_MOUSE) &&
+                 relative_supported(event->code)) {
+        emit_event(&virtual_mouse, event);
+        source->pending_mouse = true;
+      } else if (event->type == EV_MSC && event->code == MSC_SCAN) {
+        if (source->roles & ROLE_MOUSE) {
+          emit_event(&virtual_mouse, event);
+          source->pending_mouse = true;
+        }
+        if (source->roles & ROLE_KEYBOARD) {
+          emit_event(&virtual_keyboard, event);
+          source->pending_keyboard = true;
+        }
+      }
     }
   }
   return size < 0 && (errno == EAGAIN || errno == EINTR);
+}
+
+static void disconnect_physical(size_t index) {
+  struct physical_device *source = sources[index];
+  for (unsigned int code = 0; code < KEY_CNT; ++code)
+    if (source->pressed[code]) change_key(source, code, 0);
+  flush_frame(source);
+  ioctl(source->fd, EVIOCGRAB, (void *)0);
+  close(source->fd);
+  free(source);
+  memmove(sources + index, sources + index + 1,
+          (source_count - index - 1) * sizeof(*sources));
+  --source_count;
+}
+
+static long long monotonic_ms(void) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
 static bool write_ready(const char *runtime) {
@@ -260,30 +404,47 @@ int run(const char *runtime) {
   }
   log_message("info", "stable virtual mouse and keyboard ready");
 
+  long long next_scan = 0;
   while (!stop_requested) {
-    if (mouse.fd < 0) connect_physical(&mouse);
-    if (keyboard.fd < 0) connect_physical(&keyboard);
-    struct pollfd fds[2] = {
-        {mouse.fd, (short)(POLLIN | POLLERR | POLLHUP), 0},
-        {keyboard.fd, (short)(POLLIN | POLLERR | POLLHUP), 0},
-    };
-    int result = poll(fds, 2, SCAN_MS);
-    if (result < 0 && errno != EINTR) break;
-    if (mouse.fd >= 0 && !forward_events(&mouse, &virtual_mouse, true, fds[0].revents)) {
-      release_keys(&virtual_mouse);
-      disconnect_physical(&mouse);
-      log_message("info", "mouse asleep or disconnected; waiting for it to return");
+    long long now = monotonic_ms();
+    if (now >= next_scan) {
+      scan_physical();
+      next_scan = now + SCAN_MS;
     }
-    if (keyboard.fd >= 0 &&
-        !forward_events(&keyboard, &virtual_keyboard, false, fds[1].revents)) {
-      release_keys(&virtual_keyboard);
-      disconnect_physical(&keyboard);
-      log_message("info", "keyboard asleep or disconnected; waiting for it to return");
+    struct pollfd *fds = calloc(source_count ? source_count : 1, sizeof(*fds));
+    if (!fds) {
+      log_message("error", "cannot allocate input poll set");
+      break;
     }
+    for (size_t i = 0; i < source_count; ++i) {
+      fds[i].fd = sources[i]->fd;
+      fds[i].events = POLLIN | POLLERR | POLLHUP;
+    }
+    now = monotonic_ms();
+    int timeout = now >= next_scan ? 0 : (int)(next_scan - now);
+    int result = poll(fds, source_count, timeout);
+    if (result < 0 && errno != EINTR) {
+      free(fds);
+      break;
+    }
+    if (result > 0) {
+      for (size_t i = source_count; i > 0; --i) {
+        if (!forward_events(sources[i - 1], fds[i - 1].revents)) {
+          char message[PATH_MAX + 128];
+          snprintf(message, sizeof(message), "%s asleep or disconnected; releasing its input",
+                   sources[i - 1]->name);
+          disconnect_physical(i - 1);
+          log_message("info", message);
+        }
+      }
+    }
+    free(fds);
   }
 
-  disconnect_physical(&keyboard);
-  disconnect_physical(&mouse);
+  while (source_count) disconnect_physical(source_count - 1);
+  free(sources);
+  sources = NULL;
+  source_capacity = 0;
   destroy_virtual(&virtual_keyboard);
   destroy_virtual(&virtual_mouse);
   return 0;

@@ -15,6 +15,10 @@ gcc -std=gnu17 -O2 -fPIC -shared -Wall -Wextra -Werror \
     -I"$ROOT/native/common" "$ROOT/native/drm-trace/drmtrace.c" -ldl \
     -o "$TEMP/libhdmi-los-drmtrace.so"
 gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
+    "$ROOT/native/input-bridge/main.c" -o "$TEMP/hdmi-input-bridge"
+gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
+    "$ROOT/native/input-bridge/selftest.c" -o "$TEMP/input-bridge-selftest"
+gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
     -I"$ROOT/native/common" "$ROOT/native/drm-trace/selftest.c" \
     -o "$TEMP/drmtrace-selftest"
 
@@ -35,6 +39,7 @@ if pkg-config --exists x11 xtst xfixes; then
 fi
 
 "$TEMP/drmtrace-selftest" "$TEMP/libhdmi-los-drmtrace.so"
+"$TEMP/input-bridge-selftest"
 if "$TEMP/hdmi-losd" probe invalid >/dev/null 2>&1; then
     printf 'invalid broker probe unexpectedly succeeded\n' >&2
     exit 1
