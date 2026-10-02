@@ -1,0 +1,318 @@
+--- a/glamor/glamor_copy.c
++++ b/glamor/glamor_copy.c
+@@ -24,6 +24,34 @@
+ #include "glamor_transfer.h"
+ #include "glamor_prepare.h"
+ #include "glamor_transform.h"
++#include "hdmi_latency.h"
++
++static void
++glamor_latency_copy(DrawablePtr src, DrawablePtr dst, int kind, int nbox, BoxPtr box)
++{
++    static uint64_t calls[4], pixels[4], rects[4], root_temp, last;
++    static const char *names[] = {"gpu_temp", "gpu_draw", "upload", "readback"};
++    uint64_t now;
++    int i;
++    if (!hdmi_latency_enabled()) return;
++    calls[kind]++; rects[kind] += nbox;
++    for (i = 0; i < nbox; i++)
++        pixels[kind] += (uint64_t)(box[i].x2 - box[i].x1) * (box[i].y2 - box[i].y1);
++    if (kind == 0 && glamor_get_drawable_pixmap(src) == src->pScreen->GetScreenPixmap(src->pScreen) &&
++        glamor_get_drawable_pixmap(dst) == dst->pScreen->GetScreenPixmap(dst->pScreen))
++        root_temp++;
++    now = hdmi_latency_now();
++    if (!last) { last = now; return; }
++    if (now - last < 5000000) return;
++    for (i = 0; i < 4; i++)
++        LogMessage(X_INFO, "HDMI_COPY attempts=%s n=%llu rects=%llu pixels=%llu interval_us=%llu\n",
++            names[i], (unsigned long long)calls[i], (unsigned long long)rects[i],
++            (unsigned long long)pixels[i], (unsigned long long)(now-last));
++    LogMessage(X_INFO, "HDMI_COPY root_overlap_temp_attempts=%llu\n", (unsigned long long)root_temp);
++    memset(calls, 0, sizeof(calls)); memset(rects, 0, sizeof(rects));
++    memset(pixels, 0, sizeof(pixels)); root_temp = 0; last = now;
++}
++
+ 
+ struct copy_args {
+     PixmapPtr           src_pixmap;
+@@ -703,20 +731,25 @@
+ 
+     if (GLAMOR_PIXMAP_PRIV_HAS_FBO(dst_priv)) {
+         if (GLAMOR_PIXMAP_PRIV_HAS_FBO(src_priv)) {
+-            if (glamor_copy_needs_temp(src, dst, box, nbox, dx, dy))
++            if (glamor_copy_needs_temp(src, dst, box, nbox, dx, dy)) {
++                glamor_latency_copy(src, dst, 0, nbox, box);
+                 return glamor_copy_fbo_fbo_temp(src, dst, gc, box, nbox, dx, dy,
+                                                 reverse, upsidedown, bitplane, closure);
+-            else
++            } else {
++                glamor_latency_copy(src, dst, 1, nbox, box);
+                 return glamor_copy_fbo_fbo_draw(src, dst, gc, box, nbox, dx, dy,
+                                                 reverse, upsidedown, bitplane, closure);
++            }
+         }
+ 
++        glamor_latency_copy(src, dst, 2, nbox, box);
+         return glamor_copy_cpu_fbo(src, dst, gc, box, nbox, dx, dy,
+                                    reverse, upsidedown, bitplane, closure);
+     } else if (GLAMOR_PIXMAP_PRIV_HAS_FBO(src_priv) &&
+                dst_priv->type != GLAMOR_DRM_ONLY &&
+                bitplane == 0) {
+-            return glamor_copy_fbo_cpu(src, dst, gc, box, nbox, dx, dy,
++        glamor_latency_copy(src, dst, 3, nbox, box);
++        return glamor_copy_fbo_cpu(src, dst, gc, box, nbox, dx, dy,
+                                        reverse, upsidedown, bitplane, closure);
+     }
+     return FALSE;
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -625,6 +625,11 @@
+         RegionInit(&region, &crtc->bounds, 0);
+         RegionIntersect(&region, &region, dirty);
+ 
++        if (hdmi_latency_enabled() && RegionNotEmpty(&region)) {
++            trf->latency.updates++;
++            if (!trf->latency.first_damage_us)
++                trf->latency.first_damage_us = hdmi_latency_now();
++        }
+         if (trf->buf[0].px) {
+             for (i = 0; i < ARRAY_SIZE(trf->buf); i++)
+                 RegionUnion(&trf->buf[i].dmg, &trf->buf[i].dmg, &region);
+@@ -664,6 +669,9 @@
+         /* Skip if the last flip is still pending, a DRI client is flipping, or
+          * there isn't any damage on the front buffer.
+          */
++        if (hdmi_latency_enabled() && trf->flip_seq &&
++            RegionNotEmpty(&trf->buf[trf->back_idx ^ 1].dmg))
++            trf->latency.pending_skips++;
+         if (trf->flip_seq || ms->drmmode.dri2_flipping ||
+             ms->drmmode.present_flipping ||
+             RegionNil(&trf->buf[trf->back_idx ^ 1].dmg))
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -1584,6 +1584,19 @@
+ #ifdef GLAMOR_HAS_GBM
+     ScreenPtr pScreen = xf86ScrnToScreen(crtc->scrn);
+     DrawableRec *src;
++    drmmode_crtc_private_ptr private = crtc->driver_private;
++    struct hdmi_tearfree_latency *latency = &private->tearfree.latency;
++    uint64_t start = 0, submitted = 0;
++    if (hdmi_latency_enabled()) {
++        int i, count = RegionNumRects(dmg);
++        BoxPtr rect = RegionRects(dmg);
++        start = hdmi_latency_now();
++        latency->copies++;
++        latency->rects += count;
++        for (i = 0; i < count; i++)
++            latency->pixels += (uint64_t)(rect[i].x2 - rect[i].x1) *
++                               (rect[i].y2 - rect[i].y1);
++    }
+ 
+     /* Copy the screen's pixmap into the destination pixmap */
+     if (crtc->rotatedPixmap) {
+@@ -1598,8 +1611,16 @@
+     if (empty)
+         RegionEmpty(dmg);
+ 
++    if (start)
++        submitted = hdmi_latency_now();
+     /* Wait until the GC operations finish */
+     modesettingPTR(crtc->scrn)->glamor.finish(pScreen);
++    if (start) {
++        uint64_t done = hdmi_latency_now();
++        hdmi_latency_add(&latency->hist[0], submitted - start);
++        hdmi_latency_add(&latency->hist[1], done - submitted);
++        hdmi_latency_add(&latency->hist[2], done - start);
++    }
+ #endif
+ }
+ 
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.h
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.h
+@@ -35,6 +35,7 @@
+ #endif
+ 
+ #include "dumb_bo.h"
++#include "hdmi_latency.h"
+ 
+ struct gbm_device;
+ 
+@@ -181,6 +182,7 @@
+     struct xorg_list dri_flip_list;
+     uint32_t back_idx;
+     uint32_t flip_seq;
++    struct hdmi_tearfree_latency latency;
+ } drmmode_tearfree_rec, *drmmode_tearfree_ptr;
+ 
+ typedef struct {
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -637,12 +637,68 @@
+ }
+ 
+ static void
++ms_tearfree_latency_report(xf86CrtcPtr crtc, uint64_t now)
++{
++    drmmode_crtc_private_ptr private = crtc->driver_private;
++    struct hdmi_tearfree_latency *s = &private->tearfree.latency;
++    static const char *names[] = {"copy_submit", "finish", "copy_total",
++        "flip_queue", "flip_inflight", "callback_gap", "damage_to_copy",
++        "callback_minus_ust"};
++    unsigned i;
++    if (!s->report_us) { s->report_us = now; return; }
++    if (now - s->report_us < 5000000) return;
++    xf86DrvMsg(crtc->scrn->scrnIndex, X_INFO,
++        "HDMI_LATENCY crtc=%u interval_us=%llu copies=%llu rects=%llu pixels=%llu "
++        "updates=%llu pending_skips=%llu failures=%llu repeat_msc=%llu "
++        "backwards_msc=%llu future_ust=%llu\n",
++        private->mode_crtc->crtc_id,
++        (unsigned long long)(now - s->report_us),
++        (unsigned long long)s->copies, (unsigned long long)s->rects,
++        (unsigned long long)s->pixels, (unsigned long long)s->updates,
++        (unsigned long long)s->pending_skips, (unsigned long long)s->failures,
++        (unsigned long long)s->repeated_msc, (unsigned long long)s->backwards_msc,
++        (unsigned long long)s->future_ust);
++    for (i = 0; i < 8; i++) {
++        struct hdmi_latency_hist *h = &s->hist[i];
++        xf86DrvMsg(crtc->scrn->scrnIndex, X_INFO,
++            "HDMI_LATENCY crtc=%u metric=%s n=%llu total_us=%llu "
++            "p50_bound_us=%llu p95_bound_us=%llu p99_bound_us=%llu max_us=%llu\n",
++            private->mode_crtc->crtc_id, names[i],
++            (unsigned long long)h->n, (unsigned long long)h->sum,
++            (unsigned long long)hdmi_latency_quantile(h, 50),
++            (unsigned long long)hdmi_latency_quantile(h, 95),
++            (unsigned long long)hdmi_latency_quantile(h, 99),
++            (unsigned long long)h->max);
++        memset(h, 0, sizeof(*h));
++    }
++    s->rects = s->pixels = s->copies = s->updates = s->pending_skips = s->failures = 0;
++    s->repeated_msc = s->backwards_msc = s->future_ust = 0;
++    s->report_us = now;
++}
++
++static void
+ ms_tearfree_flip_handler(uint64_t msc, uint64_t usec, void *data)
+ {
+     xf86CrtcPtr crtc = data;
+     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+ 
++    if (hdmi_latency_enabled()) {
++        struct hdmi_tearfree_latency *s = &trf->latency;
++        uint64_t now = hdmi_latency_now();
++        if (s->pending_us) hdmi_latency_add(&s->hist[4], now - s->pending_us);
++        if (s->last_callback_us) {
++            hdmi_latency_add(&s->hist[5], now - s->last_callback_us);
++            s->repeated_msc += msc == s->last_msc;
++            s->backwards_msc += msc < s->last_msc;
++        }
++        if (usec && now >= usec) hdmi_latency_add(&s->hist[7], now - usec);
++        else if (usec) s->future_ust++;
++        s->pending_us = 0;
++        s->last_callback_us = now;
++        s->last_msc = msc;
++        ms_tearfree_latency_report(crtc, now);
++    }
+     /* Swap the buffers and complete the flip */
+     trf->back_idx ^= 1;
+     trf->flip_seq = 0;
+@@ -657,7 +713,13 @@
+     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+     uint32_t idx = trf->back_idx, seq;
+-
++    uint64_t queue_start = 0;
++
++    if (hdmi_latency_enabled() && trf->latency.first_damage_us) {
++        hdmi_latency_add(&trf->latency.hist[6],
++                         hdmi_latency_now() - trf->latency.first_damage_us);
++        trf->latency.first_damage_us = 0;
++    }
+     seq = ms_drm_queue_alloc(crtc, crtc, ms_tearfree_flip_handler,
+                              ms_tearfree_flip_abort);
+     if (!seq) {
+@@ -671,14 +733,24 @@
+ 
+     /* Copy the damage to the back buffer and then flip it at the vblank */
+     drmmode_copy_damage(crtc, trf->buf[idx].px, &trf->buf[idx].dmg, TRUE);
++    if (hdmi_latency_enabled()) queue_start = hdmi_latency_now();
+     if (do_queue_flip_on_crtc(screen, crtc, DRM_MODE_PAGE_FLIP_EVENT,
+                               seq, trf->buf[idx].fb_id, 0, 0))
+         goto no_flip;
+ 
++    if (queue_start) {
++        uint64_t queued = hdmi_latency_now();
++        hdmi_latency_add(&trf->latency.hist[3], queued - queue_start);
++        trf->latency.pending_us = queued;
++    }
+     trf->flip_seq = seq;
+     return FALSE;
+ 
+ no_flip:
++    if (hdmi_latency_enabled()) {
++        trf->latency.failures++;
++        trf->latency.pending_us = 0;
++    }
+     xf86DrvMsg(crtc->scrn->scrnIndex, X_WARNING,
+                "TearFree flip failed, rendering frame without TearFree\n");
+     drmmode_copy_damage(crtc, trf->buf[idx ^ 1].px,
+--- /dev/null
++++ b/include/hdmi_latency.h
+@@ -0,0 +1,57 @@
++/* SPDX-License-Identifier: MIT
++ * Opt-in wall-clock counters. No GPU query, fence, wait, or per-operation I/O.
++ */
++#ifndef HDMI_LATENCY_H
++#define HDMI_LATENCY_H
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#define HDMI_LATENCY_BINS 256
++struct hdmi_latency_hist {
++    uint64_t bins[HDMI_LATENCY_BINS], n, sum, max;
++};
++static inline int hdmi_latency_enabled(void)
++{
++    static int enabled = -1;
++    if (enabled < 0) {
++        const char *value = getenv("HDMI_LOS_LATENCY_STATS");
++        enabled = value && !strcmp(value, "1");
++    }
++    return enabled;
++}
++static inline uint64_t hdmi_latency_now(void)
++{
++    struct timespec ts;
++    clock_gettime(CLOCK_MONOTONIC, &ts);
++    return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
++}
++static inline void hdmi_latency_add(struct hdmi_latency_hist *h, uint64_t us)
++{
++    unsigned b = us / 250 < HDMI_LATENCY_BINS ? us / 250 : HDMI_LATENCY_BINS - 1;
++    h->bins[b]++; h->n++; h->sum += us;
++    if (us > h->max) h->max = us;
++}
++/* Quantiles are bucket upper bounds (250 us bins), not exact samples. */
++static inline uint64_t hdmi_latency_quantile(const struct hdmi_latency_hist *h,
++                                            unsigned percent)
++{
++    uint64_t n = 0, target = (h->n * percent + 99) / 100;
++    unsigned i;
++    if (!target) return 0;
++    for (i = 0; i < HDMI_LATENCY_BINS; i++) {
++        n += h->bins[i];
++        if (n >= target)
++            return i == HDMI_LATENCY_BINS - 1 ? h->max : (i + 1) * 250;
++    }
++    return h->max;
++}
++struct hdmi_tearfree_latency {
++    /* copy submission, finish, total copy, queue, in-flight, callback gap,
++     * first observed damage to copy, callback minus reported UST */
++    struct hdmi_latency_hist hist[8];
++    uint64_t rects, pixels, copies, updates, pending_skips, failures;
++    uint64_t repeated_msc, backwards_msc, future_ust;
++    uint64_t report_us, pending_us, last_callback_us, last_msc, first_damage_us;
++};
++#endif
