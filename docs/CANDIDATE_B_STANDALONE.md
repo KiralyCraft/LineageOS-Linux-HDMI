@@ -35,8 +35,9 @@ switch. Do not change the live lease's mode during comparisons.
 Rollback after unplugging: run `./switch-broker.sh rollback`, then launch the
 original October 2 folder's `run-agent.sh`. The companion can stay loaded and
 inactive. Normal `rmmod hdmi_companion` is optional only after sessions have
-stopped; there is no forced unload. Reboot also returns to Magisk's original
-broker. No Magisk install or reboot is part of this standalone test.
+stopped; there is no forced unload. Before installing the Candidate B ZIP, reboot
+also returns to Magisk's original broker. No Magisk install or reboot is part of
+this standalone test.
 
 ## Ownership and correctness
 
@@ -77,8 +78,29 @@ the user confirmed the desktop and USB input worked. Timeout restoration reveale
 an expired-deadline stop-wait race in the broker. The revised broker separates
 the cleanup acknowledgement budget from the session limit and renews the composer
 watchdog for guarded bounded tests. It logs session get/put balance on teardown.
-**A clean live shutdown with that revision is still pending.** This build does
-not yet establish a matched latency improvement, physical 4K cadence, or all
-kernel lifecycle cases. Magisk packaging for production follows these live gates. Persistent
+Four revised-broker sessions (generations 15 through 18) each reached valid
+timing and ended with balanced get/put counters. Their stop acknowledgements
+completed in about six seconds before timing release and Android restoration;
+the retained Xorg logs exited successfully without flip/fence errors. The module
+became inactive afterward. This passes the bounded cleanup gate. It does not
+yet establish a matched latency improvement, physical 4K cadence, continuous
+shutdown, or all kernel lifecycle cases. Persistent
 Mesa bridge generations, same-context resolve, copy backends and a kernel
 presenter remain later candidates.
+
+## Manual Magisk upgrade
+
+The Candidate B ZIP updates the existing `hdmi-los` module, retaining the exact
+installed composer/plane-reservation payloads and the newer installed Android
+app. Its late-start service verifies the kernel release/configuration and
+companion payload before ordinary `insmod` and ABI/build-identity checks. Only
+then does it start the matched broker. It neither replaces existing GPU modules
+nor starts an HDMI session automatically. The companion remains loaded but
+owns no vblank reference until a broker session starts.
+
+The ZIP also carries a compressed copy of the matched Downloads runtime. Keep
+using the folder above after reboot; no extraction is necessary. A backup
+of the previous module is packaged separately for rollback. Install the upgrade
+manually with HDMI unplugged, then reboot when convenient. No installation or
+reboot is performed by the packaging script. Boot-time activation remains a
+separate gate from the successful standalone tests.

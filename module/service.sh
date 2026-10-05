@@ -17,6 +17,10 @@ rotate_log() {
 }
 
 rotate_log "$LOGDIR/broker.log"
+if [ -f "$MODDIR/timing.env" ]; then
+  rotate_log "$LOGDIR/companion.log"
+  "$MODDIR/companion-loader.sh" >>"$LOGDIR/companion.log" 2>&1 || exit 1
+fi
 "$MODDIR/bin/hdmi-losd" daemon >>"$LOGDIR/broker.log" 2>&1 &
 BROKER_PID=$!
 
