@@ -1,0 +1,353 @@
+{
+  "schema": 1,
+  "test": "E-off / revised-E-on / E-off corrected-pattern comparison",
+  "mode": "3840x2160@30",
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "xorg_patch_commit": "ef5b88f7b133a520e7d36434002cd22d0cf32e77",
+  "runtime_unchanged_between_runs": true,
+  "workload": "Same leased-pattern.py and geometry/phase sequence; candidate name changes its label.",
+  "result": "E-off clean twice; revised E-on causes titlebar corruption with clean client viewport.",
+  "decision": "Keep BCDF with E disabled as the working baseline. Revised E has failed physical correctness.",
+  "runs": [
+    {
+      "label": "E off before",
+      "E_enabled": false,
+      "physical_report": {
+        "user_report": "Done. I saw no corruption",
+        "scope": "BCDF resize-cache corrected-pattern test at 3840x2160@30",
+        "visual_smoke": "PASS: user observed no corruption",
+        "physical_cadence_validated": false,
+        "keyboard_mouse_tested": false
+      },
+      "frames_submitted": 600,
+      "frames_completed": 600,
+      "integrated_resolves": 600,
+      "worker_copies": 0,
+      "generations": 3,
+      "cache_hits": 597,
+      "evictions": 0,
+      "phases": [
+        {
+          "phase": "stationary",
+          "frames": 120,
+          "swap_p50_ms": 1.4691139999740699,
+          "swap_p95_ms": 2.0591659999809053,
+          "swap_max_ms": 8.025624999845604
+        },
+        {
+          "phase": "move-only",
+          "frames": 120,
+          "swap_p50_ms": 1.4709369997945032,
+          "swap_p95_ms": 2.365676999943389,
+          "swap_max_ms": 3.6905730003127246
+        },
+        {
+          "phase": "resize-only",
+          "frames": 120,
+          "swap_p50_ms": 1.5627090001544275,
+          "swap_p95_ms": 2.374843999859877,
+          "swap_max_ms": 18.423541000174737
+        },
+        {
+          "phase": "move-and-resize",
+          "frames": 120,
+          "swap_p50_ms": 1.617917000203306,
+          "swap_p95_ms": 4.4727080003212905,
+          "swap_max_ms": 7.626405999872077
+        },
+        {
+          "phase": "stationary-after",
+          "frames": 120,
+          "swap_p50_ms": 1.4429679999921063,
+          "swap_p95_ms": 1.719062000120175,
+          "swap_max_ms": 1.9444269996711228
+        }
+      ],
+      "stages": [
+        {
+          "stage": "admission_lock",
+          "count": 600,
+          "total_us": 198,
+          "max_us": 1,
+          "p95_bucket_upper_bound_us": 1
+        },
+        {
+          "stage": "generation_wait",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "allocate_import",
+          "count": 3,
+          "total_us": 33631,
+          "max_us": 15803,
+          "p95_bucket_upper_bound_us": 16384
+        },
+        {
+          "stage": "generation_retire",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "slot_wait",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "resolve_submit",
+          "count": 600,
+          "total_us": 783998,
+          "max_us": 7397,
+          "p95_bucket_upper_bound_us": 2048
+        },
+        {
+          "stage": "fence_export",
+          "count": 600,
+          "total_us": 136476,
+          "max_us": 969,
+          "p95_bucket_upper_bound_us": 512
+        }
+      ],
+      "cleanup": {
+        "normal_xorg_exit": true,
+        "android_restored": true,
+        "companion_refcnt": 0
+      }
+    },
+    {
+      "label": "Revised E on",
+      "E_enabled": true,
+      "physical_report": {
+        "user_report": "It finished, the initial title bar had some blue dots. Then, when one window moved to the middle of the screen, the titlebar was not visible at all (it was a simple solid color). When it came back, it was fine. I saw no corruption inside the viewport itself.",
+        "scope": "Revised E-on BCDEF corrected-pattern test at 4K30",
+        "visual_smoke": "FAIL: titlebar dots and missing titlebar during movement; client viewport clean",
+        "physical_cadence_validated": false,
+        "keyboard_mouse_tested": false
+      },
+      "frames_submitted": 600,
+      "frames_completed": 600,
+      "integrated_resolves": 600,
+      "worker_copies": 0,
+      "generations": 3,
+      "cache_hits": 597,
+      "evictions": 0,
+      "phases": [
+        {
+          "phase": "stationary",
+          "frames": 120,
+          "swap_p50_ms": 18.53223899979639,
+          "swap_p95_ms": 25.52609400026995,
+          "swap_max_ms": 26.22213499944337
+        },
+        {
+          "phase": "move-only",
+          "frames": 120,
+          "swap_p50_ms": 2.38822900064406,
+          "swap_p95_ms": 9.164635999695747,
+          "swap_max_ms": 10.934844000075827
+        },
+        {
+          "phase": "resize-only",
+          "frames": 120,
+          "swap_p50_ms": 1.5264590001606848,
+          "swap_p95_ms": 2.9548440006692545,
+          "swap_max_ms": 16.42854100009572
+        },
+        {
+          "phase": "move-and-resize",
+          "frames": 120,
+          "swap_p50_ms": 1.5518229993176647,
+          "swap_p95_ms": 2.896927000620053,
+          "swap_max_ms": 5.5170830000861315
+        },
+        {
+          "phase": "stationary-after",
+          "frames": 120,
+          "swap_p50_ms": 1.4869279993945383,
+          "swap_p95_ms": 1.9163540000590729,
+          "swap_max_ms": 11.388437999812595
+        }
+      ],
+      "stages": [
+        {
+          "stage": "admission_lock",
+          "count": 600,
+          "total_us": 241,
+          "max_us": 2,
+          "p95_bucket_upper_bound_us": 1
+        },
+        {
+          "stage": "generation_wait",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "allocate_import",
+          "count": 3,
+          "total_us": 29856,
+          "max_us": 13797,
+          "p95_bucket_upper_bound_us": 16384
+        },
+        {
+          "stage": "generation_retire",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "slot_wait",
+          "count": 205,
+          "total_us": 2154800,
+          "max_us": 23472,
+          "p95_bucket_upper_bound_us": 32768
+        },
+        {
+          "stage": "resolve_submit",
+          "count": 600,
+          "total_us": 925271,
+          "max_us": 11028,
+          "p95_bucket_upper_bound_us": 4096
+        },
+        {
+          "stage": "fence_export",
+          "count": 600,
+          "total_us": 146866,
+          "max_us": 1933,
+          "p95_bucket_upper_bound_us": 512
+        }
+      ],
+      "cleanup": {
+        "normal_xorg_exit": true,
+        "android_restored": true,
+        "companion_refcnt": 0
+      }
+    },
+    {
+      "label": "E off after",
+      "E_enabled": false,
+      "physical_report": {
+        "user_report": "Yes, in this one the titlebars are completely fine. The only difference between this and the E-fixed one is the titlebars (visually). No corruption.",
+        "scope": "Repeated E-off BCDF corrected-pattern test at 4K30 after revised E-on test",
+        "visual_smoke": "PASS: titlebars and client viewport clean",
+        "physical_cadence_validated": false,
+        "keyboard_mouse_tested": false
+      },
+      "frames_submitted": 600,
+      "frames_completed": 600,
+      "integrated_resolves": 600,
+      "worker_copies": 0,
+      "generations": 3,
+      "cache_hits": 597,
+      "evictions": 0,
+      "phases": [
+        {
+          "phase": "stationary",
+          "frames": 120,
+          "swap_p50_ms": 1.456093000342662,
+          "swap_p95_ms": 2.0136460007051937,
+          "swap_max_ms": 29.062187999443267
+        },
+        {
+          "phase": "move-only",
+          "frames": 120,
+          "swap_p50_ms": 1.4929170001778402,
+          "swap_p95_ms": 2.7152610000484856,
+          "swap_max_ms": 3.8942190003581345
+        },
+        {
+          "phase": "resize-only",
+          "frames": 120,
+          "swap_p50_ms": 1.6086980003819917,
+          "swap_p95_ms": 2.8618749993256642,
+          "swap_max_ms": 21.743385000263515
+        },
+        {
+          "phase": "move-and-resize",
+          "frames": 120,
+          "swap_p50_ms": 1.5957819996401668,
+          "swap_p95_ms": 4.80041699938738,
+          "swap_max_ms": 12.655573000301956
+        },
+        {
+          "phase": "stationary-after",
+          "frames": 120,
+          "swap_p50_ms": 1.5186460004770197,
+          "swap_p95_ms": 1.9430209995334735,
+          "swap_max_ms": 12.228906000018469
+        }
+      ],
+      "stages": [
+        {
+          "stage": "admission_lock",
+          "count": 600,
+          "total_us": 220,
+          "max_us": 2,
+          "p95_bucket_upper_bound_us": 1
+        },
+        {
+          "stage": "generation_wait",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "allocate_import",
+          "count": 3,
+          "total_us": 37555,
+          "max_us": 18784,
+          "p95_bucket_upper_bound_us": 32768
+        },
+        {
+          "stage": "generation_retire",
+          "count": 0,
+          "total_us": 0,
+          "max_us": 0,
+          "p95_bucket_upper_bound_us": 0
+        },
+        {
+          "stage": "slot_wait",
+          "count": 1,
+          "total_us": 26512,
+          "max_us": 26512,
+          "p95_bucket_upper_bound_us": 32768
+        },
+        {
+          "stage": "resolve_submit",
+          "count": 600,
+          "total_us": 830189,
+          "max_us": 12249,
+          "p95_bucket_upper_bound_us": 4096
+        },
+        {
+          "stage": "fence_export",
+          "count": 600,
+          "total_us": 150207,
+          "max_us": 1803,
+          "p95_bucket_upper_bound_us": 512
+        }
+      ],
+      "cleanup": {
+        "normal_xorg_exit": true,
+        "android_restored": true,
+        "companion_refcnt": 0
+      }
+    }
+  ],
+  "limits": [
+    "This localizes the regression to enabling E in this configuration, not its underlying GL/Mesa cause.",
+    "E is the Xorg root-to-TearFree copy optimization; disabling it leaves Mesa client hardware resolves enabled.",
+    "Three short runs are not general lifecycle acceptance or a 4K60 result.",
+    "Swap-call measurements are not physical FPS or end-to-end latency.",
+    "The repeat had one 26.51 ms slot wait; the baseline is not proven stall-free."
+  ]
+}
