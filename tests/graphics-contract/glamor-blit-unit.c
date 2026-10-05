@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 typedef int Bool;
 typedef int GLint;
 typedef unsigned GLenum;
@@ -21,7 +22,9 @@ typedef bool GLboolean;
 #define GL_COLOR_BUFFER_BIT 7
 #define GL_NEAREST 8
 #define GL_NO_ERROR 0
-#define LogMessage(...) ((void)0)
+static void LogMessage(int level,const char *format,...) {
+ (void)level;char message[256];va_list args;va_start(args,format);vsnprintf(message,sizeof(message),format,args);va_end(args);
+}
 typedef struct {int fb,tex;bool is_red;} FBO;
 typedef struct {FBO *fbo;bool small;} glamor_pixmap_private;
 typedef struct {bool has_fbo_blit;} glamor_screen_private;
@@ -36,8 +39,10 @@ static glamor_screen_private screen_priv={true};
 static glamor_screen_private *glamor_get_screen_private(ScreenPtr s){(void)s;return &screen_priv;}
 static glamor_pixmap_private *glamor_get_pixmap_private(PixmapPtr p){return &p->priv;}
 static bool glamor_pixmap_priv_is_small(glamor_pixmap_private *p){return p->small;}
-static struct {int internalformat;} format={1};
-#define glamor_format_for_pixmap(p) (&format)
+struct Format {int internalformat;};
+static const struct Format *glamor_format_for_pixmap(PixmapPtr p) {
+ static const struct Format rgb={1},other={2};return p->drawable.depth==24?&rgb:&other;
+}
 #define RegionRects(r) ((r)->boxes)
 #define RegionNumRects(r) ((r)->count)
 static int read_fbo=71,draw_fbo=72,blit_count,binding_count;
