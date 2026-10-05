@@ -320,7 +320,7 @@ class DiagnosticContractTests(unittest.TestCase):
             ROOT
             / "third_party/mesa-for-android-container/src/freedreno/drm/freedreno_device.c"
         ).read_text())
-        self.assertIn('getenv("MESA_KGSL_X11_SHM_BRIDGE")', x11_dri3)
+        self.assertIn('debug_get_bool_option("MESA_KGSL_X11_SHM_BRIDGE", false)', x11_dri3)
         self.assertIn('return open("/dev/kgsl-3d0", O_RDWR | O_CLOEXEC);', x11_dri3)
 
         render_node_patch = (

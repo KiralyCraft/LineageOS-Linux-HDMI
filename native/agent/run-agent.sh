@@ -19,7 +19,7 @@ PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
 usage() {
-    printf 'usage: %s [--candidate B|C|D|E|F|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--candidate B|C|D|E|F|BCDF|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -96,7 +96,7 @@ if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
         "--client-present $CLIENT_PRESENT" >&2
     exit 2
 fi
-[[ $CANDIDATE == B || $CANDIDATE == C || $CANDIDATE == D || $CANDIDATE == E || $CANDIDATE == F || $CANDIDATE == BCDEF ]] || { usage; exit 2; }
+[[ $CANDIDATE == B || $CANDIDATE == C || $CANDIDATE == D || $CANDIDATE == E || $CANDIDATE == F || $CANDIDATE == BCDF || $CANDIDATE == BCDEF ]] || { usage; exit 2; }
 if [[ $CANDIDATE != B && ($XORG_ACCEL != kgsl-kms-bridge || $CLIENT_PRESENT != bridge || $TEARFREE_COMPLETION != async || $TIMING_GUARD != required) ]]; then
     printf 'Experimental profiles require the matched accelerated bridge, asynchronous TearFree and timing guard\n' >&2
     exit 2
@@ -121,6 +121,7 @@ case $CANDIDATE in
     D) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 ;;
     E) export HDMI_LOS_GLAMOR_COPY=blit MESA_KGSL_HDMI_BLIT_STATS=1 ;;
     F) export HDMI_LOS_PRESENTER=kernel ;;
+    BCDF) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 HDMI_LOS_PRESENTER=kernel MESA_KGSL_HDMI_BLIT_STATS=1 ;;
     BCDEF) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 HDMI_LOS_GLAMOR_COPY=blit HDMI_LOS_PRESENTER=kernel MESA_KGSL_HDMI_BLIT_STATS=1 ;;
 esac
 printf 'HDMI experimental candidate: %s\n' "$CANDIDATE" >&2
@@ -129,7 +130,7 @@ if [[ $CANDIDATE == E || $CANDIDATE == BCDEF ]]; then
         printf 'The matched glamor copy experiment is missing\n' >&2; exit 1;
     }
 fi
-if [[ $CANDIDATE == F || $CANDIDATE == BCDEF ]]; then
+if [[ $CANDIDATE == F || $CANDIDATE == BCDF || $CANDIDATE == BCDEF ]]; then
     LC_ALL=C grep -aFq 'HDMI_LOS_XORG_PRESENTER_ABI=1' "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so" || {
         printf 'The matched kernel presenter module is missing\n' >&2; exit 1;
     }
@@ -150,7 +151,7 @@ if [[ $TEARFREE_COMPLETION == async ]]; then
 fi
 
 if [[ $TIMING_GUARD == required ]]; then
-    if [[ $CANDIDATE == F || $CANDIDATE == BCDEF ]]; then
+    if [[ $CANDIDATE == F || $CANDIDATE == BCDF || $CANDIDATE == BCDEF ]]; then
         "$BUNDLE/load-companion.sh" --check
     else
         "$BUNDLE/load-companion.sh" --check-compatible
