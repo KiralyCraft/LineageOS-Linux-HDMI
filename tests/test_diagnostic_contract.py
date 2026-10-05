@@ -161,7 +161,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertIn("options |= XCB_PRESENT_OPTION_ASYNC", source)
         self.assertNotIn("presented_sequence < sequence", source)
         self.assertIn("LOADER_DRI3_SHM_BRIDGE_ABI", source)
-        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=5', header)
+        self.assertIn('HDMI_LOS_MESA_BRIDGE_ABI=6', header)
         self.assertNotIn("nanosleep(", source)
         self.assertNotIn("usleep(", source)
         bridge = source.split("static bool\ndri3_shm_bridge_present(", 1)[1].split(
@@ -170,7 +170,7 @@ class DiagnosticContractTests(unittest.TestCase):
         self.assertNotIn("xcb_request_check", bridge)
 
         runner = (ROOT / "native/agent/run-agent.sh").read_text()
-        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=5", runner)
+        self.assertIn("HDMI_LOS_MESA_BRIDGE_ABI=6", runner)
         self.assertIn("grep -aFq", runner)
         self.assertIn("stale or incompatible", runner)
         self.assertIn("libGLX_mesa.so.0", runner)
