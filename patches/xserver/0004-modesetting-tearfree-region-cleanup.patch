@@ -1,0 +1,25 @@
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -634,6 +634,7 @@
+                              pScreen->GetScreenPixmap(pScreen),
+                              NULL, ms->drmmode.fb_id);
+         }
++        RegionUninit(&region);
+     }
+     DamageEmpty(ms->damage);
+ }
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -347,8 +347,11 @@
+      * didn't change this CRTC's contents at all with its presentation, possibly
+      * because its window is fully occluded by another window on this CRTC.
+      */
+-    if (RegionNil(&region))
++    if (RegionNil(&region)) {
++        RegionUninit(&region);
+         return FALSE;
++    }
++    RegionUninit(&region);
+ 
+     flip = calloc(1, sizeof(*flip));
+     if (!flip)

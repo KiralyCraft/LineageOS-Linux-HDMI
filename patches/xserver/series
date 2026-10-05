@@ -1,3 +1,5 @@
 0001-present-disarm-wait-fence-callback.patch
 0002-glamor-prefer-render-node-for-dri3.patch
 0003-modesetting-backport-upstream-tearfree.patch
+0004-modesetting-tearfree-region-cleanup.patch
+0005-modesetting-fence-driven-tearfree.patch

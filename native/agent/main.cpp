@@ -42,6 +42,8 @@ std::atomic<bool> g_stop(false);
 pid_t g_bridge = -1;
 pid_t g_xorg = -1;
 pid_t g_session = -1;
+bool g_timing_required = false;
+bool g_tearfree_async = false;
 int g_broker = -1;
 int g_trace = -1;
 int g_verify_lease = -1;
@@ -651,6 +653,8 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
 }
 
 void configure_gpu_environment(bool kms_scanout_server) {
+  if (kms_scanout_server)
+    setenv("HDMI_LOS_TEARFREE_COMPLETION", g_tearfree_async ? "async" : "sync", 1);
   if (!g_kgsl_glamor) return;
   unsetenv("GALLIUM_DRIVER");
   unsetenv("VK_DRIVER_FILES");
@@ -1014,15 +1018,22 @@ int run_agent() {
   registration.opcode = HDMI_LOS_OP_AGENT_REGISTER;
   registration.request_id = static_cast<uint32_t>(getpid());
   registration.flags = g_no_timeout ? HDMI_LOS_FLAG_CONTINUOUS : 0;
+  if (g_timing_required) registration.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED;
   if (!write_full(g_broker, &registration, sizeof(registration))) return 1;
   int ignored_fd = -1;
   hdmi_los_message reply = {};
   if (!recv_message(g_broker, &reply, &ignored_fd) || reply.status != HDMI_LOS_OK) {
-    log_message("error", "broker rejected agent registration");
+    log_message("error", reply.detail[0] ? reply.detail : "broker rejected agent registration");
     return 1;
   }
   if (g_no_timeout && !(reply.flags & HDMI_LOS_FLAG_CONTINUOUS)) {
     log_message("error", "installed broker does not support continuous sessions");
+    return 1;
+  }
+  if (g_timing_required && !(reply.flags & HDMI_LOS_FLAG_TIMING_REQUIRED)) {
+    log_message("error", "broker did not acknowledge required kernel timing ownership");
+    close(g_broker);
+    g_broker = -1;
     return 1;
   }
   log_message("info", g_no_timeout ?
@@ -1150,6 +1161,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "invalid Xorg acceleration mode: %s\n", value);
         return 2;
       }
+    } else if (strcmp(argv[i], "--timing-guard") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "required") && strcmp(value, "off")) return 2;
+      g_timing_required = !strcmp(value, "required");
+    } else if (strcmp(argv[i], "--tearfree-completion") == 0 && i + 1 < argc) {
+      const char *value = argv[++i];
+      if (strcmp(value, "async") && strcmp(value, "sync")) return 2;
+      g_tearfree_async = !strcmp(value, "async");
     } else if (strcmp(argv[i], "--session") == 0 && i + 1 < argc) {
       const char *value = argv[++i];
       if (strcmp(value, "lxde") == 0) g_start_lxde = true;
@@ -1186,7 +1205,8 @@ int main(int argc, char **argv) {
       fprintf(stderr, "usage: hdmi-los-agent [--bundle DIR] "
                       "[--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] "
                       "[--client-present bridge|shadow|direct] "
-                      "[--session lxde|none] "
+                      "[--session lxde|none] [--timing-guard required|off] "
+                      "[--tearfree-completion async|sync] "
                       "[--drm-trace startup|full] "
                       "[--no-timeout]\n");
       return 2;

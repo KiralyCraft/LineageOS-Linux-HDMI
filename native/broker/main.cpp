@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "hdmi_los_protocol.h"
+#include "hdmi_timing_session.h"
 
 namespace {
 
@@ -482,6 +483,7 @@ class Broker {
         close(agent_fd_);
         agent_fd_ = -1;
         agent_continuous_ = false;
+        agent_timing_required_ = false;
         if (active_) Release("chroot agent disconnected", true);
       } else if (agent_fd_ >= 0 && (fds[2].revents & POLLIN)) {
         hdmi_los_message event = {};
@@ -508,6 +510,11 @@ class Broker {
       }
       if (active_ && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) {
         Release("mandatory 60 second timeout", true);
+      }
+      if (active_ && agent_timing_required_ && monotonic_ms() >= timing_check_ms_) {
+        std::string error;
+        if (!timing_.Valid(&error)) Release(error.c_str(), true);
+        timing_check_ms_ = monotonic_ms() + 500;
       }
       if (armed_ && !active_) AdvanceArmed();
     }
@@ -1002,6 +1009,21 @@ class Broker {
     }
     log_transition("takeover composer-create complete");
 
+    if (agent_timing_required_) {
+      if (!timing_.Start(lease_fd, response.connector_id, response.crtc_id,
+                         response.plane_id, detail)) {
+        close(lease_fd);
+        hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
+        write_full(agent_fd_, &stop, sizeof(stop));
+        ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
+        CleanupGuards();
+        return HDMI_LOS_ERR_INCOMPATIBLE;
+      }
+      std::string message = "timing session valid, generation=" + std::to_string(timing_.generation());
+      log_line("info", message.c_str());
+      timing_check_ms_ = monotonic_ms() + 500;
+    }
+
     log_transition("takeover agent-start begin");
     request = make_message(HDMI_LOS_OP_AGENT_START);
     request.connector_id = response.connector_id;
@@ -1010,6 +1032,7 @@ class Broker {
     request.flags = probe_mode;
     if (!send_with_fd(agent_fd_, request, lease_fd)) {
       close(lease_fd);
+      timing_.Stop();
       ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
       CleanupGuards();
       *detail = "could not deliver lease fd to chroot agent";
@@ -1019,6 +1042,7 @@ class Broker {
     if (!WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentStartMs, &response)) {
       hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
       write_full(agent_fd_, &stop, sizeof(stop));
+      timing_.Stop();
       ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
       CleanupGuards();
       *detail = response.opcode == HDMI_LOS_OP_AGENT_FAILED && response.detail[0] ?
@@ -1152,6 +1176,7 @@ class Broker {
   }
 
   void CleanupGuards() {
+    timing_.Stop();
     volumes_.Release();
     set_wake_lock(false);
     deadline_ms_ = 0;
@@ -1160,7 +1185,7 @@ class Broker {
   }
 
   void Release(const char *reason, bool tell_composer) {
-    if (!active_ && volumes_.down < 0 && volumes_.up < 0) return;
+    if (!active_ && volumes_.down < 0 && volumes_.up < 0 && !timing_.generation()) return;
     log_line("warning", reason);
     log_transition("restore begin");
     if (agent_fd_ >= 0) {
@@ -1170,6 +1195,7 @@ class Broker {
         WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentStopMs, &response);
       }
     }
+    timing_.Stop();
     if (tell_composer && composer_fd_ >= 0) {
       hdmi_los_message response = {};
       ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
@@ -1270,10 +1296,18 @@ class Broker {
     }
 
     if (request.opcode == HDMI_LOS_OP_AGENT_REGISTER && root) {
-      if (request.flags & ~HDMI_LOS_FLAG_CONTINUOUS) {
+      std::string timing_error;
+      if (request.flags & ~(HDMI_LOS_FLAG_CONTINUOUS | HDMI_LOS_FLAG_TIMING_REQUIRED)) {
         hdmi_los_message rejected = Status(request.request_id);
         rejected.status = HDMI_LOS_ERR_PROTOCOL;
         snprintf(rejected.detail, sizeof(rejected.detail), "unknown agent registration flag");
+        write_full(client, &rejected, sizeof(rejected));
+        close(client);
+      } else if ((request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED) &&
+                 !HdmiTimingSession::Available(&timing_error)) {
+        hdmi_los_message rejected = Status(request.request_id);
+        rejected.status = HDMI_LOS_ERR_INCOMPATIBLE;
+        snprintf(rejected.detail, sizeof(rejected.detail), "%s", timing_error.c_str());
         write_full(client, &rejected, sizeof(rejected));
         close(client);
       } else if (active_ || probing_ || agent_fd_ >= 0) {
@@ -1284,9 +1318,11 @@ class Broker {
       } else {
         agent_fd_ = client;
         agent_continuous_ = request.flags & HDMI_LOS_FLAG_CONTINUOUS;
+        agent_timing_required_ = request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED;
         hdmi_los_message ready = Status(request.request_id);
         ready.status = HDMI_LOS_OK;
         ready.state = HDMI_LOS_STATE_AGENT_READY;
+        if (agent_timing_required_) ready.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED;
         write_full(agent_fd_, &ready, sizeof(ready));
         log_line("info", "chroot agent registered");
       }
@@ -1365,6 +1401,9 @@ class Broker {
   bool probing_ = false;
   bool agent_continuous_ = false;
   bool session_continuous_ = false;
+  bool agent_timing_required_ = false;
+  int64_t timing_check_ms_ = 0;
+  HdmiTimingSession timing_;
   bool armed_ = false;
   bool preference_applied_ = false;
   bool replug_required_ = false;

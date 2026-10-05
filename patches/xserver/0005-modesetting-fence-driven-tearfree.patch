@@ -1,0 +1,470 @@
+diff --git a/glamor/glamor.h b/glamor/glamor.h
+index 3115747..e40ffba 100644
+--- a/glamor/glamor.h
++++ b/glamor/glamor.h
+@@ -419,6 +419,8 @@ extern Bool _X_EXPORT glamor_change_window_attributes(WindowPtr pWin, unsigned l
+ extern void _X_EXPORT glamor_copy_window(WindowPtr window, DDXPointRec old_origin, RegionPtr src_region);
+ 
+ extern _X_EXPORT void glamor_finish(ScreenPtr screen);
++extern _X_EXPORT Bool glamor_egl_native_fence_supported(ScreenPtr screen);
++extern _X_EXPORT int glamor_egl_export_native_fence(ScreenPtr screen);
+ #define HAS_GLAMOR_TEXT 1
+ 
+ #ifdef GLAMOR_FOR_XORG
+diff --git a/glamor/glamor_egl.c b/glamor/glamor_egl.c
+index b5f8501..a502f91 100644
+--- a/glamor/glamor_egl.c
++++ b/glamor/glamor_egl.c
+@@ -143,6 +143,43 @@ glamor_egl_get_gbm_device(ScreenPtr screen)
+     return glamor_egl->gbm;
+ }
+ 
++Bool
++glamor_egl_native_fence_supported(ScreenPtr screen)
++{
++    struct glamor_egl_screen_private *egl =
++        glamor_egl_get_screen_private(xf86ScreenToScrn(screen));
++    return egl && egl->display != EGL_NO_DISPLAY &&
++           epoxy_has_egl_extension(egl->display, "EGL_ANDROID_native_fence_sync") &&
++           epoxy_has_egl_extension(egl->display, "EGL_KHR_fence_sync");
++}
++
++int
++glamor_egl_export_native_fence(ScreenPtr screen)
++{
++    struct glamor_egl_screen_private *egl =
++        glamor_egl_get_screen_private(xf86ScreenToScrn(screen));
++    struct glamor_screen_private *glamor = glamor_get_screen_private(screen);
++    EGLSyncKHR sync;
++    int fd;
++
++    if (!glamor_egl_native_fence_supported(screen))
++        return -1;
++    glamor_make_current(glamor);
++    sync = eglCreateSyncKHR(egl->display, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
++    if (sync == EGL_NO_SYNC_KHR)
++        return -1;
++    /* Submit preceding rendering in this same context. Export can wait for
++     * CPU submission readiness, but never waits for GPU execution completion. */
++    glFlush();
++    fd = eglDupNativeFenceFDANDROID(egl->display, sync);
++    eglDestroySyncKHR(egl->display, sync);
++    if (fd >= 0 && fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
++        close(fd);
++        return -1;
++    }
++    return fd;
++}
++
+ Bool
+ glamor_egl_create_textured_screen(ScreenPtr screen, int handle, int stride)
+ {
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+index 3827c05..6b0947c 100644
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -658,6 +658,7 @@ ms_tearfree_do_flips(ScreenPtr pScreen)
+ 
+         if (!ms_tearfree_is_active_on_crtc(crtc)) {
+             /* Notify any lingering DRI clients waiting for a flip to finish */
++            ms_tearfree_cancel_copy(crtc);
+             ms_tearfree_dri_abort_all(crtc);
+             continue;
+         }
+@@ -665,7 +666,7 @@ ms_tearfree_do_flips(ScreenPtr pScreen)
+         /* Skip if the last flip is still pending, a DRI client is flipping, or
+          * there isn't any damage on the front buffer.
+          */
+-        if (trf->flip_seq || ms->drmmode.dri2_flipping ||
++        if (trf->copy_pending || trf->flip_seq || ms->drmmode.dri2_flipping ||
+             ms->drmmode.present_flipping ||
+             RegionNil(&trf->buf[trf->back_idx ^ 1].dmg))
+             continue;
+@@ -1040,6 +1041,8 @@ load_glamor(ScrnInfoPtr pScrn)
+     ms->glamor.egl_get_gbm_device = LoaderSymbolFromModule(mod, "glamor_egl_get_gbm_device");
+     ms->glamor.egl_init = LoaderSymbolFromModule(mod, "glamor_egl_init");
+     ms->glamor.finish = LoaderSymbolFromModule(mod, "glamor_finish");
++    ms->glamor.native_fence_supported = LoaderSymbolFromModule(mod, "glamor_egl_native_fence_supported");
++    ms->glamor.export_native_fence = LoaderSymbolFromModule(mod, "glamor_egl_export_native_fence");
+     ms->glamor.gbm_bo_from_pixmap = LoaderSymbolFromModule(mod, "glamor_gbm_bo_from_pixmap");
+     ms->glamor.init = LoaderSymbolFromModule(mod, "glamor_init");
+     ms->glamor.name_from_pixmap = LoaderSymbolFromModule(mod, "glamor_name_from_pixmap");
+@@ -1398,6 +1401,22 @@ PreInit(ScrnInfoPtr pScrn, int flags)
+         }
+     }
+ 
++    {
++        const char *completion = getenv("HDMI_LOS_TEARFREE_COMPLETION");
++        if (completion && strcmp(completion, "sync") && strcmp(completion, "async")) {
++            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Invalid TearFree completion mode\n");
++            return FALSE;
++        }
++        if (completion && !strcmp(completion, "async")) {
++            if (!ms->drmmode.tearfree_enable) {
++                xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Asynchronous completion requires TearFree\n");
++                return FALSE;
++            }
++            ms->drmmode.tearfree_async = TRUE;
++            xf86DrvMsg(pScrn->scrnIndex, X_INFO,
++                       "HDMI_LOS_XORG_ASYNC_ABI=1: fence-driven TearFree required\n");
++        }
++    }
+     ms->kms_has_modifiers = FALSE;
+     ret = drmGetCap(ms->fd, DRM_CAP_ADDFB2_MODIFIERS, &value);
+     if (ret == 0 && value != 0)
+@@ -2177,6 +2196,9 @@ LeaveVT(ScrnInfoPtr pScrn)
+ {
+     modesettingPtr ms = modesettingPTR(pScrn);
+ 
++#ifdef GLAMOR_HAS_GBM
++    ms_tearfree_cancel_copies(pScrn->pScreen);
++#endif
+     xf86_hide_cursors(pScrn);
+ 
+     pScrn->vtSema = FALSE;
+diff --git a/hw/xfree86/drivers/modesetting/driver.h b/hw/xfree86/drivers/modesetting/driver.h
+index 6e1381d..d56f5c0 100644
+--- a/hw/xfree86/drivers/modesetting/driver.h
++++ b/hw/xfree86/drivers/modesetting/driver.h
+@@ -168,6 +168,8 @@ typedef struct _modesettingRec {
+         struct gbm_device *(*egl_get_gbm_device)(ScreenPtr);
+         Bool (*egl_init)(ScrnInfoPtr, int);
+         void (*finish)(ScreenPtr);
++        Bool (*native_fence_supported)(ScreenPtr);
++        int (*export_native_fence)(ScreenPtr);
+         struct gbm_bo *(*gbm_bo_from_pixmap)(ScreenPtr, PixmapPtr);
+         Bool (*init)(ScreenPtr, unsigned int);
+         int (*name_from_pixmap)(PixmapPtr, CARD16 *, CARD32 *);
+@@ -253,6 +255,8 @@ void
+ ms_tearfree_dri_abort_all(xf86CrtcPtr crtc);
+ 
+ Bool ms_do_tearfree_flip(ScreenPtr screen, xf86CrtcPtr crtc);
++void ms_tearfree_cancel_copy(xf86CrtcPtr crtc);
++void ms_tearfree_cancel_copies(ScreenPtr screen);
+ 
+ #endif
+ 
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.c b/hw/xfree86/drivers/modesetting/drmmode_display.c
+index 93ed569..e8e823b 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -1474,6 +1474,10 @@ drmmode_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ 
+     /* XXX Check if DPMS mode is already the right one */
+ 
++#ifdef GLAMOR_HAS_GBM
++    if (mode != DPMSModeOn)
++        ms_tearfree_cancel_copy(crtc);
++#endif
+     drmmode_crtc->dpms_mode = mode;
+ 
+     if (ms->atomic_modeset) {
+@@ -1578,8 +1582,8 @@ drmmode_copy_fb(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
+ #endif
+ }
+ 
+-void
+-drmmode_copy_damage(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg, Bool empty)
++static void
++drmmode_copy_damage_inner(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg, Bool empty, Bool finish)
+ {
+ #ifdef GLAMOR_HAS_GBM
+     ScreenPtr pScreen = xf86ScrnToScreen(crtc->scrn);
+@@ -1598,8 +1602,26 @@ drmmode_copy_damage(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg, Bool empty)
+     if (empty)
+         RegionEmpty(dmg);
+ 
+-    /* Wait until the GC operations finish */
+-    modesettingPTR(crtc->scrn)->glamor.finish(pScreen);
++    if (finish)
++        modesettingPTR(crtc->scrn)->glamor.finish(pScreen);
++#endif
++}
++
++void
++drmmode_copy_damage(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg, Bool empty)
++{
++    drmmode_copy_damage_inner(crtc, dst, dmg, empty, TRUE);
++}
++
++int
++drmmode_copy_damage_fence(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg)
++{
++#ifdef GLAMOR_HAS_GBM
++    drmmode_copy_damage_inner(crtc, dst, dmg, FALSE, FALSE);
++    return modesettingPTR(crtc->scrn)->glamor.export_native_fence(
++        xf86ScrnToScreen(crtc->scrn));
++#else
++    return -1;
+ #endif
+ }
+ 
+@@ -1613,6 +1635,13 @@ drmmode_destroy_tearfree_shadow(xf86CrtcPtr crtc)
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+     int i;
+ 
++#ifdef GLAMOR_HAS_GBM
++    ms_tearfree_cancel_copy(crtc);
++    if (trf->copy_timer) {
++        TimerFree(trf->copy_timer);
++        trf->copy_timer = NULL;
++    }
++#endif
+     if (trf->flip_seq)
+         ms_drm_abort_seq(crtc->scrn, trf->flip_seq);
+ 
+@@ -1679,6 +1708,9 @@ static void drmmmode_prepare_modeset(ScrnInfoPtr scrn)
+     present_check_flips(pScreen->root);
+     ms->drmmode.pending_modeset = FALSE;
+ 
++#ifdef GLAMOR_HAS_GBM
++    ms_tearfree_cancel_copies(pScreen);
++#endif
+     ms_drain_drm_events(pScreen);
+ }
+ 
+@@ -3900,6 +3932,13 @@ drmmode_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
+         if (!ms->glamor.init(pScreen, GLAMOR_USE_EGL_SCREEN)) {
+             return FALSE;
+         }
++        if (drmmode->tearfree_async &&
++            (!ms->glamor.native_fence_supported || !ms->glamor.export_native_fence ||
++             !ms->glamor.native_fence_supported(pScreen))) {
++            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
++                       "Required asynchronous TearFree native-fence capability is unavailable\n");
++            return FALSE;
++        }
+ #ifdef GBM_BO_WITH_MODIFIERS
+         ms->glamor.set_drawable_modifiers_func(pScreen, get_drawable_modifiers);
+ #endif
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.h b/hw/xfree86/drivers/modesetting/drmmode_display.h
+index 3290102..30766d8 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.h
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.h
+@@ -30,6 +30,7 @@
+ #define DRMMODE_DISPLAY_H
+ 
+ #include "xf86drmMode.h"
++#include "os.h"
+ #ifdef CONFIG_UDEV_KMS
+ #include "libudev.h"
+ #endif
+@@ -136,6 +137,7 @@ typedef struct {
+     Bool dri2_enable;
+     Bool present_enable;
+     Bool tearfree_enable;
++    Bool tearfree_async;
+ 
+     uint32_t vrr_prop_id;
+     Bool use_ctm;
+@@ -181,6 +183,15 @@ typedef struct {
+     struct xorg_list dri_flip_list;
+     uint32_t back_idx;
+     uint32_t flip_seq;
++    /* A pending GPU copy is never entered in the DRM event queue. */
++    Bool copy_pending;
++    int copy_fd;
++    uint32_t copy_idx;
++    RegionRec copy_damage;
++    OsTimerPtr copy_timer;
++    uint64_t copy_started_us, copy_exported_us;
++    uint64_t copies, pixels, export_us, ready_us, max_export_us, max_ready_us;
++    uint32_t stats_last_ms;
+ } drmmode_tearfree_rec, *drmmode_tearfree_ptr;
+ 
+ typedef struct {
+@@ -332,6 +343,7 @@ void drmmode_get_default_bpp(ScrnInfoPtr pScrn, drmmode_ptr drmmmode,
+ void drmmode_copy_fb(ScrnInfoPtr pScrn, drmmode_ptr drmmode);
+ void drmmode_copy_damage(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr damage,
+                          Bool empty);
++int drmmode_copy_damage_fence(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr damage);
+ 
+ int drmmode_crtc_flip(xf86CrtcPtr crtc, uint32_t fb_id, int x, int y,
+                       uint32_t flags, void *data);
+diff --git a/hw/xfree86/drivers/modesetting/pageflip.c b/hw/xfree86/drivers/modesetting/pageflip.c
+index 8871d15..cb665dc 100644
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -26,6 +26,9 @@
+ 
+ #include <xserver_poll.h>
+ #include <xf86drm.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <linux/sync_file.h>
+ 
+ #include "driver.h"
+ 
+@@ -369,7 +372,7 @@ ms_tearfree_dri_flip(modesettingPtr ms, xf86CrtcPtr crtc, void *event,
+      */
+     flip->on_reference_crtc = TRUE;
+     flip->flipdata = flipdata;
+-    flip->tearfree_seq = trf->flip_seq;
++    flip->tearfree_seq = trf->flip_seq || trf->copy_pending;
+     flipdata->screen = xf86ScrnToScreen(crtc->scrn);
+     flipdata->event = event;
+     flipdata->flip_count = 1;
+@@ -414,6 +417,14 @@ ms_do_pageflip(ScreenPtr screen,
+         return TRUE;
+     }
+ 
++    /* A direct flip must not race an unsubmitted TearFree copy. Let Present
++     * take its normal copy path while that snapshot is pending; don't drain
++     * an unfinished GPU operation on the server thread. */
++    for (i = 0; i < config->num_crtc; ++i) {
++        drmmode_crtc_private_ptr dc = config->crtc[i]->driver_private;
++        if (dc->tearfree.copy_pending)
++            goto error_free_event;
++    }
+     ms->glamor.block_handler(screen);
+ 
+     new_front_bo.gbm = ms->glamor.gbm_bo_from_pixmap(screen, new_front);
+@@ -654,6 +665,138 @@ ms_tearfree_flip_handler(uint64_t msc, uint64_t usec, void *data)
+     ms_tearfree_dri_notify(trf, msc, usec);
+ }
+ 
++static void
++ms_tearfree_copy_clear(xf86CrtcPtr crtc, Bool restore)
++{
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    if (trf->copy_fd >= 0) {
++        RemoveNotifyFd(trf->copy_fd);
++        close(trf->copy_fd);
++    }
++    trf->copy_fd = -1;
++    if (trf->copy_timer)
++        TimerCancel(trf->copy_timer);
++    if (restore)
++        RegionUnion(&trf->buf[trf->copy_idx].dmg,
++                    &trf->buf[trf->copy_idx].dmg, &trf->copy_damage);
++    RegionUninit(&trf->copy_damage);
++    trf->copy_pending = FALSE;
++}
++
++void
++ms_tearfree_cancel_copy(xf86CrtcPtr crtc)
++{
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    if (!trf->copy_pending)
++        return;
++    /* Disable/modeset/teardown may destroy the destination. Drain only here;
++     * closing a native fence does not cancel the submitted GPU work. */
++    modesettingPTR(crtc->scrn)->glamor.finish(xf86ScrnToScreen(crtc->scrn));
++    ms_tearfree_copy_clear(crtc, TRUE);
++}
++
++void
++ms_tearfree_cancel_copies(ScreenPtr screen)
++{
++    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(xf86ScreenToScrn(screen));
++    int i;
++    for (i = 0; i < config->num_crtc; ++i)
++        ms_tearfree_cancel_copy(config->crtc[i]);
++}
++
++static CARD32
++ms_tearfree_copy_timeout(OsTimerPtr timer, CARD32 now, void *data)
++{
++    xf86CrtcPtr crtc = data;
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    if (dc->tearfree.copy_pending)
++        FatalError("HDMI asynchronous TearFree copy timed out; unfinished buffer was not displayed\n");
++    return 0;
++}
++
++static void
++ms_tearfree_copy_ready(int fd, int ready, void *data)
++{
++    xf86CrtcPtr crtc = data;
++    ScreenPtr screen = xf86ScrnToScreen(crtc->scrn);
++    modesettingPtr ms = modesettingPTR(crtc->scrn);
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    struct sync_file_info info = {0};
++    uint32_t idx, seq;
++    uint64_t elapsed;
++
++    if (!trf->copy_pending || trf->copy_fd != fd)
++        return;
++    if ((ready & X_NOTIFY_ERROR) || ioctl(fd, SYNC_IOC_FILE_INFO, &info) < 0 || info.status <= 0)
++        FatalError("HDMI asynchronous TearFree fence failed; unfinished buffer was not displayed\n");
++    elapsed = GetTimeInMicros() - trf->copy_exported_us;
++    trf->ready_us += elapsed;
++    if (elapsed > trf->max_ready_us) trf->max_ready_us = elapsed;
++    idx = trf->copy_idx;
++    if (!ms_tearfree_is_active_on_crtc(crtc) || ms->drmmode.dri2_flipping ||
++        ms->drmmode.present_flipping) {
++        ms_tearfree_copy_clear(crtc, TRUE);
++        return;
++    }
++
++    /* Allocate a DRM queue entry only now: a real kernel event will follow. */
++    seq = ms_drm_queue_alloc(crtc, crtc, ms_tearfree_flip_handler, ms_tearfree_flip_abort);
++    if (!seq)
++        FatalError("HDMI asynchronous TearFree could not allocate flip sequence\n");
++    if (do_queue_flip_on_crtc(screen, crtc, DRM_MODE_PAGE_FLIP_EVENT,
++                             seq, trf->buf[idx].fb_id, 0, 0))
++        FatalError("HDMI asynchronous TearFree flip submission failed\n");
++    trf->flip_seq = seq;
++    ms_tearfree_copy_clear(crtc, FALSE);
++    if (getenv("HDMI_LOS_TEARFREE_STATS") && GetTimeInMillis() - trf->stats_last_ms >= 1000) {
++        xf86DrvMsg(crtc->scrn->scrnIndex, X_INFO,
++                   "HDMI_ASYNC copies=%llu pixels=%llu export_us=%llu ready_us=%llu max_export_us=%llu max_ready_us=%llu\n",
++                   (unsigned long long)trf->copies, (unsigned long long)trf->pixels,
++                   (unsigned long long)trf->export_us, (unsigned long long)trf->ready_us,
++                   (unsigned long long)trf->max_export_us, (unsigned long long)trf->max_ready_us);
++        trf->stats_last_ms = GetTimeInMillis();
++        trf->copies = trf->pixels = trf->export_us = trf->ready_us = 0;
++        trf->max_export_us = trf->max_ready_us = 0;
++    }
++}
++
++static Bool
++ms_tearfree_start_copy(ScreenPtr screen, xf86CrtcPtr crtc)
++{
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    uint64_t elapsed;
++    BoxPtr boxes;
++    int i;
++    trf->copy_idx = trf->back_idx;
++    RegionInit(&trf->copy_damage, NULL, 0);
++    if (!RegionCopy(&trf->copy_damage, &trf->buf[trf->copy_idx].dmg))
++        FatalError("HDMI asynchronous TearFree could not snapshot damage\n");
++    RegionEmpty(&trf->buf[trf->copy_idx].dmg);
++    trf->copy_pending = TRUE;
++    trf->copy_started_us = GetTimeInMicros();
++    trf->copy_fd = drmmode_copy_damage_fence(crtc, trf->buf[trf->copy_idx].px, &trf->copy_damage);
++    trf->copy_exported_us = GetTimeInMicros();
++    if (trf->copy_fd < 0)
++        FatalError("HDMI asynchronous TearFree native-fence export failed\n");
++    elapsed = trf->copy_exported_us - trf->copy_started_us;
++    trf->export_us += elapsed;
++    if (elapsed > trf->max_export_us) trf->max_export_us = elapsed;
++    trf->copies++;
++    boxes = RegionRects(&trf->copy_damage);
++    for (i = 0; i < RegionNumRects(&trf->copy_damage); ++i)
++        trf->pixels += (uint64_t)(boxes[i].x2 - boxes[i].x1) * (boxes[i].y2 - boxes[i].y1);
++    if (!SetNotifyFd(trf->copy_fd, ms_tearfree_copy_ready, X_NOTIFY_READ, crtc))
++        FatalError("HDMI asynchronous TearFree could not register native-fence readiness\n");
++    trf->copy_timer = TimerSet(trf->copy_timer, 0, 2000, ms_tearfree_copy_timeout, crtc);
++    if (!trf->copy_timer)
++        FatalError("HDMI asynchronous TearFree could not arm recovery timeout\n");
++    return FALSE;
++}
++
+ Bool
+ ms_do_tearfree_flip(ScreenPtr screen, xf86CrtcPtr crtc)
+ {
+@@ -661,6 +804,9 @@ ms_do_tearfree_flip(ScreenPtr screen, xf86CrtcPtr crtc)
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+     uint32_t idx = trf->back_idx, seq;
+ 
++    if (drmmode_crtc->drmmode->tearfree_async)
++        return ms_tearfree_start_copy(screen, crtc);
++
+     seq = ms_drm_queue_alloc(crtc, crtc, ms_tearfree_flip_handler,
+                              ms_tearfree_flip_abort);
+     if (!seq) {

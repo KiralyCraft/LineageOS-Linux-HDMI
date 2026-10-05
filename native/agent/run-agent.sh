@@ -12,11 +12,13 @@ CLIENT_PRESENT=bridge
 SESSION=lxde
 NO_TIMEOUT=1
 DRM_TRACE=startup
+TIMING_GUARD=required
+TEARFREE_COMPLETION=async
 PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -24,6 +26,16 @@ while (($#)); do
         --capture)
             (($# >= 2)) || { usage; exit 2; }
             CAPTURE=$2
+            shift 2
+            ;;
+        --timing-guard)
+            (($# >= 2)) || { usage; exit 2; }
+            TIMING_GUARD=$2
+            shift 2
+            ;;
+        --tearfree-completion)
+            (($# >= 2)) || { usage; exit 2; }
+            TEARFREE_COMPLETION=$2
             shift 2
             ;;
         --xorg-accel)
@@ -67,6 +79,12 @@ done
 [[ $CLIENT_PRESENT == bridge || $CLIENT_PRESENT == shadow || \
    $CLIENT_PRESENT == direct ]] || { usage; exit 2; }
 [[ $DRM_TRACE == startup || $DRM_TRACE == full ]] || { usage; exit 2; }
+[[ $TIMING_GUARD == required || $TIMING_GUARD == off ]] || { usage; exit 2; }
+[[ $TEARFREE_COMPLETION == async || $TEARFREE_COMPLETION == sync ]] || { usage; exit 2; }
+if [[ $TEARFREE_COMPLETION == async && $XORG_ACCEL != kgsl-kms-bridge ]]; then
+    printf 'Asynchronous TearFree requires --xorg-accel kgsl-kms-bridge\n' >&2
+    exit 2
+fi
 if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
     printf '%s requires --xorg-accel kgsl-kms-bridge\n' \
         "--client-present $CLIENT_PRESENT" >&2
@@ -75,13 +93,28 @@ fi
 if ((EUID != 0)); then
     args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
           --client-present "$CLIENT_PRESENT" --session "$SESSION" \
-          --drm-trace "$DRM_TRACE")
+          --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
+          --tearfree-completion "$TEARFREE_COMPLETION")
     if ((NO_TIMEOUT)); then
         args+=(--no-timeout)
     else
         args+=(--timeout)
     fi
     exec sudo -n -- "$0" "${args[@]}"
+fi
+
+if [[ $TEARFREE_COMPLETION == async ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_ASYNC_ABI=1' \
+        "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so" || {
+        printf 'The matched asynchronous modesetting module is missing\n' >&2
+        exit 1
+    }
+    LC_ALL=C grep -aFq 'glamor_egl_export_native_fence' \
+        "$BUNDLE/lib/xorg/modules/libglamoregl.so" || {
+        printf 'The matched native-fence glamor module is missing\n' >&2
+        exit 1
+    }
+    export HDMI_LOS_TEARFREE_STATS=1
 fi
 
 for required in \
@@ -299,7 +332,8 @@ fi
 
 agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
             --client-present "$CLIENT_PRESENT" --session "$SESSION" \
-            --drm-trace "$DRM_TRACE")
+            --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
+            --tearfree-completion "$TEARFREE_COMPLETION")
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!
