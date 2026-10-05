@@ -7,8 +7,8 @@ KGSL, MSM/SDE or the installed kernel.
 
 ## Standalone testing
 
-The assembled folder is
-`~/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-timing-async-20261005`.
+The revised folder is
+`~/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-timing-async-stop-fix-20261005`.
 All C/C++ and kernel builds run on `root@192.168.104.201`.
 
 `./load-companion.sh` verifies kernel release and artifact hashes, loads the
@@ -72,9 +72,13 @@ and their native-fence exports were checked. Native tests exercise capability
 rejection, failed creation/enable, invalid generation, startup timeout, session
 invalidation and idempotent cleanup. Existing input/tracer tests also passed.
 
-**A real timing session and asynchronous HDMI presentation are still pending
-the user-approved unplug/restart test.** This build does not yet establish fresh
-live scheduling, improved latency, physical 4K cadence, or all kernel lifecycle
-cases. Magisk packaging for production follows these live gates. Persistent
+Two bounded sessions reached valid timing and ran asynchronous HDMI presentation;
+the user confirmed the desktop and USB input worked. Timeout restoration revealed
+an expired-deadline stop-wait race in the broker. The revised broker separates
+the cleanup acknowledgement budget from the session limit and renews the composer
+watchdog for guarded bounded tests. It logs session get/put balance on teardown.
+**A clean live shutdown with that revision is still pending.** This build does
+not yet establish a matched latency improvement, physical 4K cadence, or all
+kernel lifecycle cases. Magisk packaging for production follows these live gates. Persistent
 Mesa bridge generations, same-context resolve, copy backends and a kernel
 presenter remain later candidates.

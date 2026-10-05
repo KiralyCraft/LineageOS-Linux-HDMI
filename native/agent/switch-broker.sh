@@ -17,6 +17,16 @@ print(json.load(open(sys.argv[1]))['candidate_b']['native_source_commit'])
 PY
 )
 [[ $SOURCE_COMMIT =~ ^[0-9a-f]{40}$ ]] || exit 1
+PREVIOUS_COMMIT=$(python3 - "$BUNDLE/build-info.json" <<'PY'
+import json,sys
+print(json.load(open(sys.argv[1]))['candidate_b'].get('previous_native_source_commit', ''))
+PY
+)
+PREVIOUS=
+if [[ -n $PREVIOUS_COMMIT ]]; then
+    [[ $PREVIOUS_COMMIT =~ ^[0-9a-f]{40}$ ]] || exit 1
+    PREVIOUS=/data/local/tmp/hdmi-async-${PREVIOUS_COMMIT:0:12}/hdmi-losd
+fi
 STAGE=/data/local/tmp/hdmi-async-${SOURCE_COMMIT:0:12}
 OLD=/data/adb/modules/hdmi-los/bin/hdmi-losd
 NEW=$STAGE/hdmi-losd
@@ -24,7 +34,6 @@ if [[ $MODE == candidate ]]; then
     "$BUNDLE/load-companion.sh" --check
     (cd "$BUNDLE/android" && sha256sum --strict -c SHA256SUMS >/dev/null)
     install -d -m 700 "/proc/1/root$STAGE"
-    install -m 700 "$BUNDLE/android/hdmi-losd" "/proc/1/root$NEW"
     TARGET=$NEW
 else
     TARGET=$OLD
@@ -35,7 +44,8 @@ PIDS=()
 while read -r pid; do
     [[ -n $pid ]] || continue
     exe=$(readlink "/proc/$pid/exe")
-    [[ $exe == "$OLD" || $exe == "$NEW" ]] || {
+    [[ $exe == "$OLD" || $exe == "$NEW" ||
+       ( -n $PREVIOUS && $exe == "$PREVIOUS" ) ]] || {
         printf 'Unexpected HDMI broker executable: %s\n' "$exe" >&2; exit 1;
     }
     PIDS+=("$pid")
@@ -49,6 +59,11 @@ for pid in "${PIDS[@]}"; do
     done
     [[ ! -e /proc/$pid ]] || { printf 'Broker did not stop; handoff aborted\n' >&2; exit 1; }
 done
+if [[ $MODE == candidate ]]; then
+    # Install only after the prior process exited. Replacing a running stage
+    # before identifying/stopping it could leave a deleted executable pathname.
+    install -m 700 "$BUNDLE/android/hdmi-losd" "/proc/1/root$NEW"
+fi
 mkdir -p /run/hdmi-los
 chmod 700 /run/hdmi-los
 nsenter -t 1 -m -- /system/bin/toybox nohup "$TARGET" daemon \
