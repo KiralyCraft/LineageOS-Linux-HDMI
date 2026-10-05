@@ -8,6 +8,7 @@
 #define HDMI_COMPANION_ABI_VERSION 1
 #define HDMI_COMPANION_FEATURE_PROBE_ONLY (1ULL << 0)
 #define HDMI_COMPANION_FEATURE_TIMING_GUARD (1ULL << 1)
+#define HDMI_COMPANION_FEATURE_PRESENTER (1ULL << 2)
 
 /* These bits report imported interfaces, never kernel addresses. */
 #define HDMI_COMPANION_IMPORTS(X) \
@@ -116,4 +117,29 @@ struct hdmi_companion_status {
 #define HDMI_COMPANION_GET_STATUS _IOWR('H', 3, struct hdmi_companion_status)
 #define HDMI_COMPANION_STOP_SESSION _IOW('H', 4, struct hdmi_companion_control)
 
+/* Presenter FDs cannot control the broker's timing session. Creation requires
+ * the exact lease file and object set of a currently valid timing generation. */
+#define HDMI_COMPANION_CREATE_PRESENTER _IOWR('H', 5, struct hdmi_companion_create)
+enum hdmi_present_state {
+    HDMI_PRESENT_EMPTY=0, HDMI_PRESENT_WAITING=1, HDMI_PRESENT_SUBMITTED=2,
+    HDMI_PRESENT_COMPLETE=3, HDMI_PRESENT_CANCELLED=4, HDMI_PRESENT_FAILED=5
+};
+struct hdmi_present_request {
+    __u32 size, abi_version;
+    __u32 framebuffer_id;
+    __s32 acquire_fd;
+    __aligned_u64 generation, serial;
+    __aligned_u64 reserved[2];
+};
+struct hdmi_present_status {
+    __u32 size, abi_version;
+    __u32 state;
+    __s32 error;
+    __aligned_u64 generation, serial;
+    __aligned_u64 accepted_ns, submitted_ns, completed_ns;
+    __aligned_u64 reserved;
+};
+#define HDMI_COMPANION_PRESENT _IOW('H', 6, struct hdmi_present_request)
+#define HDMI_COMPANION_PRESENT_STATUS _IOWR('H', 7, struct hdmi_present_status)
+#define HDMI_COMPANION_CANCEL_PRESENT _IOWR('H', 8, struct hdmi_present_status)
 #endif

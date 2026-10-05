@@ -69,7 +69,7 @@ int main(int argc, char **argv)
         return 1;
     }
     if (caps.size != sizeof(caps) || caps.abi_version != HDMI_COMPANION_ABI_VERSION ||
-        caps.features != (timing ? HDMI_COMPANION_FEATURE_TIMING_GUARD :
+        (caps.features & ~HDMI_COMPANION_FEATURE_PRESENTER) != (timing ? HDMI_COMPANION_FEATURE_TIMING_GUARD :
                                   HDMI_COMPANION_FEATURE_PROBE_ONLY) ||
         caps.imports != HDMI_COMPANION_REQUIRED_IMPORTS ||
         caps.reserved[0] || caps.reserved[1] ||

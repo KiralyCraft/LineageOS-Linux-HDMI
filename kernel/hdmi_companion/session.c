@@ -27,6 +27,7 @@
 #include <drm/drm_plane.h>
 #include <drm/drm_vblank.h>
 #include "uapi.h"
+#include "presenter.h"
 #include "build-identity.h"
 
 #define START_TIMEOUT_NS (500ULL * NSEC_PER_MSEC)
@@ -312,6 +313,53 @@ static int validate_lease(struct timing_session *s, const struct hdmi_companion_
     return 0;
 }
 
+/* Reuse the guard's validated authority, but retain independent references:
+ * broker STOP is allowed to drop its own objects before a submitted flip ends. */
+int hdmi_present_bind(struct hdmi_present_binding *b, struct hdmi_companion_create *req)
+{
+    struct timing_session *s;
+    struct file *lease=fget(req->lease_fd);
+    int ret=-EACCES;
+    if (!lease) return -EBADF;
+    mutex_lock(&sessions_lock);
+    list_for_each_entry(s,&sessions,node) {
+        mutex_lock(&s->lock);
+        if (s->lease == lease && s->status.state == HDMI_COMPANION_TIMING_VALID &&
+            s->status.connector_id == req->connector_id && s->status.crtc_id == req->crtc_id &&
+            s->status.plane_id == req->plane_id && (!req->generation || req->generation == s->status.generation) && lease_live_locked(s)) {
+            b->lease=lease; b->dev=s->dev; drm_dev_get(b->dev);
+            b->crtc=s->crtc; b->connector=s->connector_obj; b->crtc_obj=s->crtc_obj; b->plane=s->plane_obj;
+            drm_mode_object_get(b->connector); drm_mode_object_get(b->crtc_obj); drm_mode_object_get(b->plane);
+            b->generation=req->generation=s->status.generation; ret=0;
+        }
+        mutex_unlock(&s->lock);
+        if (!ret) break;
+    }
+    mutex_unlock(&sessions_lock);
+    if (ret) fput(lease);
+    return ret;
+}
+bool hdmi_present_valid(const struct hdmi_present_binding *b)
+{
+    struct timing_session *s;
+    bool valid=false;
+    mutex_lock(&sessions_lock);
+    list_for_each_entry(s,&sessions,node) {
+        mutex_lock(&s->lock);
+        valid=s->lease == b->lease && s->status.generation == b->generation &&
+              s->status.state == HDMI_COMPANION_TIMING_VALID && lease_live_locked(s);
+        mutex_unlock(&s->lock);
+        if (valid) break;
+    }
+    mutex_unlock(&sessions_lock);
+    return valid;
+}
+void hdmi_present_unbind(struct hdmi_present_binding *b)
+{
+    drm_mode_object_put(b->plane); drm_mode_object_put(b->crtc_obj); drm_mode_object_put(b->connector);
+    fput(b->lease); drm_dev_put(b->dev);
+}
+
 static long create_session(void __user *pointer)
 {
     struct hdmi_companion_create request;
@@ -376,10 +424,11 @@ static long companion_ioctl(struct file *file, unsigned int cmd, unsigned long a
 {
     struct hdmi_companion_caps request, caps = {
         .size = sizeof(caps), .abi_version = HDMI_COMPANION_ABI_VERSION,
-        .features = HDMI_COMPANION_FEATURE_TIMING_GUARD,
+        .features = HDMI_COMPANION_FEATURE_TIMING_GUARD | HDMI_COMPANION_FEATURE_PRESENTER,
     };
     void __user *pointer = (void __user *)arg;
     if (cmd == HDMI_COMPANION_CREATE_SESSION) return create_session(pointer);
+    if (cmd == HDMI_COMPANION_CREATE_PRESENTER) return hdmi_present_create(pointer);
     if (cmd != HDMI_COMPANION_QUERY_CAPS) return -ENOTTY;
     if (copy_from_user(&request, pointer, sizeof(request))) return -EFAULT;
     if (request.size != sizeof(request) || request.abi_version != HDMI_COMPANION_ABI_VERSION ||

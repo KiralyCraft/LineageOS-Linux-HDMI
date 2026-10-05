@@ -27,9 +27,10 @@ def digest(path):
         for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
     return h.hexdigest()
 files=['kernel/hdmi_companion/session.c','kernel/hdmi_companion/uapi.h',
-       'kernel/hdmi_companion/Kbuild','native/companion-probe/main.c',
+       'kernel/hdmi_companion/Kbuild','kernel/hdmi_companion/presenter.c',
+       'kernel/hdmi_companion/presenter.h','native/companion-probe/main.c',
        'build-support/build-companion-timing.sh','build-support/verify-companion-probe.py']
-identity={'schema':1,'stage':'functional timing guard; no display updates',
+identity={'schema':1,'stage':'experimental timing guard and restricted fence-driven presenter',
           'source_commit':sys.argv[7], 'kernel_commit':'d00ba216ccda5d4fcc0d864729ae69d5b63d860c',
           'vendor_modules_commit':'ec2e039129f2b8f93fdfe62a8c6a595efb63d496',
           'kernel_release':(inputs/'kernel-release').read_text().strip(),
@@ -46,7 +47,7 @@ identity['build_id']=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()
 (build/'kmod-src/build-identity.h').write_text('#define HDMI_COMPANION_BUILD_ID "'+identity['build_id']+'"\n')
 (build/'build-id').write_text(identity['build_id']+'\n')
 PY
-cp "$SOURCE/kernel/hdmi_companion/"{Kbuild,session.c,uapi.h} "$BUILD/kmod-src/"
+cp "$SOURCE/kernel/hdmi_companion/"{Kbuild,session.c,presenter.c,presenter.h,uapi.h} "$BUILD/kmod-src/"
 export PATH="$CLANG_DIR/bin:/usr/bin:/bin"
 export KBUILD_BUILD_USER=root KBUILD_BUILD_HOST=c8e1ea4e9ef0 KBUILD_BUILD_VERSION=1
 export KBUILD_BUILD_TIMESTAMP='Sun Jun 8 00:30:34 UTC 2025'

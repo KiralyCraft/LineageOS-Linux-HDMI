@@ -1,0 +1,88 @@
+diff --git a/glamor/glamor_copy.c b/glamor/glamor_copy.c
+index eae70e9..9abacd7 100644
+--- a/glamor/glamor_copy.c
++++ b/glamor/glamor_copy.c
+@@ -337,6 +337,73 @@ bail:
+ #define GL_TILE_RASTER_ORDER_INCREASING_Y_MESA   0x8BBA
+ #endif
+ 
++/* Opt-in Candidate E. Copy only distinct, complete, compatible FBOs.
++ * Overlap and every unsupported GC/format/clipping case retain the shader path.
++ * API selection is counted here; the matched Mesa build separately counts
++ * successful Freedreno 2D blits, since GL blit alone does not prove CP_BLIT. */
++static Bool
++glamor_hdmi_copy_blit(DrawablePtr src, DrawablePtr dst, GCPtr gc,
++                      BoxPtr boxes, int nbox, int dx, int dy, Pixel bitplane)
++{
++    ScreenPtr screen = dst->pScreen;
++    glamor_screen_private *priv = glamor_get_screen_private(screen);
++    PixmapPtr sp = glamor_get_drawable_pixmap(src), dp = glamor_get_drawable_pixmap(dst);
++    glamor_pixmap_private *spriv = glamor_get_pixmap_private(sp), *dpriv = glamor_get_pixmap_private(dp);
++    static int enabled = -1;
++    static unsigned long long blits, pixels;
++    int sx, sy, tx, ty;
++    GLint read_fbo, draw_fbo;
++    GLboolean scissor;
++    unsigned long long area = 0;
++    if (enabled < 0) {
++        const char *setting = getenv("HDMI_LOS_GLAMOR_COPY");
++        enabled = setting && !strcmp(setting,"blit");
++        if (enabled) LogMessage(X_INFO,"HDMI_LOS_XORG_COPY_ABI=1 eligible GL blits enabled\n");
++    }
++    if (!enabled || !priv->has_fbo_blit || bitplane || nbox < 1 || nbox > 32 ||
++        sp == dp || !spriv || !dpriv || !glamor_pixmap_priv_is_small(spriv) ||
++        !glamor_pixmap_priv_is_small(dpriv) || !spriv->fbo || !dpriv->fbo ||
++        spriv->fbo->tex == dpriv->fbo->tex || src->depth != dst->depth ||
++        src->bitsPerPixel != dst->bitsPerPixel || src->depth < 24 ||
++        (gc && (gc->alu != GXcopy || !glamor_pm_is_solid(gc->depth,gc->planemask))))
++        return FALSE;
++    if (spriv->fbo->is_red || dpriv->fbo->is_red ||
++        glamor_format_for_pixmap(sp)->internalformat != glamor_format_for_pixmap(dp)->internalformat)
++        return FALSE;
++    glamor_get_drawable_deltas(src,sp,&sx,&sy);
++    glamor_get_drawable_deltas(dst,dp,&tx,&ty);
++    for (int i=0;i<nbox;i++) {
++        BoxPtr b=&boxes[i];
++        if (b->x2 <= b->x1 || b->y2 <= b->y1 ||
++            b->x1+dx+sx < 0 || b->y1+dy+sy < 0 ||
++            b->x2+dx+sx > sp->drawable.width || b->y2+dy+sy > sp->drawable.height ||
++            b->x1+tx < 0 || b->y1+ty < 0 ||
++            b->x2+tx > dp->drawable.width || b->y2+ty > dp->drawable.height)
++            return FALSE;
++        area += (unsigned long long)(b->x2-b->x1)*(b->y2-b->y1);
++    }
++    if (area < 131072) return FALSE;
++    glamor_make_current(priv);
++    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,&read_fbo);
++    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,&draw_fbo);
++    scissor=glIsEnabled(GL_SCISSOR_TEST);
++    glDisable(GL_SCISSOR_TEST);
++    glBindFramebuffer(GL_READ_FRAMEBUFFER,spriv->fbo->fb);
++    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,dpriv->fbo->fb);
++    for (int i=0;i<nbox;i++) {
++        BoxPtr b=&boxes[i];
++        glBlitFramebuffer(b->x1+dx+sx,b->y1+dy+sy,b->x2+dx+sx,b->y2+dy+sy,
++                          b->x1+tx,b->y1+ty,b->x2+tx,b->y2+ty,GL_COLOR_BUFFER_BIT,GL_NEAREST);
++    }
++    glBindFramebuffer(GL_READ_FRAMEBUFFER,read_fbo);
++    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,draw_fbo);
++    if (scissor) glEnable(GL_SCISSOR_TEST);
++    blits++; pixels+=area;
++    if (blits == 1 || !(blits % 1024))
++        LogMessage(X_INFO,"HDMI glamor eligible_blits=%llu pixels=%llu\n",blits,pixels);
++    return TRUE;
++}
++
+ /*
+  * Copy from GPU to GPU by using the source
+  * as a texture and painting that into the destination
+@@ -373,6 +440,9 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
+     Bool ret = FALSE;
+     BoxRec bounds = glamor_no_rendering_bounds();
+ 
++    if (glamor_hdmi_copy_blit(src,dst,gc,box,nbox,dx,dy,bitplane))
++        return TRUE;
++
+     glamor_make_current(glamor_priv);
+ 
+     if (gc && !glamor_set_planemask(gc->depth, gc->planemask))

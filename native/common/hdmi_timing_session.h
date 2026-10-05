@@ -131,7 +131,7 @@ class HdmiTimingSession {
     caps.abi_version = HDMI_COMPANION_ABI_VERSION;
     if (ioctl(device, HDMI_COMPANION_QUERY_CAPS, &caps) != 0 ||
         caps.size != sizeof(caps) || caps.abi_version != HDMI_COMPANION_ABI_VERSION ||
-        caps.features != HDMI_COMPANION_FEATURE_TIMING_GUARD ||
+        !(caps.features & HDMI_COMPANION_FEATURE_TIMING_GUARD) ||
         caps.imports != HDMI_COMPANION_REQUIRED_IMPORTS ||
         caps.reserved[0] || caps.reserved[1] ||
         !memchr(caps.build_id, 0, sizeof(caps.build_id)) || !caps.build_id[0]) {
