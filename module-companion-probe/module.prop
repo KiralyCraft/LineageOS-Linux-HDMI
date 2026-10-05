@@ -1,0 +1,6 @@
+id=hdmi_companion_probe
+name=HDMI companion compatibility probe
+version=0.1-probe
+versionCode=20261005
+author=KiralyCraft
+description=Query-only kernel compatibility probe. Does not change graphics drivers, HDMI ownership, or vblank accounting.

@@ -31,7 +31,7 @@ test:
 	@python3 -m unittest discover -s tests -p 'test_*.py'
 	@bash tests/test-mount-utils.sh
 	@bash tests/test-native.sh
-	@for script in module/*.sh native/agent/*.sh scripts/*.sh build-support/*.sh; do \
+	@for script in module/*.sh module-companion-probe/*.sh native/agent/*.sh scripts/*.sh build-support/*.sh; do \
 		bash -n "$$script"; \
 	done
 

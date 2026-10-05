@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: GPL-2.0-only
+obj-m += hdmi_companion_probe.o
+hdmi_companion_probe-y := probe.o

@@ -19,6 +19,15 @@ gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
 gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
     "$ROOT/native/input-bridge/selftest.c" -o "$TEMP/input-bridge-selftest"
 gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
+    "$ROOT/native/companion-probe/main.c" -o "$TEMP/hdmi-companion-probe"
+"$TEMP/hdmi-companion-probe" --help >/dev/null
+if "$TEMP/hdmi-companion-probe" --device /dev/null >/dev/null 2>&1; then
+    printf 'non-probe device unexpectedly accepted\n' >&2
+    exit 1
+else
+    test $? = 1
+fi
+gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
     -I"$ROOT/native/common" "$ROOT/native/drm-trace/selftest.c" \
     -o "$TEMP/drmtrace-selftest"
 
