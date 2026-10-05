@@ -126,7 +126,7 @@ case $CANDIDATE in
 esac
 printf 'HDMI experimental candidate: %s\n' "$CANDIDATE" >&2
 if [[ $CANDIDATE == C || $CANDIDATE == D || $CANDIDATE == BCDF || $CANDIDATE == BCDEF ]]; then
-    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_RESIZE_ABI=1' "$BUNDLE/lib/mesa/libGLX_mesa.so.0" || {
+    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_RESIZE_ABI=1' "$BUNDLE/lib/mesa/libgallium-26.2.0-devel.so" || {
         printf 'Missing matched Mesa resize-cache ABI\n' >&2; exit 1;
     }
 fi
