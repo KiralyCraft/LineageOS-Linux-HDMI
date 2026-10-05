@@ -5,7 +5,7 @@ Never installs a module, loads a .ko, or accesses the running display. Android
 vendor components and the verified redesigned APK come from the immutable B
 package, and their hashes are checked before and after copying.
 """
-import argparse, hashlib, importlib.util, json, pathlib, shutil, subprocess, tarfile
+import argparse, hashlib, importlib.util, json, pathlib, re, shutil, subprocess, tarfile
 P=pathlib.Path
 spec=importlib.util.spec_from_file_location('package_b',P(__file__).with_name('package-candidate-b.py'))
 helpers=importlib.util.module_from_spec(spec);spec.loader.exec_module(helpers)
@@ -24,7 +24,13 @@ def main():
  assert info['validation']['repository_tests']=='PASS'
  assert info['validation']['copy_pixel_checks']==3744 and info['validation']['shared_image_checks']==60
  assert identity['kernel_commit']=='d00ba216ccda5d4fcc0d864729ae69d5b63d860c'
- assert info['components']['mesa']['commit'].startswith('ab345293d')
+ source_commit=subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
+ assert source_commit==info['source_commit']
+ mesa_pin=subprocess.check_output(['git','-C',str(source),'ls-tree','HEAD','third_party/mesa-for-android-container'],text=True).split()[2]
+ assert info['components']['mesa']['commit']==mesa_pin
+ for relative,artifact in info['artifacts'].items():assert sha(runtime/relative)==artifact['sha256'],relative
+ assert info['components']['kernel']['source_commit']==identity['source_commit']
+ assert all(re.fullmatch('[A-Za-z0-9._+-]+',identity[key]) for key in ('kernel_release','runtime_config_sha256','build_id'))
  vendor={}
  for line in (baseline/'patched-checksums.list').read_text().splitlines():
   relative,expected=line.split('|');assert relative.startswith('vendor/') and '..' not in P(relative).parts
@@ -50,14 +56,17 @@ def main():
  archive=module/'runtime'/f'{label}.tar.gz'
  with tarfile.open(archive,'w:gz',dereference=False) as f:f.add(runtime,arcname='candidate-bcdef')
  previous=module/'previous-build-info.json';shutil.copy2(baseline/'build-info.json',previous)
- packaged=dict(old);packaged.update(experimental=True,companion=identity,runtime_archive=str(archive.relative_to(module)),bcdef_runtime=info,
+ packaged={key:value for key,value in old.items() if key not in ('candidate_b_runtime','apk_verification','build_mode')};packaged.update(experimental=True,companion=identity,runtime_archive=str(archive.relative_to(module)),bcdef_runtime=info,
   preserved_vendor_payloads=vendor,magisk_installed=False,boot_activation='pending',packaging_source_commit=info['source_commit'])
  packaged['artifacts']={**old['artifacts'],'hdmi-losd':{'sha256':sha(module/'bin/hdmi-losd'),'repository_commit':info['components']['native']['source_commit']}}
  (module/'build-info.json').write_text(json.dumps(packaged,indent=2)+'\n')
+ readme=(source/'docs/experiments/BCDEF-20261005.md').read_text()
+ (module/'README.txt').write_text(readme)
  for root in (module,rollback):
   for relative,expected in vendor.items():assert sha(root/relative)==expected
   assert sha(root/'apk/HdmiLosTile.apk')==sha(baseline/'apk/HdmiLosTile.apk')
   helpers.write_sums(root)
+  helpers.verify_sums(root)
  candidate=a.output/f'hdmi-los-{label}-magisk.zip';back=a.output/f'hdmi-los-{label}-candidate-b-rollback.zip'
  helpers.make_zip(module,candidate);helpers.make_zip(rollback,back)
  result={'candidate':{'name':candidate.name,'sha256':sha(candidate)},'rollback':{'name':back.name,'sha256':sha(back)},'installed':False,'kernel_loaded':False}
