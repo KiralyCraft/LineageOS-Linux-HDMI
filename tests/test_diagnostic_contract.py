@@ -344,6 +344,8 @@ class DiagnosticContractTests(unittest.TestCase):
             "0003-modesetting-backport-upstream-tearfree.patch",
             "0004-modesetting-tearfree-region-cleanup.patch",
             "0005-modesetting-fence-driven-tearfree.patch",
+            "0006-glamor-eligible-copy-blit.patch",
+            "0007-modesetting-kernel-deferred-presenter.patch",
         ])
         self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
         self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)

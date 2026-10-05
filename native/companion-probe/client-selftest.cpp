@@ -12,7 +12,7 @@
 #include "../../kernel/hdmi_companion/uapi.h"
 
 // Fault injection into the real broker client, without a module or display.
-enum Fault { None, MissingDevice, WrongCaps, CreateFailure, EnableFailure,
+enum Fault { None, WithPresenter, MissingDevice, WrongCaps, CreateFailure, EnableFailure,
              StartupStopped, WrongGeneration, NeverReady };
 static Fault fault;
 static std::vector<unsigned long> operations;
@@ -44,6 +44,7 @@ static int test_ioctl(int fd, unsigned long operation, void *argument) {
         auto *caps = static_cast<hdmi_companion_caps *>(argument);
         assert(caps->size == sizeof(*caps) && !caps->features && !caps->imports);
         caps->features = fault == WrongCaps ? HDMI_COMPANION_FEATURE_PROBE_ONLY : HDMI_COMPANION_FEATURE_TIMING_GUARD;
+        if (fault == WithPresenter) caps->features |= HDMI_COMPANION_FEATURE_PRESENTER;
         caps->imports = HDMI_COMPANION_REQUIRED_IMPORTS;
         strcpy(caps->build_id, "selftest");
         return 0;
@@ -133,5 +134,8 @@ int main() {
     reset(None);
     assert(HdmiTimingSession::Available(&error));
     assert(count(HDMI_COMPANION_CREATE_SESSION) == 0 && close_count(10) == 1);
+    reset(WithPresenter);
+    { HdmiTimingSession session; assert(session.Start(20,30,40,50,&error)); assert(session.Valid(&error)); }
+    assert(count(HDMI_COMPANION_STOP_SESSION) == 1 && close_count(13) == 1);
     puts("Timing session capability, startup, invalidation, timeout and cleanup tests: PASS");
 }

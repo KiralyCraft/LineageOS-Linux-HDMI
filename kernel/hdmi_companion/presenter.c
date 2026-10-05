@@ -26,6 +26,7 @@
 #include "uapi.h"
 #include "presenter.h"
 
+static atomic_t presenter_count=ATOMIC_INIT(0);
 struct presenter;
 struct present_job {
     struct dma_fence done;
@@ -55,6 +56,7 @@ static void presenter_destroy(struct kref *ref)
     struct presenter *p=container_of(ref,struct presenter,refs);
     hdmi_present_unbind(&p->binding);
     kfree(p);
+    atomic_dec(&presenter_count);
     module_put(THIS_MODULE);
 }
 static const char *present_fence_name(struct dma_fence *f) { return "hdmi-companion-present"; }
@@ -324,7 +326,10 @@ long hdmi_present_create(void __user *pointer)
     if (!p) return -ENOMEM;
     ret=hdmi_present_bind(&p->binding,&req);
     if (ret) { kfree(p); return ret; }
-    if (!try_module_get(THIS_MODULE)) { hdmi_present_unbind(&p->binding); kfree(p); return -ENODEV; }
+    if (atomic_inc_return(&presenter_count)>4) {
+        atomic_dec(&presenter_count); hdmi_present_unbind(&p->binding); kfree(p); return -ENOSPC;
+    }
+    if (!try_module_get(THIS_MODULE)) { atomic_dec(&presenter_count); hdmi_present_unbind(&p->binding); kfree(p); return -ENODEV; }
     kref_init(&p->refs); mutex_init(&p->lock); init_waitqueue_head(&p->changed);
     fd=get_unused_fd_flags(O_CLOEXEC);
     if (fd < 0) { ret=fd; goto fail; }
