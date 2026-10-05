@@ -34,8 +34,8 @@ for file in "${mesa_files[@]}" "$dril" "$gbm" "$gbm_backend" \
     }
 done
 for file in "${mesa_files[@]}"; do
-    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_BRIDGE_ABI=5' "$file" || {
-        printf 'Mesa component does not carry ABI 5: %s\n' "$file" >&2
+    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_BRIDGE_ABI=6' "$file" || {
+        printf 'Mesa component does not carry ABI 6: %s\n' "$file" >&2
         exit 1
     }
 done

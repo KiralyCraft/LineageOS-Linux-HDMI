@@ -687,7 +687,10 @@ void configure_gpu_environment(bool kms_scanout_server) {
       setenv("MESA_KGSL_X11_GPU_BRIDGE", "1", 1);
       // CPU readback is used below the adaptive GPU-bridge threshold.  UBWC
       // must be disabled for that mapping; ordinary Freedreno tiling remains.
-      setenv("FD_MESA_DEBUG", "noubwc", 1);
+      // The C/D pipeline has no CPU-readback path. Keep private rendering
+      // eligible for UBWC; shared destinations retain their validated layout.
+      if (!getenv("MESA_KGSL_X11_PIPELINE") || strcmp(getenv("MESA_KGSL_X11_PIPELINE"),"1"))
+        setenv("FD_MESA_DEBUG", "noubwc", 1);
     } else {
       // Direct and shadow clients receive Xorg's leased DRM render node and
       // use KGSL only for submission.  Renderonly owns the KMS-compatible

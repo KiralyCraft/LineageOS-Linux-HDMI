@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 BUNDLE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 MODE=${1:-load}
-[[ $MODE == load || $MODE == --check ]] || exit 2
+[[ $MODE == load || $MODE == --check || $MODE == --check-compatible ]] || exit 2
 if ((EUID != 0)); then exec sudo -n -- "$0" "$MODE"; fi
 mapfile -t identity < <(python3 - "$BUNDLE/companion/manifest.json" <<'PY'
 import json,sys
@@ -34,6 +34,17 @@ if [[ ! -d /sys/module/hdmi_companion ]]; then
     }
     nsenter -t 1 -m -- /system/bin/toybox insmod "$STAGE/hdmi_companion.ko"
 fi
-nsenter -t 1 -m -- "$STAGE/hdmi-companion-probe" --timing \
-    --expect-release "${identity[0]}" --expect-build "${identity[1]}"
+if [[ $MODE == --check-compatible ]]; then
+    # Both entries are checksum-pinned build identities in the runtime manifest.
+    probe_result=$(nsenter -t 1 -m -- "$STAGE/hdmi-companion-probe" --timing --expect-release "${identity[0]}")
+    printf '%s\n' "$probe_result"
+    python3 - "$BUNDLE/compatible-companions.json" "$probe_result" <<'PYCODE'
+import json,sys
+allowed=json.load(open(sys.argv[1]))['build_ids']
+assert any(build in sys.argv[2] for build in allowed), 'Loaded companion build is outside the pinned compatibility set'
+PYCODE
+else
+    nsenter -t 1 -m -- "$STAGE/hdmi-companion-probe" --timing \
+        --expect-release "${identity[0]}" --expect-build "${identity[1]}"
+fi
 printf 'Matching standalone timing companion is loaded. No lease was created.\n'

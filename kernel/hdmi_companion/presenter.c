@@ -45,7 +45,7 @@ struct presenter {
     struct mutex lock;
     wait_queue_head_t changed;
     struct hdmi_present_binding binding;
-    struct present_job *current;
+    struct present_job *job;
     u64 change, seen;
     bool closing;
 };
@@ -229,7 +229,7 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
             input.state || input.error || input.generation || input.serial || input.accepted_ns ||
             input.submitted_ns || input.completed_ns || input.reserved) return -EINVAL;
         mutex_lock(&p->lock);
-        r=p->current;
+        r=p->job;
         if (r && r->status.state == HDMI_PRESENT_SUBMITTED && dma_fence_is_signaled(&r->done))
             retire_locked(r,HDMI_PRESENT_COMPLETE,0);
         if (cmd == HDMI_COMPANION_CANCEL_PRESENT && r && r->status.state == HDMI_PRESENT_WAITING) {
@@ -251,9 +251,9 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
         req.acquire_fd < 0 || req.reserved[0] || req.reserved[1]) return -EINVAL;
     mutex_lock(&p->lock);
     if (p->closing || !hdmi_present_valid(&p->binding)) { ret=-EACCES; goto out; }
-    if (p->current && p->current->status.state == HDMI_PRESENT_SUBMITTED && dma_fence_is_signaled(&p->current->done))
-        retire_locked(p->current,HDMI_PRESENT_COMPLETE,0);
-    if (job_active(p->current)) { ret=-EBUSY; goto out; }
+    if (p->job && p->job->status.state == HDMI_PRESENT_SUBMITTED && dma_fence_is_signaled(&p->job->done))
+        retire_locked(p->job,HDMI_PRESENT_COMPLETE,0);
+    if (job_active(p->job)) { ret=-EBUSY; goto out; }
     r=kzalloc(sizeof(*r),GFP_KERNEL);
     if (!r) { ret=-ENOMEM; goto out; }
     r->acquire=sync_file_get_fence(req.acquire_fd);
@@ -266,8 +266,8 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
     INIT_WORK(&r->work,present_work); INIT_DELAYED_WORK(&r->deadline,present_deadline);
     r->status=(struct hdmi_present_status){.size=sizeof(r->status),.abi_version=HDMI_COMPANION_ABI_VERSION,
         .state=HDMI_PRESENT_WAITING,.generation=req.generation,.serial=req.serial,.accepted_ns=ktime_get_ns()};
-    if (p->current) dma_fence_put(&p->current->done);
-    p->current=r;
+    if (p->job) dma_fence_put(&p->job->done);
+    p->job=r;
     dma_fence_get(&r->done); /* callback reference, released at signal */
     ret=dma_fence_add_callback(&r->done,&r->done_cb,flip_ready);
     if (WARN_ON(ret)) { dma_fence_put(&r->done); retire_locked(r,HDMI_PRESENT_FAILED,ret); goto out; }
@@ -296,10 +296,10 @@ static int present_release(struct inode *inode,struct file *file)
 {
     struct presenter *p=file->private_data;
     mutex_lock(&p->lock); p->closing=true;
-    if (p->current) {
-        struct present_job *r=p->current;
+    if (p->job) {
+        struct present_job *r=p->job;
         if (r->status.state == HDMI_PRESENT_WAITING) retire_locked(r,HDMI_PRESENT_CANCELLED,-ECANCELED);
-        p->current=NULL; dma_fence_put(&r->done);
+        p->job=NULL; dma_fence_put(&r->done);
     }
     mutex_unlock(&p->lock);
     kref_put(&p->refs,presenter_destroy);

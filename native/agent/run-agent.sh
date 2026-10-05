@@ -14,15 +14,21 @@ NO_TIMEOUT=1
 DRM_TRACE=startup
 TIMING_GUARD=required
 TEARFREE_COMPLETION=async
+CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDEF}
 PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
 usage() {
-    printf 'usage: %s [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--candidate B|C|D|E|F|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
     case $1 in
+        --candidate)
+            (($# >= 2)) || { usage; exit 2; }
+            CANDIDATE=$2
+            shift 2
+            ;;
         --capture)
             (($# >= 2)) || { usage; exit 2; }
             CAPTURE=$2
@@ -90,8 +96,13 @@ if [[ $XORG_ACCEL != kgsl-kms-bridge && $CLIENT_PRESENT != bridge ]]; then
         "--client-present $CLIENT_PRESENT" >&2
     exit 2
 fi
+[[ $CANDIDATE == B || $CANDIDATE == C || $CANDIDATE == D || $CANDIDATE == E || $CANDIDATE == F || $CANDIDATE == BCDEF ]] || { usage; exit 2; }
+if [[ $CANDIDATE != B && ($XORG_ACCEL != kgsl-kms-bridge || $CLIENT_PRESENT != bridge || $TEARFREE_COMPLETION != async || $TIMING_GUARD != required) ]]; then
+    printf 'Experimental profiles require the matched accelerated bridge, asynchronous TearFree and timing guard\n' >&2
+    exit 2
+fi
 if ((EUID != 0)); then
-    args=(--capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
+    args=(--candidate "$CANDIDATE" --capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
           --client-present "$CLIENT_PRESENT" --session "$SESSION" \
           --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
           --tearfree-completion "$TEARFREE_COMPLETION")
@@ -102,6 +113,17 @@ if ((EUID != 0)); then
     fi
     exec sudo -n -- "$0" "${args[@]}"
 fi
+
+# Select experiments explicitly; inherited shell variables cannot mix profiles.
+unset MESA_KGSL_X11_PIPELINE MESA_KGSL_X11_INTEGRATED_RESOLVE HDMI_LOS_GLAMOR_COPY HDMI_LOS_PRESENTER MESA_KGSL_HDMI_BLIT_STATS
+case $CANDIDATE in
+    C) export MESA_KGSL_X11_PIPELINE=1 ;;
+    D) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 ;;
+    E) export HDMI_LOS_GLAMOR_COPY=blit MESA_KGSL_HDMI_BLIT_STATS=1 ;;
+    F) export HDMI_LOS_PRESENTER=kernel ;;
+    BCDEF) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 HDMI_LOS_GLAMOR_COPY=blit HDMI_LOS_PRESENTER=kernel MESA_KGSL_HDMI_BLIT_STATS=1 ;;
+esac
+printf 'HDMI experimental candidate: %s\n' "$CANDIDATE" >&2
 
 if [[ $TEARFREE_COMPLETION == async ]]; then
     LC_ALL=C grep -aFq 'HDMI_LOS_XORG_ASYNC_ABI=1' \
@@ -118,7 +140,11 @@ if [[ $TEARFREE_COMPLETION == async ]]; then
 fi
 
 if [[ $TIMING_GUARD == required ]]; then
-    "$BUNDLE/load-companion.sh" --check
+    if [[ $CANDIDATE == F || $CANDIDATE == BCDEF ]]; then
+        "$BUNDLE/load-companion.sh" --check
+    else
+        "$BUNDLE/load-companion.sh" --check-compatible
+    fi
 fi
 
 for required in \
@@ -233,7 +259,7 @@ fi
 if [[ $XORG_ACCEL == kgsl-glamor ]]; then
     printf 'WARNING: KGSL glamor is an isolated diagnostic; prefer kgsl-kms-bridge or safe ShadowFB\n' >&2
 elif [[ $XORG_ACCEL == kgsl-kms-bridge ]]; then
-    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=5'
+    mesa_bridge_abi='HDMI_LOS_MESA_BRIDGE_ABI=6'
     for xorg_file in \
         "$BUNDLE/libexec/Xorg" \
         "$BUNDLE/lib/xorg/modules/libglamoregl.so" \
