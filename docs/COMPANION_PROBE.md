@@ -70,6 +70,10 @@ records on-device loading as pending until the user installs the artifact.
 
 ## Next gate
 
-After installation reports PASS, implement the broker-owned timing session and
+The [2026-10-05 standalone live probe](../diagnostics/companion-probe/LIVE-20261005.md)
+passed load, query, negative ioctl checks, and unload without rebooting. This
+establishes compatibility of that identifiable query-only build.
+
+After the compatibility gate passes, implement the broker-owned timing session and
 fence-driven Xorg TearFree completion. Candidate B preserves the deployed Mesa
 buffers and presentation path. Copy/layout optimizations remain subsequent work.
