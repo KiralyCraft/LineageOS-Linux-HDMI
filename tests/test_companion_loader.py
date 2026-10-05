@@ -78,6 +78,13 @@ esac
         self.assertNotEqual(code, 0)
         self.assertEqual(calls, [])
 
+    def test_wrong_kernel_release_cannot_load(self):
+        identity = self.root / 'timing.env'
+        identity.write_text(identity.read_text().replace('test-release', 'other-release'))
+        code, calls = self.run_loader()
+        self.assertNotEqual(code, 0)
+        self.assertEqual(calls, [])
+
     def test_changed_payload_cannot_load(self):
         self.query.write_text('#!/bin/sh\nexit 0\n')
         code, calls = self.run_loader()

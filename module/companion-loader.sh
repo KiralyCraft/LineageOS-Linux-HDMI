@@ -3,6 +3,8 @@
 # Load an additive timing companion, never replace or unload a GPU driver.
 MODDIR=${0%/*}
 TOYBOX=/system/bin/toybox
+PATH=/system/bin:/system/xbin:$PATH
+export PATH
 
 fail_companion() {
     printf 'FAIL: timing companion: %s\n' "$1" >&2
