@@ -171,6 +171,10 @@ retry:
     ret=drm_crtc_vblank_get(b->crtc);
     if (ret) goto out;
     r->vblank=true;
+    /* A deadlock retry cancels the previous attempt's reserved event and
+     * releases its sole completion-fence reference synchronously. That
+     * cancellation must not become the outcome of a later successful flip. */
+    atomic_set(&r->event_result,0);
     event=kzalloc(sizeof(*event),GFP_KERNEL);
     if (!event) { ret=-ENOMEM; goto out; }
     event->event.base.type=DRM_EVENT_FLIP_COMPLETE;
