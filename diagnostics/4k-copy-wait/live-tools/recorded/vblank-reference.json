@@ -1,0 +1,68 @@
+{
+  "pid": 26244,
+  "phases": [
+    {
+      "phase": "move-before",
+      "seconds": 23.786097699019592,
+      "start_monotonic": 256395.623901202,
+      "end_monotonic": 256419.409998901,
+      "xorg_cpu_seconds": 14.74,
+      "p50_ms": 3.3645830117166042,
+      "p95_ms": 33.97869801847264,
+      "max_ms": 431.40078100259416,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "request_samples": 1080
+    },
+    {
+      "phase": "move-held-reference",
+      "seconds": 19.614924939989578,
+      "start_monotonic": 256421.415167911,
+      "end_monotonic": 256441.030092851,
+      "xorg_cpu_seconds": 11.58,
+      "p50_ms": 2.7708330017048866,
+      "p95_ms": 26.577291020657867,
+      "max_ms": 76.6363540024031,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "request_samples": 1080
+    },
+    {
+      "phase": "move-after",
+      "seconds": 19.018819158984115,
+      "start_monotonic": 256443.418866913,
+      "end_monotonic": 256462.437686072,
+      "xorg_cpu_seconds": 9.54,
+      "p50_ms": 1.1571870127227157,
+      "p95_ms": 18.121041997801512,
+      "max_ms": 130.58354199165478,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "request_samples": 1080
+    }
+  ],
+  "note": "XSync request turnaround is not paint completion or physical display FPS.",
+  "window": 37748743,
+  "graphics_libraries": [
+    "/usr/lib/libEGL.so.1.1.0",
+    "/usr/lib/libGLX.so.0.0.0",
+    "/usr/lib/libQt6Widgets.so.6.11.2"
+  ],
+  "hold": {
+    "at": 256421.413930307,
+    "target": 644482,
+    "ret": 0,
+    "errno": 0
+  },
+  "events": [
+    {
+      "type": 3,
+      "length": 32,
+      "cookie": 1212435785,
+      "timestamp_ns": 256441409424465,
+      "sequence": 644482,
+      "received_at": 256441.410436341
+    }
+  ],
+  "sequence_queries": []
+}

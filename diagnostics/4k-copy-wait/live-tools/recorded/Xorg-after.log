@@ -1,0 +1,182 @@
+[256393.970] (II) HDMI_COPY attempts=gpu_temp n=1 rects=1 pixels=1835680 interval_us=5005879
+[256393.970] (II) HDMI_COPY attempts=gpu_draw n=431 rects=448 pixels=42839285 interval_us=5005879
+[256393.971] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5005879
+[256393.971] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5005879
+[256393.971] (II) HDMI_COPY root_overlap_temp_attempts=1
+[256394.006] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5033194 copies=62 rects=316 pixels=28415295 updates=89 pending_skips=347 failures=0 repeat_msc=62 backwards_msc=0 future_ust=0
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=62 total_us=8444 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1000 max_us=924
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=62 total_us=225994 p50_bound_us=2000 p95_bound_us=12000 p99_bound_us=18000 max_us=17760
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=62 total_us=234438 p50_bound_us=2000 p95_bound_us=12250 p99_bound_us=18000 max_us=17866
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=62 total_us=15808 p50_bound_us=250 p95_bound_us=750 p99_bound_us=1500 max_us=1313
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=62 total_us=704949 p50_bound_us=13000 p95_bound_us=18000 p99_bound_us=21250 max_us=21181
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=62 total_us=5033194 p50_bound_us=17250 p95_bound_us=1016799 p99_bound_us=1016799 max_us=1016799
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=62 total_us=264279 p50_bound_us=250 p95_bound_us=13250 p99_bound_us=16250 max_us=16090
+[256394.007] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=62 total_us=3334840832 p50_bound_us=55536669 p95_bound_us=55536669 p99_bound_us=55536669 max_us=55536669
+[256398.971] (II) HDMI_COPY attempts=gpu_temp n=191 rects=361 pixels=140057540 interval_us=5000196
+[256398.971] (II) HDMI_COPY attempts=gpu_draw n=2497 rects=2729 pixels=153946059 interval_us=5000196
+[256398.971] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000196
+[256398.971] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000196
+[256398.971] (II) HDMI_COPY root_overlap_temp_attempts=191
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5001644 copies=201 rects=1576 pixels=153714059 updates=796 pending_skips=1146 failures=0 repeat_msc=201 backwards_msc=0 future_ust=0
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=201 total_us=32634 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=866
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=201 total_us=929206 p50_bound_us=5250 p95_bound_us=8000 p99_bound_us=9500 max_us=12706
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=201 total_us=961840 p50_bound_us=5500 p95_bound_us=8250 p99_bound_us=9500 max_us=13009
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=201 total_us=29755 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=662
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=201 total_us=2267493 p50_bound_us=11500 p95_bound_us=15500 p99_bound_us=17750 max_us=17971
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=201 total_us=5001644 p50_bound_us=16750 p95_bound_us=20500 p99_bound_us=30250 max_us=983883
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=201 total_us=1849880 p50_bound_us=9500 p95_bound_us=13750 p99_bound_us=15750 max_us=17570
+[256399.008] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=201 total_us=11828344946 p50_bound_us=60538313 p95_bound_us=60538313 p99_bound_us=60538313 max_us=60538313
+[256403.971] (II) HDMI_COPY attempts=gpu_temp n=407 rects=611 pixels=566441766 interval_us=5000268
+[256403.971] (II) HDMI_COPY attempts=gpu_draw n=5694 rects=6436 pixels=452134826 interval_us=5000268
+[256403.971] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000268
+[256403.971] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000268
+[256403.971] (II) HDMI_COPY root_overlap_temp_attempts=407
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5021814 copies=290 rects=3434 pixels=433448480 updates=1252 pending_skips=1623 failures=0 repeat_msc=290 backwards_msc=0 future_ust=0
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=290 total_us=60364 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=700
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=290 total_us=1745609 p50_bound_us=6000 p95_bound_us=9250 p99_bound_us=11750 max_us=17867
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=290 total_us=1805973 p50_bound_us=6000 p95_bound_us=9500 p99_bound_us=12000 max_us=17992
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=290 total_us=43705 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=645
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=290 total_us=2813513 p50_bound_us=9750 p95_bound_us=15000 p99_bound_us=18750 max_us=19841
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=290 total_us=5021814 p50_bound_us=17000 p95_bound_us=23000 p99_bound_us=33000 max_us=33998
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=290 total_us=2697370 p50_bound_us=9500 p95_bound_us=14750 p99_bound_us=17500 max_us=19151
+[256404.030] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=290 total_us=18281208866 p50_bound_us=65560127 p95_bound_us=65560127 p99_bound_us=65560127 max_us=65560127
+[256408.972] (II) HDMI_COPY attempts=gpu_temp n=492 rects=671 pixels=829562643 interval_us=5001270
+[256408.972] (II) HDMI_COPY attempts=gpu_draw n=5269 rects=6223 pixels=587756664 interval_us=5001270
+[256408.972] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5001270
+[256408.972] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5001270
+[256408.972] (II) HDMI_COPY root_overlap_temp_attempts=492
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5014010 copies=275 rects=3257 pixels=563769219 updates=1078 pending_skips=1346 failures=0 repeat_msc=275 backwards_msc=0 future_ust=0
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=275 total_us=60643 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1000 max_us=1141
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=275 total_us=1838824 p50_bound_us=6250 p95_bound_us=12500 p99_bound_us=18750 max_us=33298
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=275 total_us=1899467 p50_bound_us=6500 p95_bound_us=12750 p99_bound_us=19000 max_us=33474
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=275 total_us=41671 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=376
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=275 total_us=2773562 p50_bound_us=10000 p95_bound_us=17500 p99_bound_us=20500 max_us=39234
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=275 total_us=5014010 p50_bound_us=17000 p95_bound_us=32000 p99_bound_us=51000 max_us=55525
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=275 total_us=2528532 p50_bound_us=9000 p95_bound_us=16750 p99_bound_us=25000 max_us=39869
+[256409.044] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=275 total_us=18717756019 p50_bound_us=70574137 p95_bound_us=70574137 p99_bound_us=70574137 max_us=70574137
+[256413.975] (II) HDMI_COPY attempts=gpu_temp n=294 rects=668 pixels=398408051 interval_us=5002661
+[256413.975] (II) HDMI_COPY attempts=gpu_draw n=3474 rects=4069 pixels=419732992 interval_us=5002661
+[256413.975] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5002661
+[256413.975] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5002661
+[256413.975] (II) HDMI_COPY root_overlap_temp_attempts=294
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5014096 copies=293 rects=2331 pixels=410269602 updates=1061 pending_skips=1625 failures=0 repeat_msc=293 backwards_msc=0 future_ust=0
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=293 total_us=48820 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=815
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=293 total_us=1544661 p50_bound_us=4750 p95_bound_us=10250 p99_bound_us=12250 max_us=12731
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=293 total_us=1593481 p50_bound_us=5000 p95_bound_us=10500 p99_bound_us=12500 max_us=13181
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=293 total_us=43310 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=439
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=293 total_us=3127694 p50_bound_us=11250 p95_bound_us=15750 p99_bound_us=22500 max_us=23904
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=293 total_us=5014096 p50_bound_us=17000 p95_bound_us=21000 p99_bound_us=30000 max_us=40337
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=293 total_us=2623035 p50_bound_us=9500 p95_bound_us=13750 p99_bound_us=22250 max_us=25922
+[256414.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=293 total_us=21416093383 p50_bound_us=75588233 p95_bound_us=75588233 p99_bound_us=75588233 max_us=75588233
+[256418.975] (II) HDMI_COPY attempts=gpu_temp n=286 rects=693 pixels=347742393 interval_us=5000382
+[256418.975] (II) HDMI_COPY attempts=gpu_draw n=3190 rects=3771 pixels=383530481 interval_us=5000382
+[256418.975] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000382
+[256418.975] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000382
+[256418.975] (II) HDMI_COPY root_overlap_temp_attempts=286
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5000011 copies=298 rects=2125 pixels=373468621 updates=1049 pending_skips=1764 failures=0 repeat_msc=298 backwards_msc=0 future_ust=0
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=298 total_us=46643 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1000 max_us=910
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=298 total_us=1487012 p50_bound_us=4500 p95_bound_us=10000 p99_bound_us=12250 max_us=13721
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=298 total_us=1533655 p50_bound_us=4750 p95_bound_us=10000 p99_bound_us=12500 max_us=13823
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=298 total_us=43462 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=347
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=298 total_us=3273947 p50_bound_us=11750 p95_bound_us=15250 p99_bound_us=17500 max_us=23024
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=298 total_us=5000011 p50_bound_us=16750 p95_bound_us=20250 p99_bound_us=27500 max_us=33333
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=298 total_us=2603659 p50_bound_us=9250 p95_bound_us=13000 p99_bound_us=16500 max_us=19369
+[256419.058] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=298 total_us=23274630802 p50_bound_us=80588244 p95_bound_us=80588244 p99_bound_us=80588244 max_us=80588244
+[256423.976] (II) HDMI_COPY attempts=gpu_temp n=159 rects=395 pixels=191319224 interval_us=5000936
+[256423.976] (II) HDMI_COPY attempts=gpu_draw n=1952 rects=2296 pixels=227667864 interval_us=5000936
+[256423.977] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000936
+[256423.977] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000936
+[256423.977] (II) HDMI_COPY root_overlap_temp_attempts=159
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5000758 copies=183 rects=1394 pixels=221423079 updates=621 pending_skips=911 failures=0 repeat_msc=29 backwards_msc=0 future_ust=0
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=183 total_us=34759 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1250 max_us=1113
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=183 total_us=1144345 p50_bound_us=6750 p95_bound_us=11000 p99_bound_us=15000 max_us=15242
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=183 total_us=1179104 p50_bound_us=6750 p95_bound_us=11250 p99_bound_us=15000 max_us=15663
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=183 total_us=29989 p50_bound_us=250 p95_bound_us=500 p99_bound_us=500 max_us=829
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=183 total_us=1774023 p50_bound_us=9750 p95_bound_us=15500 p99_bound_us=17500 max_us=19838
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=183 total_us=5000758 p50_bound_us=17000 p95_bound_us=21750 p99_bound_us=883685 max_us=883685
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=183 total_us=1419242 p50_bound_us=8250 p95_bound_us=13750 p99_bound_us=15000 max_us=15564
+[256424.059] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=183 total_us=2348541505 p50_bound_us=2000 p95_bound_us=82605521 p99_bound_us=82605521 max_us=82605521
+[256428.982] (II) HDMI_COPY attempts=gpu_temp n=281 rects=693 pixels=344703710 interval_us=5005971
+[256428.982] (II) HDMI_COPY attempts=gpu_draw n=4036 rects=4632 pixels=452404256 interval_us=5005971
+[256428.982] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5005971
+[256428.982] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5005971
+[256428.982] (II) HDMI_COPY root_overlap_temp_attempts=281
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5001799 copies=296 rects=2610 pixels=411044400 updates=1151 pending_skips=1662 failures=0 repeat_msc=0 backwards_msc=0 future_ust=0
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=296 total_us=48871 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=2203
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=296 total_us=1586010 p50_bound_us=4750 p95_bound_us=10500 p99_bound_us=11500 max_us=15650
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=296 total_us=1634881 p50_bound_us=5000 p95_bound_us=10500 p99_bound_us=12000 max_us=15954
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=296 total_us=47036 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=964
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=296 total_us=3109924 p50_bound_us=11250 p95_bound_us=14500 p99_bound_us=16500 max_us=18180
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=296 total_us=5001799 p50_bound_us=16750 p95_bound_us=19750 p99_bound_us=30000 max_us=30946
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=296 total_us=2486274 p50_bound_us=8750 p95_bound_us=13250 p99_bound_us=15750 max_us=16912
+[256429.061] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=296 total_us=421339 p50_bound_us=1000 p95_bound_us=4250 p99_bound_us=6500 max_us=6722
+[256433.984] (II) HDMI_COPY attempts=gpu_temp n=271 rects=654 pixels=329914996 interval_us=5002388
+[256433.985] (II) HDMI_COPY attempts=gpu_draw n=2972 rects=3526 pixels=358869449 interval_us=5002388
+[256433.985] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5002388
+[256433.985] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5002388
+[256433.985] (II) HDMI_COPY root_overlap_temp_attempts=271
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5014879 copies=292 rects=2004 pixels=352098281 updates=960 pending_skips=1530 failures=0 repeat_msc=0 backwards_msc=0 future_ust=0
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=292 total_us=54024 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=776
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=292 total_us=1665732 p50_bound_us=5500 p95_bound_us=10750 p99_bound_us=15500 max_us=15732
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=292 total_us=1719756 p50_bound_us=5500 p95_bound_us=10750 p99_bound_us=15500 max_us=15939
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=292 total_us=46095 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=523
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=292 total_us=2987068 p50_bound_us=10750 p95_bound_us=15750 p99_bound_us=17000 max_us=19926
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=292 total_us=5014879 p50_bound_us=16750 p95_bound_us=21250 p99_bound_us=35000 max_us=35827
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=292 total_us=2403315 p50_bound_us=8750 p95_bound_us=13250 p99_bound_us=15000 max_us=19586
+[256434.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=292 total_us=480800 p50_bound_us=1250 p95_bound_us=4500 p99_bound_us=6500 max_us=7895
+[256438.985] (II) HDMI_COPY attempts=gpu_temp n=278 rects=691 pixels=335446186 interval_us=5000017
+[256438.985] (II) HDMI_COPY attempts=gpu_draw n=3012 rects=3587 pixels=378361371 interval_us=5000017
+[256438.985] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000017
+[256438.985] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000017
+[256438.985] (II) HDMI_COPY root_overlap_temp_attempts=278
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5000639 copies=295 rects=1996 pixels=371189289 updates=1036 pending_skips=1617 failures=0 repeat_msc=0 backwards_msc=0 future_ust=0
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=295 total_us=47157 p50_bound_us=250 p95_bound_us=500 p99_bound_us=500 max_us=461
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=295 total_us=1537611 p50_bound_us=4500 p95_bound_us=10250 p99_bound_us=14250 max_us=17994
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=295 total_us=1584768 p50_bound_us=4500 p95_bound_us=10500 p99_bound_us=14500 max_us=18120
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=295 total_us=47869 p50_bound_us=250 p95_bound_us=250 p99_bound_us=750 max_us=2417
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=295 total_us=3188497 p50_bound_us=11500 p95_bound_us=15250 p99_bound_us=17250 max_us=18210
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=295 total_us=5000639 p50_bound_us=16750 p95_bound_us=20250 p99_bound_us=29250 max_us=30858
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=295 total_us=2517787 p50_bound_us=9250 p95_bound_us=13000 p99_bound_us=15250 max_us=16905
+[256439.076] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=295 total_us=410453 p50_bound_us=1000 p95_bound_us=4500 p99_bound_us=5500 max_us=6242
+[256443.988] (II) HDMI_COPY attempts=gpu_temp n=148 rects=350 pixels=180959932 interval_us=5003739
+[256443.988] (II) HDMI_COPY attempts=gpu_draw n=2218 rects=2560 pixels=212441195 interval_us=5003739
+[256443.988] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5003739
+[256443.988] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5003739
+[256443.988] (II) HDMI_COPY root_overlap_temp_attempts=148
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5018818 copies=171 rects=1499 pixels=203510971 updates=618 pending_skips=877 failures=0 repeat_msc=48 backwards_msc=0 future_ust=0
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=171 total_us=31963 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1000 max_us=810
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=171 total_us=865462 p50_bound_us=4250 p95_bound_us=10250 p99_bound_us=16000 max_us=16485
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=171 total_us=897425 p50_bound_us=4500 p95_bound_us=10500 p99_bound_us=16000 max_us=16780
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=171 total_us=28218 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=588
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=171 total_us=1897240 p50_bound_us=11500 p95_bound_us=15750 p99_bound_us=18250 max_us=19272
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=171 total_us=5018818 p50_bound_us=16750 p95_bound_us=29500 p99_bound_us=733070 max_us=733070
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=171 total_us=1428998 p50_bound_us=8750 p95_bound_us=13500 p99_bound_us=17250 max_us=19567
+[256444.095] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=171 total_us=16699311 p50_bound_us=2500 p95_bound_us=1883715 p99_bound_us=1883715 max_us=1883715
+[256448.989] (II) HDMI_COPY attempts=gpu_temp n=279 rects=693 pixels=341889250 interval_us=5000845
+[256448.989] (II) HDMI_COPY attempts=gpu_draw n=3796 rects=4371 pixels=374261299 interval_us=5000845
+[256448.989] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5000845
+[256448.989] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5000845
+[256448.989] (II) HDMI_COPY root_overlap_temp_attempts=279
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5016001 copies=298 rects=2572 pixels=370460141 updates=1110 pending_skips=1662 failures=0 repeat_msc=298 backwards_msc=0 future_ust=0
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=298 total_us=51966 p50_bound_us=250 p95_bound_us=500 p99_bound_us=750 max_us=741
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=298 total_us=1508529 p50_bound_us=4500 p95_bound_us=10000 p99_bound_us=12000 max_us=12313
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=298 total_us=1560495 p50_bound_us=4750 p95_bound_us=10250 p99_bound_us=12250 max_us=12563
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=298 total_us=41685 p50_bound_us=250 p95_bound_us=250 p99_bound_us=500 max_us=362
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=298 total_us=3229045 p50_bound_us=11750 p95_bound_us=15000 p99_bound_us=18250 max_us=21117
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=298 total_us=5016001 p50_bound_us=16750 p95_bound_us=19750 p99_bound_us=31750 max_us=36634
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=298 total_us=2771107 p50_bound_us=9750 p95_bound_us=13250 p99_bound_us=16000 max_us=20356
+[256449.111] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=298 total_us=796915603 p50_bound_us=5168538 p95_bound_us=5168538 p99_bound_us=5168538 max_us=5168538
+[256454.083] (II) HDMI_COPY attempts=gpu_temp n=14 rects=28 pixels=16735753 interval_us=5094233
+[256454.083] (II) HDMI_COPY attempts=gpu_draw n=190 rects=221 pixels=37014552 interval_us=5094233
+[256454.083] (II) HDMI_COPY attempts=upload n=0 rects=0 pixels=0 interval_us=5094233
+[256454.083] (II) HDMI_COPY attempts=readback n=0 rects=0 pixels=0 interval_us=5094233
+[256454.084] (II) HDMI_COPY root_overlap_temp_attempts=14
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 interval_us=5235841 copies=21 rects=92 pixels=27989492 updates=31 pending_skips=122 failures=0 repeat_msc=21 backwards_msc=0 future_ust=0
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_submit n=21 total_us=3425 p50_bound_us=250 p95_bound_us=750 p99_bound_us=750 max_us=657
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=finish n=21 total_us=87298 p50_bound_us=4000 p95_bound_us=10750 p99_bound_us=14250 max_us=14059
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=copy_total n=21 total_us=90723 p50_bound_us=4000 p95_bound_us=10750 p99_bound_us=14250 max_us=14190
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_queue n=21 total_us=5562 p50_bound_us=250 p95_bound_us=500 p99_bound_us=1000 max_us=919
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=flip_inflight n=21 total_us=214049 p50_bound_us=10750 p95_bound_us=13250 p99_bound_us=18000 max_us=17955
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_gap n=21 total_us=5235841 p50_bound_us=2533330 p95_bound_us=2533330 p99_bound_us=2533330 max_us=2533330
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=damage_to_copy n=21 total_us=81360 p50_bound_us=250 p95_bound_us=12250 p99_bound_us=28250 max_us=28221
+[256454.347] (II) modeset(0): HDMI_LATENCY crtc=235 metric=callback_minus_ust n=21 total_us=153128116 p50_bound_us=10404379 p95_bound_us=10404379 p99_bound_us=10404379 max_us=10404379

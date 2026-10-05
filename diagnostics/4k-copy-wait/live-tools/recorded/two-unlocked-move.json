@@ -1,0 +1,71 @@
+{
+  "phases": [
+    {
+      "phase": "one-before",
+      "moving_windows": 1,
+      "start_monotonic": 257625.077128337,
+      "end_monotonic": 257643.079626663,
+      "seconds": 18.002498326008208,
+      "requests": 816,
+      "requests_per_second": 45.32704212621005,
+      "xorg_cpu_seconds": 9.060000000000002,
+      "sync_p50_ms": 3.1241659889928997,
+      "sync_p95_ms": 25.068749993806705,
+      "sync_max_ms": 51.60088499542326,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "geometry_samples": 28
+    },
+    {
+      "phase": "two",
+      "moving_windows": 2,
+      "start_monotonic": 257645.214037444,
+      "end_monotonic": 257663.220910666,
+      "seconds": 18.00687322198064,
+      "requests": 765,
+      "requests_per_second": 42.483777753606844,
+      "xorg_cpu_seconds": 9.650000000000006,
+      "sync_p50_ms": 4.706719017121941,
+      "sync_p95_ms": 34.835103986551985,
+      "sync_max_ms": 91.68656199472025,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "geometry_samples": 26
+    },
+    {
+      "phase": "one-after",
+      "moving_windows": 1,
+      "start_monotonic": 257665.356855197,
+      "end_monotonic": 257683.363803784,
+      "seconds": 18.006948587018996,
+      "requests": 817,
+      "requests_per_second": 45.37137405884337,
+      "xorg_cpu_seconds": 9.189999999999998,
+      "sync_p50_ms": 2.6317709998693317,
+      "sync_p95_ms": 25.266198004828766,
+      "sync_max_ms": 47.26786399260163,
+      "gbm_failures": 0,
+      "tearfree_failures": 0,
+      "geometry_samples": 28
+    }
+  ],
+  "windows": [
+    {
+      "pid": 16468,
+      "id": 33554439,
+      "width": 900,
+      "height": 900,
+      "base_x": 1900,
+      "base_y": 200
+    },
+    {
+      "pid": 16533,
+      "id": 41943047,
+      "width": 900,
+      "height": 900,
+      "base_x": 2850,
+      "base_y": 200
+    }
+  ],
+  "note": "XSync acknowledges requests. Counts and timing do not directly measure physical display FPS."
+}

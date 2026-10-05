@@ -8,6 +8,8 @@ Counters separate damage-copy submission, `glamor.finish`, total copy, successfu
 
 The restarted combined bundle has now been measured; see [live validation and timing results](LIVE-20261002.md).
 
+The [2026-10-05 follow-up](LIVE-20261005.md) includes the unlocked one/two/one-window comparison, a bounded-reference experiment confirming stale vblank accounting, and hardware copy/fence costs. [Measurement tools and recorded diagnostic extracts](live-tools/README.md) accompany the compact results. The invalid locked comparisons are explicitly excluded.
+
 ## Findings against the deployed build
 
 - The active server already uses FD740 glamor, software cursor, TearFree, and startup-only DRM tracing. The private Termux Present pacer is gated off on this leased Xorg; the HDMI bridge has its own queue scheduling.
