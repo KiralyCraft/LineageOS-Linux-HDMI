@@ -18,7 +18,8 @@ NDK_DIR=/bigdata/android-sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x8
 [[ $SOURCE_COMMIT =~ ^[0-9a-f]{40}$ ]]
 [[ $(git -C "$KERNEL_SOURCE" rev-parse HEAD) == d00ba216ccda5d4fcc0d864729ae69d5b63d860c ]]
 cmp "$INPUT/running.config" "$KERNEL_BUILD/.config"
-cmp "$KERNEL_BUILD/running-autoconf.h" "$KERNEL_BUILD/include/generated/autoconf.h"
+python3 "$SOURCE/build-support/verify-kernel-autoconf.py" \
+    "$KERNEL_BUILD/running-autoconf.h" "$KERNEL_BUILD/include/generated/autoconf.h"
 test -s "$KERNEL_BUILD/Module.symvers"
 mkdir -p "$BUILD/kmod-src" "$BUILD/bin" "$BUILD/output" "$BUILD/tests"
 
@@ -50,7 +51,8 @@ identity = {
     'source_files': {name: digest(source / name) for name in [
         'kernel/hdmi_companion/probe.c', 'kernel/hdmi_companion/uapi.h',
         'kernel/hdmi_companion/Kbuild', 'native/companion-probe/main.c',
-        'build-support/build-companion-probe.sh', 'build-support/verify-companion-probe.py']},
+        'build-support/build-companion-probe.sh', 'build-support/verify-companion-probe.py',
+        'build-support/build-companion-kernel.sh', 'build-support/verify-kernel-autoconf.py']},
     'configuration_changed': False,
     'signature': 'unsigned vendor-style module; no signature enforcement changes',
     'on_device_load_test': 'pending; not installed or loaded',

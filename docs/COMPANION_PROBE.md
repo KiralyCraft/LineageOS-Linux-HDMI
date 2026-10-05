@@ -56,6 +56,10 @@ and `installed-msm_drm.ko`. The first command creates build output and
 `Module.symvers`; it refuses configuration drift. The second creates the probe,
 Android query tool, manifest, ABI report, and ZIP.
 
+The effective `.config` must match byte for byte. Generated `autoconf.h`
+definitions must also match, while allowing the leading comment that the
+kernel's `gen_kheaders.sh` removes from the runtime header archive.
+
 Offline gates check AArch64 ELF format, exact vermagic, all required imports after
 LTO, cross-DSO CFI instrumentation, every probe symbol version, and all installed
 DRM import versions available in the rebuilt kernel. A relocation check rejects

@@ -5,6 +5,7 @@ set -Eeuo pipefail
 KERNEL_SOURCE=${1:?pinned kernel checkout}
 BUILD=${2:?isolated kernel output directory}
 INPUT=${3:?captured running-kernel inputs}
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 LINEAGE=/bigdata/hdmi-los-build/cache/lineage-22.2-display
 CLANG_DIR=$LINEAGE/prebuilts/clang/host/linux-x86/clang-r536225
 PAHOLE=$LINEAGE/prebuilts/kernel-build-tools/linux-x86/bin/pahole
@@ -45,7 +46,8 @@ if ! cmp -s "$INPUT/running.config" "$BUILD/.config"; then
     exit 1
 fi
 "${kernel_make[@]}" -j"$JOBS" vmlinux modules
-cmp "$BUILD/running-autoconf.h" "$BUILD/include/generated/autoconf.h"
+python3 "$SCRIPT_DIR/verify-kernel-autoconf.py" \
+    "$BUILD/running-autoconf.h" "$BUILD/include/generated/autoconf.h"
 [[ $(cat "$BUILD/include/config/kernel.release") == "$EXPECTED_RELEASE" ]]
 test -s "$BUILD/Module.symvers"
 printf 'Matching kernel build output and symbol versions: PASS\n'
