@@ -117,6 +117,10 @@ if [[ $TEARFREE_COMPLETION == async ]]; then
     export HDMI_LOS_TEARFREE_STATS=1
 fi
 
+if [[ $TIMING_GUARD == required ]]; then
+    "$BUNDLE/load-companion.sh" --check
+fi
+
 for required in \
     "$BUNDLE/bin/hdmi-los-agent" \
     "$BUNDLE/bin/hdmi-input-bridge" \
