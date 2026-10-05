@@ -42,7 +42,8 @@ class ModuleVersionTests(unittest.TestCase):
 class ProbeBranchTests(unittest.TestCase):
     def probe(self, relocation=282, code=(0xd503245f, 0x14000000),
               thunk_size=8, thunk_name="drm_ioctl.cfi_jt", addend=0,
-              extra_call=False, call_via_thunk=False, raw_call_via_thunk=False):
+              extra_call=False, call_via_thunk=False, raw_call_via_thunk=False,
+              valid_group=False):
         # Minimal post-link section/symbol model; no compiler or module load.
         elf = object.__new__(VERIFIER.ElfModule)
         elf.sections = {".symtab": 2}
@@ -55,8 +56,9 @@ class ProbeBranchTests(unittest.TestCase):
         records = [(4, relocation, addend)]
         if extra_call:
             records.append((12, (2 << 32 if call_via_thunk else 0) | 283, 0))
-        sections = {1: struct.pack("<IIII", *code, 0xd503201f,
-                                  0x97fffffd if raw_call_via_thunk else 0x94000000),
+        tail = (0xd503245f, 0x14000000) if valid_group else (
+            0xd503201f, 0x97fffffd if raw_call_via_thunk else 0x94000000)
+        sections = {1: struct.pack("<IIII", *code, *tail),
                     3: b"".join(struct.pack("<QQq", *record) for record in records)}
         elf.symbol_entries = lambda index: symbols
         elf.section_data = lambda index: sections[index]
@@ -64,6 +66,10 @@ class ProbeBranchTests(unittest.TestCase):
 
     def test_exact_cfi_address_thunk_is_reported_separately(self):
         self.assertEqual(self.probe().branches_to({"drm_ioctl"}), ([], ["drm_ioctl"]))
+
+    def test_grouped_cfi_symbol_extent_is_validated(self):
+        self.assertEqual(self.probe(thunk_size=16, valid_group=True).branches_to({"drm_ioctl"}),
+                         ([], ["drm_ioctl"]))
 
     def test_call_relocation_is_rejected_even_with_thunk_name(self):
         self.assertEqual(self.probe(relocation=283).calls_to({"drm_ioctl"}), ["drm_ioctl"])

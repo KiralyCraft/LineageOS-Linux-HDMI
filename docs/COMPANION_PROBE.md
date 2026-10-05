@@ -64,7 +64,7 @@ Offline gates check AArch64 ELF format, exact vermagic, all required imports aft
 LTO, cross-DSO CFI instrumentation, every probe symbol version, and all installed
 DRM import versions available in the rebuilt kernel. A relocation check rejects
 direct calls to functional probe imports, including calls through local CFI
-thunks. Compiler-generated eight-byte CFI address thunks are checked and reported
+thunks. Compiler-generated eight-byte CFI address entries are checked and reported
 separately. These are offline checks; the manifest
 records on-device loading as pending until the user installs the artifact.
 

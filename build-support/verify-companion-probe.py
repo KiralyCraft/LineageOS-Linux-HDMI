@@ -92,10 +92,20 @@ class ElfModule:
     def branches_to(self, targets):
         calls, trampolines = set(), set()
         entries = self.symbol_entries(self.sections[".symtab"])
-        thunks = {(section, value): name[:-7]
-                  for name, _, section, value, size, kind in entries
-                  if name.endswith(".cfi_jt") and kind == 2 and size == 8
-                  and name[:-7] in targets}
+        thunks = {}
+        entry_code = struct.pack("<II", 0xd503245f, 0x14000000)
+        for name, _, section, value, size, kind in entries:
+            if (not name.endswith(".cfi_jt") or kind != 2 or not size
+                    or size % 8 or name[:-7] not in targets):
+                continue
+            code = self.section_data(section)
+            # LLVM may give a symbol the extent of a group of eight-byte
+            # entries. Validate every instruction in that extent, retaining
+            # only the entry at this symbol's actual start address.
+            if (value + size <= len(code) and
+                    all(code[offset:offset + 8] == entry_code
+                        for offset in range(value, value + size, 8))):
+                thunks[(section, value)] = name[:-7]
         for index, row in enumerate(self.headers):
             if row[1] != 4:  # SHT_RELA
                 continue
@@ -112,7 +122,7 @@ class ElfModule:
                     # Full-LTO CFI emits an eight-byte BTI + B import thunk
                     # when taking a typed function address. Its relocation is
                     # not a call from the probe's init/ioctl/exit code. Check
-                    # the actual instructions and symbol extent, not a name
+                    # the actual instructions throughout the symbol extent, not a name
                     # or section-name exemption.
                     origin = thunks.get((row[7], offset - 4))
                     code = self.section_data(row[7])
