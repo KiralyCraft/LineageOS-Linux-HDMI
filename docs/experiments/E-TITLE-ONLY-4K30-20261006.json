@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "test": "E finish-after title-only control",
+  "mode": "3840x2160@30",
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "xorg_patch_commit": "acba53a55e0ed3375925ed2c1b051b9cfbcb0ef5",
+  "harness_commit": "d515355165648b4e3b25b74ebdb0d2e2bf709ff4",
+  "test_sources": {
+    "leased-pattern.py": "d9e167786755f5fc36ed0e038c645e9deae126dff258947db3c234a257914d83",
+    "xroot_capture.py": "3755b2e0862adfdb6c6855e456694311b2f0d16ad4bd353110fd751825309159"
+  },
+  "diagnostic_verified_in_xorg_log": true,
+  "e_blit_executed_in_xorg_log": true,
+  "physical_report": {
+    "user_report": "It seemed fine now, i saw no issues",
+    "scope": "E finish-after title-only control at 3840x2160@30",
+    "visual_smoke": "PASS for this workload: user saw no issues; inspected move and pre-title-update images retain the titlebar",
+    "bug_reproduced": false,
+    "repair_demonstrated": false,
+    "physical_cadence_validated": false,
+    "interpretation": "The titlebar was already intact before the title-only update, so this run cannot establish that a title repaint repairs the earlier failure."
+  },
+  "test_exit": 0,
+  "renderer": "FD740",
+  "workload_completed": true,
+  "frames_submitted_by_test": 582,
+  "phases": [
+    {
+      "phase": "stationary",
+      "frames": 119,
+      "phase_entry_requests": [
+        "XStoreName",
+        "XMoveResizeWindow"
+      ]
+    },
+    {
+      "phase": "move-only",
+      "frames": 115,
+      "phase_entry_requests": []
+    },
+    {
+      "phase": "title-only",
+      "frames": 119,
+      "phase_entry_requests": [
+        "XStoreName"
+      ]
+    },
+    {
+      "phase": "move-after-title",
+      "frames": 110,
+      "phase_entry_requests": []
+    },
+    {
+      "phase": "title-only-after",
+      "frames": 119,
+      "phase_entry_requests": [
+        "XStoreName"
+      ]
+    }
+  ],
+  "screenshot_count": 42,
+  "png_crc_dimensions_and_decompression_valid": true,
+  "all_capture_geometry_stable": true,
+  "all_captured_clients_800x600": true,
+  "selected_captures": [
+    {
+      "file": "008-move-only-1-settled.png",
+      "client_bounds": [
+        1452,
+        925,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        1450,
+        900,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 1,
+        "kind": "settled",
+        "frame_serial": 145,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "d3d9fd76b3262382e85859ecd0e66565bb4a97766d5bb59056ac5c30f482b75e",
+      "visual_observation": "Titlebar and client panels intact."
+    },
+    {
+      "file": "010-move-only-2-settled.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 2,
+        "kind": "settled",
+        "frame_serial": 163,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "51aa254d5dc433826609fbfdfb3ad6a9a9485ee81e2cb2854e21ae59e2b93b57",
+      "visual_observation": "Titlebar and client panels intact."
+    },
+    {
+      "file": "019-title-only-before-title.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "title-only",
+        "kind": "before-title-update"
+      },
+      "sha256": "05deece9127587737847f1b7bee5ddb782cd0b6656275a0dc372983e829e8489",
+      "visual_observation": "Titlebar and client panels intact."
+    },
+    {
+      "file": "027-move-after-title-1-settled.png",
+      "client_bounds": [
+        1452,
+        925,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        1450,
+        900,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-after-title",
+        "step": 1,
+        "kind": "settled",
+        "frame_serial": 378,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "d7b470e6c127dbe9b3989e419f1a1005f7b4853e55063ca21f52d728800bc40f",
+      "visual_observation": "Titlebar and client panels intact."
+    }
+  ],
+  "placement_confound": {
+    "earlier_failing_reference_frame": [
+      501,
+      199,
+      804,
+      627
+    ],
+    "current_reference_frame": [
+      1518,
+      808,
+      804,
+      627
+    ],
+    "note": "Openbox chose different initial positions despite the same creation coordinates. This changes overlap/exposure relative to the moving primary window and prevents treating the runs as a one-variable comparison."
+  },
+  "normal_xorg_exit": true,
+  "companion_refcnt_after": 0,
+  "android_restored": true,
+  "performance_result": false,
+  "e_promoted": false,
+  "limitations": [
+    "This clean workload does not invalidate the earlier reproducible E-on failure and clean E-off controls.",
+    "X root readback changes timing and is not physical scanout capture.",
+    "The modified phase-entry sequence and different reference placement are not isolated from each other."
+  ],
+  "artifacts": "PNG captures and raw logs retained locally; images not published."
+}

@@ -210,3 +210,44 @@ window-preservation path. Another blanket wait is not supported as a fix by
 these results. No further HDMI session was started during this analysis.
 The 581 frames submitted by the screenshot workload are not a performance
 or cadence result.
+
+## Title-only control result and manual session
+
+The title-only run completed at 4K30 with 582 submitted frames and 42 root
+captures. The user saw no issues. Inspected images show intact titlebars
+after movement and **before** the title-only update. The fault did not
+reproduce, so this run does not establish that changing the title repairs it.
+Xorg exited normally, Android was restored, and the companion reference count
+returned to zero. All PNGs pass CRC, decompression and dimension checks; all
+capture geometry is stable and every captured client remains 800x600.
+See [the result](E-TITLE-ONLY-4K30-20261006.json).
+
+The comparison also revealed an uncontrolled placement difference: Openbox
+put the reference frame at (501,199) in the failing screenshot run and
+(1518,808) in the clean title-only run. That changes overlap and exposure
+relative to the moving window. The phase-entry request sequence also differs,
+so this is not a one-variable comparison and does not validate E generally.
+
+A further opt-in `--move-entry-control` workload is prepared but not run.
+It explicitly places both managed windows, keeps the reference clear of the
+movement path, and compares neither, title-only, same-size configuration-only,
+and both phase-entry requests. It repeats those conditions in reverse order,
+records pre-entry images, and refuses unexpected starting geometry. It needs
+screenshots and four-second phases, for 36 seconds of rendering. Syntax and
+argument parsing were checked; live validation is pending.
+
+The user then requested suspending automated experiments and leaving the
+ordinary E-enabled stack available for manual testing without the 60-second
+limit. The completed diagnostic agent was replaced while HDMI was disconnected.
+The unchanged, checksum-verified resize bundle is launched with:
+
+```sh
+cd ~/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdf-resize-20261005
+sudo -n env -u HDMI_LOS_E_DIAGNOSTIC ./run-agent.sh --candidate BCDEF --no-timeout --capture none
+```
+
+The agent's arguments and environment confirm continuous BCDEF with E blits,
+the C/D bridge path and F presenter, and no E diagnostic wait. The broker
+acknowledges a continuous agent. No automatic test observer or pattern workload
+is running. This is a manual-test selection, not promotion of E to the ordinary
+launcher default. No launcher, runtime library or Magisk module was changed.

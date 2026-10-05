@@ -61,9 +61,14 @@ def main():
     ap.add_argument('--phase-seconds', type=float, default=4.)
     ap.add_argument('--screenshot-dir', type=pathlib.Path,
                     help='Opt-in root screenshots; saved after rendering, changes timing')
-    ap.add_argument('--title-only-control', action='store_true',
-                    help='Alternate movement and title-only updates; never resize after initial placement')
+    controls = ap.add_mutually_exclusive_group()
+    controls.add_argument('--title-only-control', action='store_true',
+                          help='Alternate movement and title-only updates; never resize after initial placement')
+    controls.add_argument('--move-entry-control', action='store_true',
+                          help='Fixed-layout movement with neither, title, configure or both entry requests, repeated in reverse order')
     args = ap.parse_args()
+    if args.move_entry_control and (not args.screenshot_dir or args.phase_seconds != 4):
+        ap.error('--move-entry-control requires --screenshot-dir and the default four-second phases')
     assert not args.output.exists()
     assert not args.screenshot_dir or not args.screenshot_dir.exists()
     assert 1 <= args.phase_seconds <= 5
@@ -168,7 +173,8 @@ def main():
         capture = RootCapture(d, X, root, screen_width, screen_height)
     result = {'renderer': renderer, 'loaded': loaded, 'label': args.label,
               'background': 'defined black', 'readback': bool(capture), 'phases': [],
-              'workload': 'title-only-control' if args.title_only_control else 'move-resize',
+              'workload': ('move-entry-control' if args.move_entry_control else
+                           'title-only-control' if args.title_only_control else 'move-resize'),
               'note': 'Swap-call timing is not physical display cadence or latency.'}
     if capture:
         result.update(screenshots=capture.records, performance_result=False,
@@ -186,6 +192,28 @@ def main():
             if not mapped:
                 time.sleep(.01)
         assert mapped, 'No MapNotify for test window'
+        if args.move_entry_control:
+            # Initial creation coordinates are only placement hints to the WM.
+            # Wait for both frames, then explicitly place our own windows.
+            deadline = time.monotonic() + 3
+            while capture.frame(window) == window or capture.frame(reference) == reference:
+                assert time.monotonic() < deadline, 'WM did not frame both test windows'
+                drain_events()
+                time.sleep(.01)
+            move(d, reference, screen_width - 880, 150)
+            move(d, window, 120, 150)
+            sync(d, 0)
+            deadline = time.monotonic() + 3
+            while (capture.bounds(capture.frame(reference))[:2] != [screen_width - 880, 150]
+                   or capture.bounds(capture.frame(window))[:2] != [120, 150]):
+                assert time.monotonic() < deadline, 'WM did not apply fixed test positions'
+                drain_events()
+                time.sleep(.01)
+            result['fixed_layout'] = {
+                'reference_frame': capture.bounds(capture.frame(reference)),
+                'primary_frame': capture.bounds(capture.frame(window)),
+                'reference_client': capture.bounds(reference),
+                'primary_client': capture.bounds(window)}
         if capture:
             capture.capture(window, 'mapped-primary')
         serial = 0
@@ -194,9 +222,31 @@ def main():
         if args.title_only_control:
             phases = ['stationary', 'move-only', 'title-only', 'move-after-title',
                       'title-only-after']
+        entry_modes = {}
+        if args.move_entry_control:
+            order = ['neither', 'title', 'configure', 'both',
+                     'both', 'configure', 'title', 'neither']
+            entry_modes = {f'move-entry-{i}-{mode}': mode
+                           for i, mode in enumerate(order)}
+            phases = ['stationary', *entry_modes]
         for phase in phases:
             phase_requests = []
-            if not args.title_only_control or phase == 'stationary':
+            moving = phase in ('move-only', 'move-after-title') or phase in entry_modes
+            if phase in entry_modes:
+                # The trajectory ends at its starting position. Refuse to
+                # conflate a late WM move with the phase-entry request control.
+                before = capture.capture(window, phase + '-before-entry',
+                                         {'phase': phase, 'kind': 'before-entry'})
+                assert before['geometry_stable'] and before['frame_bounds'][:2] == [120, 150]
+                assert before['client_bounds'][2:] == [800, 600]
+                assert capture.bounds(capture.frame(reference)) == result['fixed_layout']['reference_frame']
+                if entry_modes[phase] in ('title', 'both'):
+                    store_name(d, window, (args.label + ' - ' + phase).encode())
+                    phase_requests.append('XStoreName')
+                if entry_modes[phase] in ('configure', 'both'):
+                    move_resize(d, window, 120, 150, 800, 600)
+                    phase_requests.append('XMoveResizeWindow')
+            elif not args.title_only_control or phase == 'stationary':
                 store_name(d, window, (args.label + ' - ' + phase).encode())
                 move_resize(d, window, 120, 150, 800, 600)
                 phase_requests = ['XStoreName', 'XMoveResizeWindow']
@@ -219,7 +269,7 @@ def main():
                 if step != previous:
                     w, h = [(800, 600), (1001, 701), (1279, 719)][step % 3]
                     x, y = [(120, 150), (1450, 900)][step % 2]
-                    if phase in ('move-only', 'move-after-title'):
+                    if moving:
                         move(d, window, x, y)
                     elif phase == 'resize-only':
                         resize(d, window, w, h)
@@ -228,7 +278,7 @@ def main():
                     sync(d, 0)
                     previous = step
                     changes.append({'seconds': before_frame - start, 'step': step})
-                    if capture and (step == 0 or phase in ('move-only', 'move-after-title', 'resize-only', 'move-and-resize')):
+                    if capture and (step == 0 or moving or phase in ('resize-only', 'move-and-resize')):
                         capture.capture(window, f'{phase}-{step}-immediate',
                                         {'phase': phase, 'step': step, 'kind': 'immediate',
                                          'requested_xy': [x, y] if 'move' in phase else None,
