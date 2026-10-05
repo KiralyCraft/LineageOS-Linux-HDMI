@@ -61,6 +61,8 @@ def main():
     ap.add_argument('--phase-seconds', type=float, default=4.)
     ap.add_argument('--screenshot-dir', type=pathlib.Path,
                     help='Opt-in root screenshots; saved after rendering, changes timing')
+    ap.add_argument('--title-only-control', action='store_true',
+                    help='Alternate movement and title-only updates; never resize after initial placement')
     args = ap.parse_args()
     assert not args.output.exists()
     assert not args.screenshot_dir or not args.screenshot_dir.exists()
@@ -166,6 +168,7 @@ def main():
         capture = RootCapture(d, X, root, screen_width, screen_height)
     result = {'renderer': renderer, 'loaded': loaded, 'label': args.label,
               'background': 'defined black', 'readback': bool(capture), 'phases': [],
+              'workload': 'title-only-control' if args.title_only_control else 'move-resize',
               'note': 'Swap-call timing is not physical display cadence or latency.'}
     if capture:
         result.update(screenshots=capture.records, performance_result=False,
@@ -188,9 +191,23 @@ def main():
         serial = 0
         phases = ['stationary', 'move-only', 'resize-only', 'move-and-resize',
                   'stationary-after']
+        if args.title_only_control:
+            phases = ['stationary', 'move-only', 'title-only', 'move-after-title',
+                      'title-only-after']
         for phase in phases:
-            store_name(d, window, (args.label + ' - ' + phase).encode())
-            move_resize(d, window, 120, 150, 800, 600)
+            phase_requests = []
+            if not args.title_only_control or phase == 'stationary':
+                store_name(d, window, (args.label + ' - ' + phase).encode())
+                move_resize(d, window, 120, 150, 800, 600)
+                phase_requests = ['XStoreName', 'XMoveResizeWindow']
+            elif phase in ('title-only', 'title-only-after'):
+                # Isolate repaint from the same-size configuration request
+                # made at phase boundaries by the ordinary workload.
+                if capture:
+                    capture.capture(window, phase + '-before-title',
+                                    {'phase': phase, 'kind': 'before-title-update'})
+                store_name(d, window, (args.label + ' - ' + phase).encode())
+                phase_requests = ['XStoreName']
             sync(d, 0)
             start, samples, changes, frames, previous = time.monotonic(), [], [], 0, -1
             capture_due = None
@@ -202,7 +219,7 @@ def main():
                 if step != previous:
                     w, h = [(800, 600), (1001, 701), (1279, 719)][step % 3]
                     x, y = [(120, 150), (1450, 900)][step % 2]
-                    if phase == 'move-only':
+                    if phase in ('move-only', 'move-after-title'):
                         move(d, window, x, y)
                     elif phase == 'resize-only':
                         resize(d, window, w, h)
@@ -211,7 +228,7 @@ def main():
                     sync(d, 0)
                     previous = step
                     changes.append({'seconds': before_frame - start, 'step': step})
-                    if capture and (step == 0 or phase in ('move-only', 'resize-only', 'move-and-resize')):
+                    if capture and (step == 0 or phase in ('move-only', 'move-after-title', 'resize-only', 'move-and-resize')):
                         capture.capture(window, f'{phase}-{step}-immediate',
                                         {'phase': phase, 'step': step, 'kind': 'immediate',
                                          'requested_xy': [x, y] if 'move' in phase else None,
@@ -248,6 +265,7 @@ def main():
                                 {'phase': phase, 'step': capture_due[1], 'kind': 'phase-end'})
             ordered = sorted(samples)
             entry = {'phase': phase, 'frames': frames,
+                     'phase_entry_requests': phase_requests,
                      'seconds': time.monotonic() - start, 'changes': changes,
                      'swap_p50_ms': ordered[len(ordered) // 2],
                      'swap_p95_ms': ordered[int(len(ordered) * .95)],

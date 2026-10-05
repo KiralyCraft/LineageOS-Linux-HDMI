@@ -1,0 +1,240 @@
+{
+  "schema": 1,
+  "test": "E finish-after root screenshot follow-up",
+  "mode": "3840x2160@30",
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "xorg_patch_commit": "acba53a55e0ed3375925ed2c1b051b9cfbcb0ef5",
+  "harness_commit": "ebd2dc1b85f8a0c7f8ad93f9c296ae7eb3ceacaa",
+  "test_sources": {
+    "leased-pattern.py": "78b94c9c4151e858391307601b2dbe45f77630e0c7aa8efeb28d35870abb0467",
+    "xroot_capture.py": "3755b2e0862adfdb6c6855e456694311b2f0d16ad4bd353110fd751825309159"
+  },
+  "diagnostic_verified_in_xorg_log": true,
+  "physical_report": {
+    "user_report": "Done. The place where the titlebars disappear are after move-only but before resize only.",
+    "scope": "E finish-after diagnostic with root screenshots at 3840x2160@30",
+    "visual_smoke": "FAIL: titlebar disappears during movement; recovered in the resize-only phase",
+    "screenshots_taken": true,
+    "physical_cadence_validated": false,
+    "analyst_observation": "Root images show titlebar loss after moving. It returns at resize-only step 0 while the client is still 800x600, before the first size change. Phase entry also changes the title and requests the initial geometry; title repaint alone has not been isolated."
+  },
+  "test_exit": 0,
+  "renderer": "FD740",
+  "workload_completed": true,
+  "frames_submitted_by_test": 581,
+  "frames_by_phase": {
+    "stationary": 119,
+    "move-only": 115,
+    "resize-only": 114,
+    "move-and-resize": 114,
+    "stationary-after": 119
+  },
+  "screenshot_count": 52,
+  "png_crc_dimensions_and_decompression_valid": true,
+  "captures_with_geometry_change_during_readback": 6,
+  "selected_captures": [
+    {
+      "file": "006-move-only-0-settled.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 0,
+        "kind": "settled",
+        "frame_serial": 125,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "fbb3dd8820a267742beab8328f94745b36f14ff29ee51ef2c9fae452081f0ef9",
+      "visual_observation": "Titlebar present before the first move away."
+    },
+    {
+      "file": "008-move-only-1-settled.png",
+      "client_bounds": [
+        1452,
+        925,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        1450,
+        900,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 1,
+        "kind": "settled",
+        "frame_serial": 145,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "aeec41d5fa3b3a7c9311615b014eec69ff69a98cfc576d9f4dd6c5376e1690f3",
+      "visual_observation": "Titlebar absent after moving; client panels intact."
+    },
+    {
+      "file": "010-move-only-2-settled.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 2,
+        "kind": "settled",
+        "frame_serial": 163,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "19973ed7c5810090df185e49dc33c057ebfae4fac154a396c6b707bfb5c9f81c",
+      "visual_observation": "Titlebar remains absent after moving back."
+    },
+    {
+      "file": "018-move-only-6-phase-end.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "move-only",
+        "step": 6,
+        "kind": "phase-end"
+      },
+      "sha256": "36c32a92568f4905671b4983614db32c19eda6e8461a23e8e3ea0e1871a0b283",
+      "visual_observation": "Titlebar still absent at the end of move-only."
+    },
+    {
+      "file": "020-resize-only-0-immediate.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "resize-only",
+        "step": 0,
+        "kind": "immediate",
+        "requested_xy": null,
+        "requested_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "37cbe36673bf7a7e4cd5f0eb4be67c3c5affdaa59706a5d20de7cb60a18d3b9d",
+      "visual_observation": "Titlebar restored at phase entry; client remains 800x600."
+    },
+    {
+      "file": "021-resize-only-0-settled.png",
+      "client_bounds": [
+        122,
+        175,
+        800,
+        600
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        804,
+        627
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "resize-only",
+        "step": 0,
+        "kind": "settled",
+        "frame_serial": 240,
+        "actual_size": [
+          800,
+          600
+        ]
+      },
+      "sha256": "c949df39c9d932310eba224b03ea4838d81dc5c60d4dfbc4153f45c66401c853",
+      "visual_observation": "Restored titlebar persists; client still 800x600."
+    },
+    {
+      "file": "023-resize-only-1-settled.png",
+      "client_bounds": [
+        122,
+        175,
+        1001,
+        701
+      ],
+      "frame_bounds": [
+        120,
+        150,
+        1005,
+        728
+      ],
+      "geometry_stable": true,
+      "metadata": {
+        "phase": "resize-only",
+        "step": 1,
+        "kind": "settled",
+        "frame_serial": 260,
+        "actual_size": [
+          1001,
+          701
+        ]
+      },
+      "sha256": "380384726a0b60eba3c7b0d356793692bdd1deb947d7e410ec05d620b48a0c93",
+      "visual_observation": "Titlebar present after the first actual resize to 1001x701."
+    }
+  ],
+  "artifacts": "Raw logs and PNGs retained locally; no images published.",
+  "normal_xorg_exit": true,
+  "companion_refcnt_after": 0,
+  "android_restored": true,
+  "performance_result": false,
+  "interpretation": "The matching root-image and physical observation makes a fault confined solely to final HDMI scanout insufficient to explain the evidence. Window pixel preservation or decoration repaint handling is a candidate for investigation, not an established cause. Phase entry changes the title and submits a same-size geometry request, so repaint alone has not been isolated.",
+  "limitations": [
+    "XGetImage reads the X root through its readback path, not the TearFree destination or physical scanout.",
+    "Readback synchronizes work and changes timing. Submitted-frame count is not displayed FPS.",
+    "The title-only repaint hypothesis needs a control with no geometry request.",
+    "A successful finish-after wait did not prevent this failure; E remains unvalidated."
+  ]
+}

@@ -148,3 +148,65 @@ Xvfb test with a reparented client, a distinct frame/title area, movement,
 resize, clipping and deferred image saving. The next proposed HDMI test keeps
 the same finish-after runtime and adds only capture instrumentation. It waits
 for the user's unplug confirmation before arming another bounded session.
+
+## Screenshot follow-up result
+
+The authorized 60-second finish-after run completed at 4K30 and produced 52
+root-image crops. The user again reported missing titlebars between move-only
+and resize-only. The captures show the same fault. Xorg exited normally,
+Android was restored, and the companion reference count returned to zero.
+See [the recorded result](E-SCREENSHOTS-4K30-20261005.json) for capture hashes,
+geometry and source identities. The actual PNGs and raw logs remain private.
+
+| Capture | Observed decoration | Client size |
+|---|---|---|
+| `006-move-only-0-settled.png` | Titlebar present before moving away | 800x600 |
+| `008-move-only-1-settled.png` | Titlebar absent after moving; client panels intact | 800x600 |
+| `010-move-only-2-settled.png` | Titlebar still absent after moving back | 800x600 |
+| `018-move-only-6-phase-end.png` | Titlebar absent at the end of move-only | 800x600 |
+| `020-resize-only-0-immediate.png` | Titlebar restored at phase entry | 800x600 |
+| `021-resize-only-0-settled.png` | Restored titlebar persists | 800x600 |
+| `023-resize-only-1-settled.png` | Titlebar present after the first actual resize | 1001x701 |
+
+All selected captures have stable frame/client geometry across their readback.
+Six other captures report a geometry change during readback and are not used
+for this comparison. PNG CRCs, decompression and dimensions pass for all 52.
+
+The important distinction is that recovery precedes the first actual size
+change. At phase entry the harness changes the title and requests the initial
+800x600 geometry. A decoration repaint may restore pixels lost during movement,
+but these two operations have not yet been isolated. The client redraws its
+viewport continuously; the titlebar depends on preserving or repainting window
+decoration pixels when the window moves.
+
+This is evidence against an explanation confined solely to final HDMI scanout:
+the missing decoration is also visible through X's root-image readback path.
+It does not identify the faulty operation, prove that readback itself is free
+of faults, or establish a missing fence. Finishing the E copy still does not
+prevent the failure. E remains disabled in the ordinary launcher.
+
+Two additional private offscreen probes exercised nonoverlapping root
+self-copies using either a texture barrier or a temporary image, with shader
+or blit presentation and finish-after enabled. One repainted the old source
+with a GPU clear; the other immediately uploaded over it from the CPU. Both
+preserved a title pattern while repainting only the client body: 15,088 sampled
+pixel checks passed in total. These simplified probes did **not** reproduce
+the live fault. They include readback and omit Xorg's actual damage, state and
+window-manager sequence, so they do not validate E or exclude a driver bug.
+
+The next focused control is prepared as
+`leased-pattern.py --title-only-control --screenshot-dir PATH OUTPUT`.
+It holds the title constant through movement, captures the frame before
+changing its title, then issues only `XStoreName` at the repair point. It
+repeats movement and another title-only update, never requesting a resize
+after initial placement. Phase-entry request types and actual geometry are
+recorded so recovery can be checked without conflating it with resizing.
+This new workload has not yet run on HDMI; it needs the usual user-confirmed
+unplug/arm preparation. It uses the existing finish-after diagnostic runtime
+and requires no rebuild or module change.
+
+If needed, follow that control with tracing of the actual Xorg
+window-preservation path. Another blanket wait is not supported as a fix by
+these results. No further HDMI session was started during this analysis.
+The 581 frames submitted by the screenshot workload are not a performance
+or cadence result.
