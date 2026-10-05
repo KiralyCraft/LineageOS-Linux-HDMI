@@ -347,6 +347,7 @@ class DiagnosticContractTests(unittest.TestCase):
             "0006-glamor-eligible-copy-blit.patch",
             "0007-modesetting-kernel-deferred-presenter.patch",
             "0008-glamor-restrict-tearfree-blit.patch",
+            "0009-glamor-tearfree-copy-diagnostics.patch",
         ])
         self.assertIn("drmGetRenderDeviceNameFromFd", render_node_patch)
         self.assertIn("present_fence_set_callback(vblank->wait_fence, NULL, NULL)", present_patch)

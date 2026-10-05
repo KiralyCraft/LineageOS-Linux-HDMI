@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "test": "Offscreen Candidate E mixed upload/draw/copy regression",
+  "renderer": "FD740",
+  "modeled_image_size": [
+    3840,
+    2160
+  ],
+  "physical_display_tested": false,
+  "performance_result": false,
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "test_source_sha256": "e5c2e0a70dec429545807d5af436a37988d33f161625ea9aca79209ef93caf77",
+  "scope": "BGRA REV title patterns, shader or direct uploads, shader/blit/mixed copies, full/fragmented accumulated per-slot damage, alternating two destinations, pre-copy finish off/on",
+  "runs": [
+    {
+      "renderer": "FD740",
+      "gl_version": "4.6 (Core Profile) Mesa 26.2.0-devel (git-e04c1852d3)",
+      "context": "core",
+      "physical_display_tested": false,
+      "upload": "direct",
+      "upload_bgra_rev": true,
+      "fourcc": "0x34325241",
+      "cases": [
+        {
+          "backend": "shader",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        }
+      ],
+      "checks": 9936,
+      "failures": [],
+      "native_fence_wait_used": true
+    },
+    {
+      "renderer": "FD740",
+      "gl_version": "4.6 (Core Profile) Mesa 26.2.0-devel (git-e04c1852d3)",
+      "context": "core",
+      "physical_display_tested": false,
+      "upload": "atlas",
+      "upload_bgra_rev": true,
+      "fourcc": "0x34325241",
+      "cases": [
+        {
+          "backend": "shader",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "shader",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "blit",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "full",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "full",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "fragmented",
+          "pre_copy_finish": false,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        },
+        {
+          "backend": "mixed",
+          "damage": "fragmented",
+          "pre_copy_finish": true,
+          "bursts": 6,
+          "pixel_checks": 828,
+          "failure_records": 0
+        }
+      ],
+      "checks": 9936,
+      "failures": [],
+      "native_fence_wait_used": true
+    }
+  ],
+  "limitations": [
+    "Final GL readback can add synchronization and conceal an early completion-fence problem.",
+    "Not the actual Xorg/Openbox decoration path, DRM scanout, or a visual test.",
+    "Selected pixels are checked, not a full-image comparison.",
+    "Passing does not override the failed physical E-on test."
+  ]
+}
