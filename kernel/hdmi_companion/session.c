@@ -477,16 +477,21 @@ static int __init companion_init(void)
     BUILD_BUG_ON(sizeof(struct hdmi_companion_status) != 96);
     BUILD_BUG_ON(sizeof(struct hdmi_companion_control) != 16);
     if (import_mask() != HDMI_COMPANION_REQUIRED_IMPORTS) return -ENODEV;
-    ret = register_pm_notifier(&power_notifier);
+    BUILD_BUG_ON(sizeof(struct hdmi_present_request) != 48);
+    BUILD_BUG_ON(sizeof(struct hdmi_present_status) != 64);
+    ret = hdmi_present_init();
     if (ret) return ret;
+    ret = register_pm_notifier(&power_notifier);
+    if (ret) { hdmi_present_exit(); return ret; }
     ret = misc_register(&companion_device);
-    if (ret) unregister_pm_notifier(&power_notifier);
+    if (ret) { unregister_pm_notifier(&power_notifier); hdmi_present_exit(); }
     return ret;
 }
 static void __exit companion_exit(void)
 {
     misc_deregister(&companion_device);
     unregister_pm_notifier(&power_notifier);
+    hdmi_present_exit();
     WARN_ON(!list_empty(&sessions)); /* Session file_operations pin this module. */
 }
 module_init(companion_init);

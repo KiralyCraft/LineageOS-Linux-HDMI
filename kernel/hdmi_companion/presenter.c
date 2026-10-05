@@ -26,6 +26,7 @@
 #include "uapi.h"
 #include "presenter.h"
 
+static struct workqueue_struct *presenter_queue;
 static atomic_t presenter_count=ATOMIC_INIT(0);
 struct presenter;
 struct present_job {
@@ -76,7 +77,7 @@ static const struct dma_fence_ops present_fence_ops={
 static void kick_job(struct present_job *r)
 {
     dma_fence_get(&r->done);
-    if (!schedule_work(&r->work)) dma_fence_put(&r->done);
+    if (!queue_work(presenter_queue,&r->work)) dma_fence_put(&r->done);
 }
 static void acquire_ready(struct dma_fence *f, struct dma_fence_cb *cb)
 {
@@ -277,7 +278,7 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
     ret=dma_fence_add_callback(r->acquire,&r->acquire_cb,acquire_ready);
     if (ret && atomic_xchg(&r->acquire_callback_ref,0)) dma_fence_put(&r->done);
     dma_fence_get(&r->done); atomic_set(&r->deadline_ref,1);
-    schedule_delayed_work(&r->deadline,msecs_to_jiffies(2000));
+    queue_delayed_work(presenter_queue,&r->deadline,msecs_to_jiffies(2000));
     notify_locked(p); kick_job(r); ret=0;
 out:
     mutex_unlock(&p->lock);
@@ -342,4 +343,16 @@ long hdmi_present_create(void __user *pointer)
 fail:
     kref_put(&p->refs,presenter_destroy);
     return ret;
+}
+
+int hdmi_present_init(void)
+{
+    presenter_queue=alloc_workqueue("hdmi-present",WQ_UNBOUND|WQ_MEM_RECLAIM,1);
+    return presenter_queue ? 0 : -ENOMEM;
+}
+void hdmi_present_exit(void)
+{
+    WARN_ON(atomic_read(&presenter_count));
+    /* Drain executing module code even after its last session pin is released. */
+    destroy_workqueue(presenter_queue);
 }

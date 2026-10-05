@@ -17,4 +17,6 @@ int hdmi_present_bind(struct hdmi_present_binding *, struct hdmi_companion_creat
 bool hdmi_present_valid(const struct hdmi_present_binding *);
 void hdmi_present_unbind(struct hdmi_present_binding *);
 long hdmi_present_create(void __user *);
+int hdmi_present_init(void);
+void hdmi_present_exit(void);
 #endif
