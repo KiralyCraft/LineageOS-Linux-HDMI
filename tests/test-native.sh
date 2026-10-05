@@ -24,6 +24,9 @@ gcc -std=gnu17 -O2 -fPIE -pie -Wall -Wextra -Werror \
 g++ -std=c++20 -O2 -Wall -Wextra -Werror \
     "$ROOT/native/companion-probe/client-selftest.cpp" -o "$TEMP/timing-client-selftest"
 "$TEMP/timing-client-selftest"
+g++ -std=c++20 -O2 -pthread -Wall -Wextra -Werror \
+    -I"$ROOT/native/common" "$ROOT/native/broker/stop-selftest.cpp" -o "$TEMP/broker-stop-selftest"
+"$TEMP/broker-stop-selftest"
 if "$TEMP/hdmi-companion-probe" --device /dev/null >/dev/null 2>&1; then
     printf 'non-probe device unexpectedly accepted\n' >&2
     exit 1

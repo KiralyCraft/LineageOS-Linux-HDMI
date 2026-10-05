@@ -87,12 +87,27 @@ class HdmiTimingSession {
     return false;
   }
 
-  void Stop() {
+  std::string Describe() const {
+    hdmi_companion_status status = {};
+    std::string error;
+    if (!ReadStatus(&status, &error)) return error;
+    return "generation=" + std::to_string(status.generation) +
+           " state=" + std::to_string(status.state) +
+           " reason=" + std::to_string(status.reason) +
+           " msc=" + std::to_string(status.msc) +
+           " timestamp_ns=" + std::to_string(status.timestamp_ns) +
+           " sampled_ns=" + std::to_string(status.sampled_ns) +
+           " gets=" + std::to_string(status.reference_gets) +
+           " puts=" + std::to_string(status.reference_puts);
+  }
+
+  void Stop(std::string *report = nullptr) {
     if (fd_ < 0) return;
     hdmi_companion_control control = {};
     control.size = sizeof(control);
     control.abi_version = HDMI_COMPANION_ABI_VERSION;
     (void)ioctl(fd_, HDMI_COMPANION_STOP_SESSION, &control);
+    if (report) *report = Describe();
     close(fd_); // Final-FD release is also an independent kernel cleanup path.
     fd_ = -1;
     generation_ = 0;
