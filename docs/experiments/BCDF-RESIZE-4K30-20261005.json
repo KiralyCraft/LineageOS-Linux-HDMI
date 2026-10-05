@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "candidate": "BCDF (E disabled)",
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "xorg_patch_commit": "ef5b88f7b133a520e7d36434002cd22d0cf32e77",
+  "mode": "3840x2160@30",
+  "renderer": "FD740",
+  "physical_report": {
+    "user_report": "Done. I saw no corruption",
+    "scope": "BCDF resize-cache corrected-pattern test at 3840x2160@30",
+    "visual_smoke": "PASS: user observed no corruption",
+    "physical_cadence_validated": false,
+    "keyboard_mouse_tested": false
+  },
+  "submitted": 600,
+  "completed": 600,
+  "integrated_resolves": 600,
+  "worker_copies": 0,
+  "generations": 3,
+  "previous_generations": 13,
+  "cache_hits": 597,
+  "evictions": 0,
+  "phases": [
+    {
+      "phase": "stationary",
+      "previous": {
+        "frames": 120,
+        "swap_p50_ms": 8.459114999823214,
+        "swap_p95_ms": 15.280521000022418,
+        "swap_max_ms": 16.57843800012415
+      },
+      "resize_cache": {
+        "frames": 120,
+        "swap_p50_ms": 1.4691139999740699,
+        "swap_p95_ms": 2.0591659999809053,
+        "swap_max_ms": 8.025624999845604
+      }
+    },
+    {
+      "phase": "move-only",
+      "previous": {
+        "frames": 120,
+        "swap_p50_ms": 1.458124999771826,
+        "swap_p95_ms": 2.0939070000167703,
+        "swap_max_ms": 5.892707999919367
+      },
+      "resize_cache": {
+        "frames": 120,
+        "swap_p50_ms": 1.4709369997945032,
+        "swap_p95_ms": 2.365676999943389,
+        "swap_max_ms": 3.6905730003127246
+      }
+    },
+    {
+      "phase": "resize-only",
+      "previous": {
+        "frames": 120,
+        "swap_p50_ms": 1.6004690000954724,
+        "swap_p95_ms": 14.987708999797178,
+        "swap_max_ms": 44.28984300011507
+      },
+      "resize_cache": {
+        "frames": 120,
+        "swap_p50_ms": 1.5627090001544275,
+        "swap_p95_ms": 2.374843999859877,
+        "swap_max_ms": 18.423541000174737
+      }
+    },
+    {
+      "phase": "move-and-resize",
+      "previous": {
+        "frames": 118,
+        "swap_p50_ms": 1.5915620001578645,
+        "swap_p95_ms": 15.147083000101702,
+        "swap_max_ms": 256.14359300016076
+      },
+      "resize_cache": {
+        "frames": 120,
+        "swap_p50_ms": 1.617917000203306,
+        "swap_p95_ms": 4.4727080003212905,
+        "swap_max_ms": 7.626405999872077
+      }
+    },
+    {
+      "phase": "stationary-after",
+      "previous": {
+        "frames": 120,
+        "swap_p50_ms": 1.4808850000918028,
+        "swap_p95_ms": 1.8797909997374518,
+        "swap_max_ms": 2.0678129999396333
+      },
+      "resize_cache": {
+        "frames": 120,
+        "swap_p50_ms": 1.4429679999921063,
+        "swap_p95_ms": 1.719062000120175,
+        "swap_max_ms": 1.9444269996711228
+      }
+    }
+  ],
+  "stages": [
+    {
+      "stage": "admission_lock",
+      "count": 600,
+      "total_us": 198,
+      "max_us": 1,
+      "p95_bucket_upper_bound_us": 1
+    },
+    {
+      "stage": "generation_wait",
+      "count": 0,
+      "total_us": 0,
+      "max_us": 0,
+      "p95_bucket_upper_bound_us": 0
+    },
+    {
+      "stage": "allocate_import",
+      "count": 3,
+      "total_us": 33631,
+      "max_us": 15803,
+      "p95_bucket_upper_bound_us": 16384
+    },
+    {
+      "stage": "generation_retire",
+      "count": 0,
+      "total_us": 0,
+      "max_us": 0,
+      "p95_bucket_upper_bound_us": 0
+    },
+    {
+      "stage": "slot_wait",
+      "count": 0,
+      "total_us": 0,
+      "max_us": 0,
+      "p95_bucket_upper_bound_us": 0
+    },
+    {
+      "stage": "resolve_submit",
+      "count": 600,
+      "total_us": 783998,
+      "max_us": 7397,
+      "p95_bucket_upper_bound_us": 2048
+    },
+    {
+      "stage": "fence_export",
+      "count": 600,
+      "total_us": 136476,
+      "max_us": 969,
+      "p95_bucket_upper_bound_us": 512
+    }
+  ],
+  "cleanup": {
+    "xorg_normal_exit": true,
+    "android_restored": true,
+    "companion_refcnt": 0
+  },
+  "limits": [
+    "One short run per runtime; no randomized repeat comparison.",
+    "Swap-call timing is not physical cadence or end-to-end input latency.",
+    "Initial stationary timing differs substantially; do not attribute it solely to the cache.",
+    "Cached-size revisits were exercised; live eviction under continuous unique-size resizing remains untested.",
+    "Maps, real application resize storms, 4K60 and the revised E backend remain untested."
+  ]
+}
