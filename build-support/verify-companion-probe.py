@@ -151,6 +151,8 @@ def verify(module, installed, symvers, header, expected_release, expected_build)
     if "module_layout" not in shared:
         raise ValueError("probe/reference layout was not compared")
     info, reference_info = probe.modinfo(), reference.modinfo()
+    if reference_info.get("scmversion") != "gec2e039129f2":
+        raise ValueError("installed DRM module does not match the pinned vendor revision")
     if info.get("vermagic") != reference_info.get("vermagic"):
         raise ValueError("probe vermagic differs from installed msm_drm")
     if not info.get("vermagic", "").startswith(expected_release + " "):
@@ -169,6 +171,7 @@ def verify(module, installed, symvers, header, expected_release, expected_build)
         "result": "PASS",
         "module_sha256": sha256(module),
         "installed_msm_sha256": sha256(installed),
+        "installed_msm_scmversion": reference_info["scmversion"],
         "symbol_versions_sha256": sha256(symvers),
         "vermagic": info["vermagic"],
         "build_id": expected_build,
