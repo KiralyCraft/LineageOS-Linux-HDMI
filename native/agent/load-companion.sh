@@ -10,11 +10,17 @@ import json,sys
 d=json.load(open(sys.argv[1]))
 print(d['kernel_release'])
 print(d['build_id'])
+print(d['runtime_config_sha256'])
 PY
 )
-[[ ${#identity[@]} == 2 && ${identity[1]} =~ ^[0-9a-f]{64}$ ]] || exit 1
+[[ ${#identity[@]} == 3 && ${identity[1]} =~ ^[0-9a-f]{64}$ &&
+   ${identity[2]} =~ ^[0-9a-f]{64}$ ]] || exit 1
 [[ $(uname -r) == "${identity[0]}" ]] || {
     printf 'The companion does not match the running kernel\n' >&2; exit 1;
+}
+current_config=$(gzip -dc /proc/config.gz | sha256sum)
+[[ ${current_config%% *} == "${identity[2]}" ]] || {
+    printf 'The companion does not match the running kernel configuration\n' >&2; exit 1;
 }
 (cd "$BUNDLE/companion" && sha256sum --strict -c SHA256SUMS >/dev/null)
 STAGE=/data/local/tmp/hdmi-companion-${identity[1]:0:12}
