@@ -46,13 +46,17 @@ class ElfModule:
             raise ValueError("section outside ELF file")
         return self.data[offset:offset + size]
 
-    def symbols(self, index):
+    def symbol_entries(self, index):
         row = self.headers[index]
         if row[9] != 24 or row[5] % 24 or row[6] >= len(self.headers):
             raise ValueError("invalid symbol table")
         names = self.section_data(row[6])
-        return [(self.string(names, entry[0]), entry[1] >> 4, entry[3])
+        return [(self.string(names, entry[0]), entry[1] >> 4, entry[3],
+                 entry[4], entry[5], entry[1] & 15)
                 for entry in struct.iter_unpack("<IBBHQQ", self.section_data(index))]
+
+    def symbols(self, index):
+        return [entry[:3] for entry in self.symbol_entries(index)]
 
     def imported_symbols(self):
         return {name for name, binding, section in self.symbols(self.sections[".symtab"])
@@ -85,21 +89,59 @@ class ElfModule:
                 result[key] = value
         return result
 
-    def calls_to(self, targets):
-        calls = set()
+    def branches_to(self, targets):
+        calls, trampolines = set(), set()
+        entries = self.symbol_entries(self.sections[".symtab"])
+        thunks = {(section, value): name[:-7]
+                  for name, _, section, value, size, kind in entries
+                  if name.endswith(".cfi_jt") and kind == 2 and size == 8
+                  and name[:-7] in targets}
         for index, row in enumerate(self.headers):
             if row[1] != 4:  # SHT_RELA
                 continue
             if row[9] != 24 or row[5] % 24:
                 raise ValueError("invalid relocation table")
-            symbols = self.symbols(row[6])
-            for _, information, _ in struct.iter_unpack("<QQq", self.section_data(index)):
+            symbols = self.symbol_entries(row[6])
+            for offset, information, addend in struct.iter_unpack("<QQq", self.section_data(index)):
                 # R_AARCH64_JUMP26 and R_AARCH64_CALL26.
                 if (information & 0xffffffff) in (282, 283):
-                    name = symbols[information >> 32][0]
-                    if name in targets:
-                        calls.add(name)
-        return sorted(calls)
+                    name, _, section, value, _, _ = symbols[information >> 32]
+                    target = name if name in targets else thunks.get((section, value + addend))
+                    if not target:
+                        continue
+                    # Full-LTO CFI emits an eight-byte BTI + B import thunk
+                    # when taking a typed function address. Its relocation is
+                    # not a call from the probe's init/ioctl/exit code. Check
+                    # the actual instructions and symbol extent, not a name
+                    # or section-name exemption.
+                    origin = thunks.get((row[7], offset - 4))
+                    code = self.section_data(row[7])
+                    if (name == target == origin and addend == 0 and section == 0
+                            and (information & 0xffffffff) == 282 and offset >= 4
+                            and code[offset - 4:offset + 4] ==
+                            struct.pack("<II", 0xd503245f, 0x14000000)):
+                        trampolines.add(target)
+                    else:
+                        calls.add(target)
+        # A local branch can be resolved by the linker without a relocation.
+        for section, row in enumerate(self.headers):
+            if row[1] != 1 or not row[2] & 4:  # Executable SHT_PROGBITS.
+                continue
+            code = self.section_data(section)
+            for offset in range(0, len(code) - 3, 4):
+                instruction = struct.unpack_from("<I", code, offset)[0]
+                if instruction & 0x7c000000 != 0x14000000:  # B or BL.
+                    continue
+                displacement = instruction & 0x03ffffff
+                if displacement & 0x02000000:
+                    displacement -= 0x04000000
+                target = thunks.get((section, offset + displacement * 4))
+                if target:
+                    calls.add(target)
+        return sorted(calls), sorted(trampolines)
+
+    def calls_to(self, targets):
+        return self.branches_to(targets)[0]
 
 
 def sha256(path):
@@ -163,7 +205,7 @@ def verify(module, installed, symvers, header, expected_release, expected_build)
         raise ValueError("unexpected module identity/license")
     if "__cfi_check" not in probe.defined_symbols():
         raise ValueError("probe lacks cross-DSO CFI instrumentation")
-    calls = probe.calls_to(set(required))
+    calls, trampolines = probe.branches_to(set(required))
     if calls:
         raise ValueError(f"query-only probe calls functional imports: {calls}")
     return {
@@ -181,6 +223,7 @@ def verify(module, installed, symvers, header, expected_release, expected_build)
         "installed_msm_matching_kernel_symbols": reference_checked,
         "probe_symbols_shared_with_installed_msm": shared,
         "functional_import_calls": calls,
+        "cfi_import_trampolines": trampolines,
         "cfi_check_present": True,
         "on_device_load_test": "pending; module not installed or loaded",
     }
