@@ -33,7 +33,8 @@ struct present_job {
     struct dma_fence done;
     spinlock_t fence_lock;
     struct dma_fence *acquire;
-    struct dma_fence_cb acquire_cb, done_cb;
+    struct dma_fence_cb acquire_cb;
+    atomic_t event_result;
     atomic_t acquire_callback_ref, deadline_ref;
     struct work_struct work;
     struct delayed_work deadline;
@@ -85,12 +86,30 @@ static void acquire_ready(struct dma_fence *f, struct dma_fence_cb *cb)
     kick_job(r);
     if (atomic_xchg(&r->acquire_callback_ref,0)) dma_fence_put(&r->done);
 }
-static void flip_ready(struct dma_fence *f, struct dma_fence_cb *cb)
+/* The DRM event owns this fence's only initial reference. Its release
+ * therefore distinguishes an actual signal from event cancellation, even
+ * after the presenter FD closes. No callback/reference cycle can hide a
+ * cancelled kernel event and strand a vblank reference indefinitely. */
+struct display_event_fence {
+    struct dma_fence fence;
+    spinlock_t lock;
+    struct present_job *job;
+};
+static void display_event_release(struct dma_fence *f)
 {
-    struct present_job *r=container_of(cb,struct present_job,done_cb);
+    struct display_event_fence *event=container_of(f,struct display_event_fence,fence);
+    struct present_job *r=event->job;
+    int result=dma_fence_get_status(f);
+    atomic_set(&r->event_result,result ? result : -ECANCELED);
     kick_job(r);
-    dma_fence_put(&r->done); /* callback-owned reference */
+    kfree(event);
+    dma_fence_put(&r->done); /* event-owned job lifetime */
 }
+static const struct dma_fence_ops display_event_ops={
+    .get_driver_name=present_fence_name,.get_timeline_name=present_fence_name,
+    .release=display_event_release,
+};
+
 static void notify_locked(struct presenter *p)
 {
     p->change++;
@@ -110,10 +129,8 @@ static void retire_locked(struct present_job *r, u32 state, int error)
     if (r->vblank) { drm_crtc_vblank_put(r->p->binding.crtc); r->vblank=false; }
     r->status.state=state; r->status.error=error;
     r->status.completed_ns=ktime_get_ns();
-    if (state != HDMI_PRESENT_COMPLETE) {
-        if (error) dma_fence_set_error(&r->done,error);
-        dma_fence_signal(&r->done);
-    }
+    if (error) dma_fence_set_error(&r->done,error);
+    dma_fence_signal(&r->done);
     notify_locked(r->p);
 }
 
@@ -125,6 +142,7 @@ static int submit_locked(struct present_job *r)
     struct hdmi_present_binding *b=&r->p->binding;
     struct drm_modeset_acquire_ctx ctx;
     struct drm_pending_vblank_event *event=NULL;
+    struct display_event_fence *completion;
     struct drm_plane *plane=b->crtc->primary;
     struct drm_plane_state *ps;
     struct drm_mode_object *obj;
@@ -161,7 +179,11 @@ retry:
     event->event.vbl.crtc_id=b->crtc->base.id;
     ret=drm_event_reserve_init(b->dev,b->lease->private_data,&event->base,&event->event.base);
     if (ret) { kfree(event); event=NULL; goto out; }
-    event->base.fence=dma_fence_get(&r->done);
+    completion=kzalloc(sizeof(*completion),GFP_KERNEL);
+    if (!completion) { drm_event_cancel_free(b->dev,&event->base); event=NULL; ret=-ENOMEM; goto out; }
+    completion->job=r; spin_lock_init(&completion->lock); dma_fence_get(&r->done);
+    dma_fence_init(&completion->fence,&display_event_ops,&completion->lock,dma_fence_context_alloc(1),r->status.serial);
+    event->base.fence=&completion->fence; /* transfer initial reference to DRM */
     ret=drm_atomic_helper_page_flip(b->crtc,r->fb,event,DRM_MODE_PAGE_FLIP_EVENT,&ctx);
     if (ret) { drm_event_cancel_free(b->dev,&event->base); event=NULL; }
 out:
@@ -175,6 +197,12 @@ out:
     if (ret && r->vblank) { drm_crtc_vblank_put(b->crtc); r->vblank=false; }
     return ret;
 }
+static void observe_display_locked(struct present_job *r)
+{
+    int result=atomic_read(&r->event_result);
+    if (r->status.state == HDMI_PRESENT_SUBMITTED && result)
+        retire_locked(r,result > 0 ? HDMI_PRESENT_COMPLETE : HDMI_PRESENT_FAILED,result > 0 ? 0 : result);
+}
 static void present_work(struct work_struct *work)
 {
     struct present_job *r=container_of(work,struct present_job,work);
@@ -182,7 +210,7 @@ static void present_work(struct work_struct *work)
     int ready,ret;
     mutex_lock(&p->lock);
     if (r->status.state == HDMI_PRESENT_SUBMITTED) {
-        if (dma_fence_is_signaled(&r->done)) retire_locked(r,HDMI_PRESENT_COMPLETE,0);
+        observe_display_locked(r);
     } else if (r->status.state == HDMI_PRESENT_WAITING) {
         ready=dma_fence_get_status(r->acquire);
         if (r->cancel || p->closing || !hdmi_present_valid(&p->binding))
@@ -198,7 +226,7 @@ static void present_work(struct work_struct *work)
                 if (cancel_delayed_work(&r->deadline) && atomic_xchg(&r->deadline_ref,0)) dma_fence_put(&r->done);
                 notify_locked(p);
                 /* A fast real completion may have occurred inside commit. */
-                if (dma_fence_is_signaled(&r->done)) retire_locked(r,HDMI_PRESENT_COMPLETE,0);
+                observe_display_locked(r);
             }
         }
     }
@@ -233,8 +261,7 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
             input.submitted_ns || input.completed_ns || input.reserved) return -EINVAL;
         mutex_lock(&p->lock);
         r=p->job;
-        if (r && r->status.state == HDMI_PRESENT_SUBMITTED && dma_fence_is_signaled(&r->done))
-            retire_locked(r,HDMI_PRESENT_COMPLETE,0);
+        if (r) observe_display_locked(r);
         if (cmd == HDMI_COMPANION_CANCEL_PRESENT && r && r->status.state == HDMI_PRESENT_WAITING) {
             r->cancel=true;
             /* Cancellation is serialized with submission. Return a terminal
@@ -254,8 +281,7 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
         req.acquire_fd < 0 || req.reserved[0] || req.reserved[1]) return -EINVAL;
     mutex_lock(&p->lock);
     if (p->closing || !hdmi_present_valid(&p->binding)) { ret=-EACCES; goto out; }
-    if (p->job && p->job->status.state == HDMI_PRESENT_SUBMITTED && dma_fence_is_signaled(&p->job->done))
-        retire_locked(p->job,HDMI_PRESENT_COMPLETE,0);
+    if (p->job) observe_display_locked(p->job);
     if (job_active(p->job)) { ret=-EBUSY; goto out; }
     r=kzalloc(sizeof(*r),GFP_KERNEL);
     if (!r) { ret=-ENOMEM; goto out; }
@@ -271,9 +297,6 @@ static long present_ioctl(struct file *file,unsigned int cmd,unsigned long arg)
         .state=HDMI_PRESENT_WAITING,.generation=req.generation,.serial=req.serial,.accepted_ns=ktime_get_ns()};
     if (p->job) dma_fence_put(&p->job->done);
     p->job=r;
-    dma_fence_get(&r->done); /* callback reference, released at signal */
-    ret=dma_fence_add_callback(&r->done,&r->done_cb,flip_ready);
-    if (WARN_ON(ret)) { dma_fence_put(&r->done); retire_locked(r,HDMI_PRESENT_FAILED,ret); goto out; }
     dma_fence_get(&r->done); atomic_set(&r->acquire_callback_ref,1);
     ret=dma_fence_add_callback(r->acquire,&r->acquire_cb,acquire_ready);
     if (ret && atomic_xchg(&r->acquire_callback_ref,0)) dma_fence_put(&r->done);
