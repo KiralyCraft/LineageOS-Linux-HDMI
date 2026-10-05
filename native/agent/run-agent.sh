@@ -124,6 +124,16 @@ case $CANDIDATE in
     BCDEF) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 HDMI_LOS_GLAMOR_COPY=blit HDMI_LOS_PRESENTER=kernel MESA_KGSL_HDMI_BLIT_STATS=1 ;;
 esac
 printf 'HDMI experimental candidate: %s\n' "$CANDIDATE" >&2
+if [[ $CANDIDATE == E || $CANDIDATE == BCDEF ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_COPY_ABI=1' "$BUNDLE/lib/xorg/modules/libglamoregl.so" || {
+        printf 'The matched glamor copy experiment is missing\n' >&2; exit 1;
+    }
+fi
+if [[ $CANDIDATE == F || $CANDIDATE == BCDEF ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_PRESENTER_ABI=1' "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so" || {
+        printf 'The matched kernel presenter module is missing\n' >&2; exit 1;
+    }
+fi
 
 if [[ $TEARFREE_COMPLETION == async ]]; then
     LC_ALL=C grep -aFq 'HDMI_LOS_XORG_ASYNC_ABI=1' \

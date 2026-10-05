@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Additive, lease-scoped vblank ownership. Does not submit display updates. */
+/* Additive lease timing, with an opt-in restricted deferred presenter. */
 #include <linux/anon_inodes.h>
 #include <linux/compat.h>
 #include <linux/file.h>
