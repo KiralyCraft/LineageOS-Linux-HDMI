@@ -1,0 +1,229 @@
+From: HDMI project
+Subject: [PATCH] glamor: confine optional blits to validated TearFree FBOs
+
+Keep ordinary window copies on the established shader path. Reject texture-only
+FBO metadata, check attachment completeness, restore GL state on all paths and
+fall back to CopyArea when the optional transfer cannot be completed.
+
+diff --git a/glamor/glamor.h b/glamor/glamor.h
+index e40ffba..5532e15 100644
+--- a/glamor/glamor.h
++++ b/glamor/glamor.h
+@@ -421,6 +421,7 @@ extern void _X_EXPORT glamor_copy_window(WindowPtr window, DDXPointRec old_origi
+ extern _X_EXPORT void glamor_finish(ScreenPtr screen);
+ extern _X_EXPORT Bool glamor_egl_native_fence_supported(ScreenPtr screen);
+ extern _X_EXPORT int glamor_egl_export_native_fence(ScreenPtr screen);
++extern _X_EXPORT Bool glamor_copy_tearfree(PixmapPtr src, PixmapPtr dst, RegionPtr damage);
+ #define HAS_GLAMOR_TEXT 1
+ 
+ #ifdef GLAMOR_FOR_XORG
+diff --git a/glamor/glamor_copy.c b/glamor/glamor_copy.c
+index 9abacd7..9762c55 100644
+--- a/glamor/glamor_copy.c
++++ b/glamor/glamor_copy.c
+@@ -337,70 +337,99 @@ bail:
+ #define GL_TILE_RASTER_ORDER_INCREASING_Y_MESA   0x8BBA
+ #endif
+ 
+-/* Opt-in Candidate E. Copy only distinct, complete, compatible FBOs.
+- * Overlap and every unsupported GC/format/clipping case retain the shader path.
+- * API selection is counted here; the matched Mesa build separately counts
+- * successful Freedreno 2D blits, since GL blit alone does not prove CP_BLIT. */
+-static Bool
+-glamor_hdmi_copy_blit(DrawablePtr src, DrawablePtr dst, GCPtr gc,
+-                      BoxPtr boxes, int nbox, int dx, int dy, Pixel bitplane)
++/* Candidate E is deliberately limited to the root-to-TearFree transfer.
++ * Generic window copies (including overlap-safe scratch copies) use the
++ * established shader path. API selection does not itself prove CP_BLIT. */
++Bool
++glamor_copy_tearfree(PixmapPtr sp, PixmapPtr dp, RegionPtr damage)
+ {
+-    ScreenPtr screen = dst->pScreen;
++    ScreenPtr screen = sp->drawable.pScreen;
+     glamor_screen_private *priv = glamor_get_screen_private(screen);
+-    PixmapPtr sp = glamor_get_drawable_pixmap(src), dp = glamor_get_drawable_pixmap(dst);
+-    glamor_pixmap_private *spriv = glamor_get_pixmap_private(sp), *dpriv = glamor_get_pixmap_private(dp);
++    glamor_pixmap_private *spriv = glamor_get_pixmap_private(sp);
++    glamor_pixmap_private *dpriv = glamor_get_pixmap_private(dp);
++    BoxPtr boxes = RegionRects(damage);
++    int nbox = RegionNumRects(damage);
+     static int enabled = -1;
+-    static unsigned long long blits, pixels;
+-    int sx, sy, tx, ty;
++    static unsigned long long blits, pixels, failures;
+     GLint read_fbo, draw_fbo;
+     GLboolean scissor;
++    GLenum error;
++    Bool ok = FALSE;
+     unsigned long long area = 0;
++
+     if (enabled < 0) {
+         const char *setting = getenv("HDMI_LOS_GLAMOR_COPY");
+-        enabled = setting && !strcmp(setting,"blit");
+-        if (enabled) LogMessage(X_INFO,"HDMI_LOS_XORG_COPY_ABI=1 eligible GL blits enabled\n");
++        enabled = setting && !strcmp(setting, "blit");
++        if (enabled)
++            LogMessage(X_INFO, "HDMI_LOS_XORG_COPY_ABI=2 root-to-TearFree blits enabled\n");
+     }
+-    if (!enabled || !priv->has_fbo_blit || bitplane || nbox < 1 || nbox > 32 ||
+-        sp == dp || !spriv || !dpriv || !glamor_pixmap_priv_is_small(spriv) ||
++    if (!enabled || !priv->has_fbo_blit || nbox < 1 || nbox > 32 ||
++        sp != screen->GetScreenPixmap(screen) || sp == dp ||
++        dp->drawable.pScreen != screen ||
++        sp->drawable.width != dp->drawable.width ||
++        sp->drawable.height != dp->drawable.height ||
++        !spriv || !dpriv || !glamor_pixmap_priv_is_small(spriv) ||
+         !glamor_pixmap_priv_is_small(dpriv) || !spriv->fbo || !dpriv->fbo ||
+-        spriv->fbo->tex == dpriv->fbo->tex || src->depth != dst->depth ||
+-        src->bitsPerPixel != dst->bitsPerPixel || src->depth < 24 ||
+-        (gc && (gc->alu != GXcopy || !glamor_pm_is_solid(gc->depth,gc->planemask))))
+-        return FALSE;
+-    if (spriv->fbo->is_red || dpriv->fbo->is_red ||
++        !spriv->fbo->fb || !dpriv->fbo->fb ||
++        !spriv->fbo->tex || !dpriv->fbo->tex ||
++        spriv->fbo->fb == dpriv->fbo->fb ||
++        spriv->fbo->tex == dpriv->fbo->tex ||
++        sp->drawable.depth != dp->drawable.depth ||
++        sp->drawable.bitsPerPixel != dp->drawable.bitsPerPixel ||
++        sp->drawable.depth < 24 || spriv->fbo->is_red || dpriv->fbo->is_red ||
+         glamor_format_for_pixmap(sp)->internalformat != glamor_format_for_pixmap(dp)->internalformat)
+         return FALSE;
+-    glamor_get_drawable_deltas(src,sp,&sx,&sy);
+-    glamor_get_drawable_deltas(dst,dp,&tx,&ty);
+-    for (int i=0;i<nbox;i++) {
+-        BoxPtr b=&boxes[i];
+-        if (b->x2 <= b->x1 || b->y2 <= b->y1 ||
+-            b->x1+dx+sx < 0 || b->y1+dy+sy < 0 ||
+-            b->x2+dx+sx > sp->drawable.width || b->y2+dy+sy > sp->drawable.height ||
+-            b->x1+tx < 0 || b->y1+ty < 0 ||
+-            b->x2+tx > dp->drawable.width || b->y2+ty > dp->drawable.height)
++    for (int i = 0; i < nbox; i++) {
++        BoxPtr b = &boxes[i];
++        if (b->x2 <= b->x1 || b->y2 <= b->y1 || b->x1 < 0 || b->y1 < 0 ||
++            b->x2 > sp->drawable.width || b->y2 > sp->drawable.height)
+             return FALSE;
+-        area += (unsigned long long)(b->x2-b->x1)*(b->y2-b->y1);
++        area += (unsigned long long)(b->x2 - b->x1) * (b->y2 - b->y1);
+     }
+-    if (area < 131072) return FALSE;
++    if (area < 131072)
++        return FALSE;
++
+     glamor_make_current(priv);
+-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,&read_fbo);
+-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,&draw_fbo);
+-    scissor=glIsEnabled(GL_SCISSOR_TEST);
++    /* Report an existing error and leave this operation to the shader path;
++     * never count a failed blit as a successful copy. */
++    error = glGetError();
++    if (error != GL_NO_ERROR) {
++        if (++failures == 1)
++            LogMessage(X_WARNING, "HDMI TearFree blit skipped: prior GL error 0x%x\n", error);
++        return FALSE;
++    }
++    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fbo);
++    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
++    scissor = glIsEnabled(GL_SCISSOR_TEST);
+     glDisable(GL_SCISSOR_TEST);
+-    glBindFramebuffer(GL_READ_FRAMEBUFFER,spriv->fbo->fb);
+-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,dpriv->fbo->fb);
+-    for (int i=0;i<nbox;i++) {
+-        BoxPtr b=&boxes[i];
+-        glBlitFramebuffer(b->x1+dx+sx,b->y1+dy+sy,b->x2+dx+sx,b->y2+dy+sy,
+-                          b->x1+tx,b->y1+ty,b->x2+tx,b->y2+ty,GL_COLOR_BUFFER_BIT,GL_NEAREST);
++    glBindFramebuffer(GL_READ_FRAMEBUFFER, spriv->fbo->fb);
++    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dpriv->fbo->fb);
++    if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE ||
++        glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
++        goto restore;
++    for (int i = 0; i < nbox; i++) {
++        BoxPtr b = &boxes[i];
++        glBlitFramebuffer(b->x1, b->y1, b->x2, b->y2,
++                          b->x1, b->y1, b->x2, b->y2,
++                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
++    }
++    ok = TRUE;
++restore:
++    glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
++    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_fbo);
++    if (scissor)
++        glEnable(GL_SCISSOR_TEST);
++    error = glGetError();
++    if (error != GL_NO_ERROR || !ok) {
++        if (++failures == 1)
++            LogMessage(X_WARNING, "HDMI TearFree blit rejected: incomplete FBO or GL error 0x%x\n", error);
++        /* Recopy the entire snapshot with GXcopy after a partial failure. */
++        return FALSE;
+     }
+-    glBindFramebuffer(GL_READ_FRAMEBUFFER,read_fbo);
+-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,draw_fbo);
+-    if (scissor) glEnable(GL_SCISSOR_TEST);
+-    blits++; pixels+=area;
++    blits++;
++    pixels += area;
+     if (blits == 1 || !(blits % 1024))
+-        LogMessage(X_INFO,"HDMI glamor eligible_blits=%llu pixels=%llu\n",blits,pixels);
++        LogMessage(X_INFO, "HDMI glamor tearfree_blits=%llu pixels=%llu\n", blits, pixels);
+     return TRUE;
+ }
+ 
+@@ -440,9 +469,6 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
+     Bool ret = FALSE;
+     BoxRec bounds = glamor_no_rendering_bounds();
+ 
+-    if (glamor_hdmi_copy_blit(src,dst,gc,box,nbox,dx,dy,bitplane))
+-        return TRUE;
+-
+     glamor_make_current(glamor_priv);
+ 
+     if (gc && !glamor_set_planemask(gc->depth, gc->planemask))
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+index 6b0947c..e2d5a81 100644
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -1043,6 +1043,7 @@ load_glamor(ScrnInfoPtr pScrn)
+     ms->glamor.finish = LoaderSymbolFromModule(mod, "glamor_finish");
+     ms->glamor.native_fence_supported = LoaderSymbolFromModule(mod, "glamor_egl_native_fence_supported");
+     ms->glamor.export_native_fence = LoaderSymbolFromModule(mod, "glamor_egl_export_native_fence");
++    ms->glamor.copy_tearfree = LoaderSymbolFromModule(mod, "glamor_copy_tearfree");
+     ms->glamor.gbm_bo_from_pixmap = LoaderSymbolFromModule(mod, "glamor_gbm_bo_from_pixmap");
+     ms->glamor.init = LoaderSymbolFromModule(mod, "glamor_init");
+     ms->glamor.name_from_pixmap = LoaderSymbolFromModule(mod, "glamor_name_from_pixmap");
+diff --git a/hw/xfree86/drivers/modesetting/driver.h b/hw/xfree86/drivers/modesetting/driver.h
+index d56f5c0..0146b76 100644
+--- a/hw/xfree86/drivers/modesetting/driver.h
++++ b/hw/xfree86/drivers/modesetting/driver.h
+@@ -170,6 +170,7 @@ typedef struct _modesettingRec {
+         void (*finish)(ScreenPtr);
+         Bool (*native_fence_supported)(ScreenPtr);
+         int (*export_native_fence)(ScreenPtr);
++        Bool (*copy_tearfree)(PixmapPtr, PixmapPtr, RegionPtr);
+         struct gbm_bo *(*gbm_bo_from_pixmap)(ScreenPtr, PixmapPtr);
+         Bool (*init)(ScreenPtr, unsigned int);
+         int (*name_from_pixmap)(PixmapPtr, CARD16 *, CARD32 *);
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.c b/hw/xfree86/drivers/modesetting/drmmode_display.c
+index 2459277..613d766 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -1594,8 +1594,19 @@ drmmode_copy_damage_inner(xf86CrtcPtr crtc, PixmapPtr dst, RegionPtr dmg, Bool e
+         src = &crtc->rotatedPixmap->drawable;
+         xf86RotateCrtcRedisplay(crtc, dst, src, dmg, FALSE);
+     } else {
+-        src = &pScreen->GetScreenPixmap(pScreen)->drawable;
+-        PixmapDirtyCopyArea(dst, src, 0, 0, -crtc->x, -crtc->y, dmg);
++        PixmapPtr root = pScreen->GetScreenPixmap(pScreen);
++        drmmode_crtc_private_ptr dc = crtc->driver_private;
++        modesettingPtr ms = modesettingPTR(crtc->scrn);
++        Bool copied = FALSE;
++        src = &root->drawable;
++        /* E applies only to the unrotated, origin-aligned TearFree buffers.
++         * Other origins/transforms and every ordinary window copy retain the
++         * existing accelerated CopyArea implementation. */
++        if (!crtc->x && !crtc->y && ms->glamor.copy_tearfree &&
++            (dst == dc->tearfree.buf[0].px || dst == dc->tearfree.buf[1].px))
++            copied = ms->glamor.copy_tearfree(root, dst, dmg);
++        if (!copied)
++            PixmapDirtyCopyArea(dst, src, 0, 0, -crtc->x, -crtc->y, dmg);
+     }
+ 
+     /* Reset the damages if requested */

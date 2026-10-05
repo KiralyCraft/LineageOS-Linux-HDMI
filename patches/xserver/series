@@ -5,3 +5,4 @@
 0005-modesetting-fence-driven-tearfree.patch
 0006-glamor-eligible-copy-blit.patch
 0007-modesetting-kernel-deferred-presenter.patch
+0008-glamor-restrict-tearfree-blit.patch

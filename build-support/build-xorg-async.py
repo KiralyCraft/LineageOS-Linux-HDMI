@@ -114,11 +114,13 @@ def main():
     outputs['Xorg'] = digest(output / 'Xorg')
     # The new entry points must be exported, not just present in local symbols.
     symbols = subprocess.check_output(['nm', '-D', str(output / 'libglamoregl.so')], text=True)
-    for symbol in ('glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence'):
+    for symbol in ('glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence', 'glamor_copy_tearfree'):
         if not any(line.endswith(' T ' + symbol) for line in symbols.splitlines()):
             raise RuntimeError(f'missing exported native-fence entry point: {symbol}')
     if b'HDMI_LOS_XORG_ASYNC_ABI=1' not in (output / 'modesetting_drv.so').read_bytes():
         raise RuntimeError('missing modesetting ABI marker')
+    if b'HDMI_LOS_XORG_COPY_ABI=2' not in (output / 'libglamoregl.so').read_bytes():
+        raise RuntimeError('missing restricted-copy ABI marker')
     result = {'base': str(base), 'configuration': str(build), 'optimization': 'O2',
               'compile_commands_sha256': digest(commands_path), 'patches': patches,
               'artifacts': outputs, 'live_tested': False, 'compiled_units': len(tasks)}

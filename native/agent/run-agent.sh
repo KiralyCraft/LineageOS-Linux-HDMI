@@ -14,7 +14,7 @@ NO_TIMEOUT=1
 DRM_TRACE=startup
 TIMING_GUARD=required
 TEARFREE_COMPLETION=async
-CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDEF}
+CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDF}
 PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
@@ -125,8 +125,13 @@ case $CANDIDATE in
     BCDEF) export MESA_KGSL_X11_PIPELINE=1 MESA_KGSL_X11_INTEGRATED_RESOLVE=1 HDMI_LOS_GLAMOR_COPY=blit HDMI_LOS_PRESENTER=kernel MESA_KGSL_HDMI_BLIT_STATS=1 ;;
 esac
 printf 'HDMI experimental candidate: %s\n' "$CANDIDATE" >&2
+if [[ $CANDIDATE == C || $CANDIDATE == D || $CANDIDATE == BCDF || $CANDIDATE == BCDEF ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_RESIZE_ABI=1' "$BUNDLE/lib/mesa/libGLX_mesa.so.0" || {
+        printf 'Missing matched Mesa resize-cache ABI\n' >&2; exit 1;
+    }
+fi
 if [[ $CANDIDATE == E || $CANDIDATE == BCDEF ]]; then
-    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_COPY_ABI=1' "$BUNDLE/lib/xorg/modules/libglamoregl.so" || {
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_COPY_ABI=2' "$BUNDLE/lib/xorg/modules/libglamoregl.so" || {
         printf 'The matched glamor copy experiment is missing\n' >&2; exit 1;
     }
 fi
