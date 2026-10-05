@@ -1,3 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
+ifeq ($(HDMI_COMPANION_FUNCTIONAL),1)
+obj-m += hdmi_companion.o
+hdmi_companion-y := session.o
+else
 obj-m += hdmi_companion_probe.o
 hdmi_companion_probe-y := probe.o
+endif

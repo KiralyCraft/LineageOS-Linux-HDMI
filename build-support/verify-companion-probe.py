@@ -182,7 +182,7 @@ def compare_versions(versions, kernel, require_all=True):
     return sorted(versions.keys() & kernel.keys())
 
 
-def verify(module, installed, symvers, header, expected_release, expected_build):
+def verify(module, installed, symvers, header, expected_release, expected_build, timing=False):
     probe = ElfModule(module)
     reference = ElfModule(installed)
     kernel = read_symvers(symvers)
@@ -211,16 +211,18 @@ def verify(module, installed, symvers, header, expected_release, expected_build)
         raise ValueError("kernel release mismatch")
     if info.get("version") != expected_build:
         raise ValueError("probe build identity mismatch")
-    if info.get("name") != "hdmi_companion_probe" or info.get("license") != "GPL":
+    expected_name = "hdmi_companion" if timing else "hdmi_companion_probe"
+    if info.get("name") != expected_name or info.get("license") != "GPL":
         raise ValueError("unexpected module identity/license")
     if "__cfi_check" not in probe.defined_symbols():
         raise ValueError("probe lacks cross-DSO CFI instrumentation")
     calls, trampolines = probe.branches_to(set(required))
-    if calls:
+    if calls and not timing:
         raise ValueError(f"query-only probe calls functional imports: {calls}")
     return {
         "schema": 1,
         "result": "PASS",
+        "module_kind": "timing guard" if timing else "query-only probe",
         "module_sha256": sha256(module),
         "installed_msm_sha256": sha256(installed),
         "installed_msm_scmversion": reference_info["scmversion"],
@@ -248,9 +250,11 @@ def main():
     parser.add_argument("expected_release")
     parser.add_argument("expected_build")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--timing", action="store_true", help="verify functional hdmi_companion identity")
     arguments = parser.parse_args()
     report = verify(arguments.module, arguments.installed_msm, arguments.symbol_versions,
-                    arguments.uapi_header, arguments.expected_release, arguments.expected_build)
+                    arguments.uapi_header, arguments.expected_release, arguments.expected_build,
+                    timing=arguments.timing)
     arguments.output.write_text(json.dumps(report, indent=2) + "\n")
     print(f"Module ABI: PASS; {len(report['versioned_probe_symbols'])} probe versions; "
           f"{len(report['installed_msm_matching_kernel_symbols'])} installed DRM versions")

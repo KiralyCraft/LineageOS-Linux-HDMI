@@ -8,6 +8,9 @@
 #include "../../kernel/hdmi_companion/uapi.h"
 
 _Static_assert(sizeof(struct hdmi_companion_caps) == 176, "caps ABI changed");
+_Static_assert(sizeof(struct hdmi_companion_create) == 64, "create ABI changed");
+_Static_assert(sizeof(struct hdmi_companion_control) == 16, "control ABI changed");
+_Static_assert(sizeof(struct hdmi_companion_status) == 96, "status ABI changed");
 
 static void reset_caps(struct hdmi_companion_caps *caps)
 {
@@ -34,12 +37,18 @@ int main(int argc, char **argv)
     const char *device = "/dev/hdmi_companion_probe";
     const char *expected_release = NULL, *expected_build = NULL;
     int fd, errors = 0;
+    int timing = 0;
 
     for (int index = 1; index < argc; ++index) {
         if (!strcmp(argv[index], "--help")) {
             puts("usage: hdmi-companion-probe [--device PATH] "
-                 "[--expect-release RELEASE] [--expect-build ID]");
+                 "[--expect-release RELEASE] [--expect-build ID] [--timing]");
             return 0;
+        }
+        if (!strcmp(argv[index], "--timing")) {
+            timing = 1;
+            device = "/dev/hdmi_companion";
+            continue;
         }
         if (index + 1 >= argc) return 2;
         if (!strcmp(argv[index], "--device")) device = argv[++index];
@@ -60,7 +69,8 @@ int main(int argc, char **argv)
         return 1;
     }
     if (caps.size != sizeof(caps) || caps.abi_version != HDMI_COMPANION_ABI_VERSION ||
-        caps.features != HDMI_COMPANION_FEATURE_PROBE_ONLY ||
+        caps.features != (timing ? HDMI_COMPANION_FEATURE_TIMING_GUARD :
+                                  HDMI_COMPANION_FEATURE_PROBE_ONLY) ||
         caps.imports != HDMI_COMPANION_REQUIRED_IMPORTS ||
         caps.reserved[0] || caps.reserved[1] ||
         !memchr(caps.kernel_release, 0, sizeof(caps.kernel_release)) ||
@@ -94,6 +104,25 @@ int main(int argc, char **argv)
     reset_caps(&caps);
     errors += expect_error(fd, _IO('H', 127), &caps, ENOTTY, "unknown ioctl");
     errors += expect_error(fd, HDMI_COMPANION_QUERY_CAPS, NULL, EFAULT, "null pointer");
+    if (timing) {
+        struct hdmi_companion_create request = {
+            .size = sizeof(request), .abi_version = HDMI_COMPANION_ABI_VERSION,
+            .lease_fd = -1, .session_fd = -1,
+        };
+        errors += expect_error(fd, HDMI_COMPANION_CREATE_SESSION, &request, EBADF, "invalid lease FD");
+        int null_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+        if (null_fd < 0) { perror("open /dev/null"); ++errors; }
+        else {
+            request.lease_fd = null_fd;
+            errors += expect_error(fd, HDMI_COMPANION_CREATE_SESSION, &request, EINVAL, "non-DRM FD");
+            close(null_fd);
+        }
+        request.reserved[0] = 1;
+        errors += expect_error(fd, HDMI_COMPANION_CREATE_SESSION, &request, EINVAL, "create reserved field");
+        errors += expect_error(fd, HDMI_COMPANION_CREATE_SESSION, NULL, EFAULT, "null create pointer");
+        errors += expect_error(fd, HDMI_COMPANION_ENABLE_TIMING, NULL, ENOTTY, "enable on control device");
+        errors += expect_error(fd, HDMI_COMPANION_STOP_SESSION, NULL, ENOTTY, "stop on control device");
+    }
     /* Repeated queries exercise FD operations without creating timing sessions. */
     for (int query = 0; query < 100; ++query) {
         reset_caps(&caps);
@@ -105,6 +134,7 @@ int main(int argc, char **argv)
     }
     close(fd);
     if (errors) return 1;
-    puts("PASS: query-only compatibility probe; no timing session created");
+    puts(timing ? "PASS: timing guard ABI and invalid-session checks; no timing session created" :
+                  "PASS: query-only compatibility probe; no timing session created");
     return 0;
 }

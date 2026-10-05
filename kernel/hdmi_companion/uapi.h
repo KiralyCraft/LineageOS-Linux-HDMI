@@ -54,4 +54,66 @@ struct hdmi_companion_caps {
 
 #define HDMI_COMPANION_QUERY_CAPS _IOWR('H', 0, struct hdmi_companion_caps)
 
+enum hdmi_companion_state {
+    HDMI_COMPANION_CREATED = 0,
+    HDMI_COMPANION_STARTING = 1,
+    HDMI_COMPANION_TIMING_VALID = 2,
+    HDMI_COMPANION_STOPPED = 3,
+};
+
+enum hdmi_companion_stop_reason {
+    HDMI_COMPANION_REASON_NONE = 0,
+    HDMI_COMPANION_REASON_USER = 1,
+    HDMI_COMPANION_REASON_FD_CLOSED = 2,
+    HDMI_COMPANION_REASON_LEASE_REVOKED = 3,
+    HDMI_COMPANION_REASON_CRTC_INACTIVE = 4,
+    HDMI_COMPANION_REASON_MODE_CHANGED = 5,
+    HDMI_COMPANION_REASON_TIMING_LOST = 6,
+    HDMI_COMPANION_REASON_SUSPEND = 7,
+    HDMI_COMPANION_REASON_START_TIMEOUT = 8,
+};
+
+struct hdmi_companion_create {
+    __u32 size;
+    __u32 abi_version;
+    __s32 lease_fd;
+    __s32 session_fd; /* Input -1; output O_CLOEXEC descriptor. */
+    __u32 connector_id;
+    __u32 crtc_id;
+    __u32 plane_id;
+    __u32 flags; /* Must be zero. */
+    __aligned_u64 generation; /* Input zero; output session identity. */
+    __aligned_u64 reserved[3];
+};
+
+struct hdmi_companion_control {
+    __u32 size;
+    __u32 abi_version;
+    __aligned_u64 reserved;
+};
+
+struct hdmi_companion_status {
+    __u32 size;
+    __u32 abi_version;
+    __u32 state;
+    __u32 reason;
+    __u32 connector_id;
+    __u32 crtc_id;
+    __u32 plane_id;
+    __u32 reserved0;
+    __aligned_u64 generation;
+    __aligned_u64 msc;
+    __aligned_u64 timestamp_ns;
+    __aligned_u64 sampled_ns;
+    __aligned_u64 reference_gets;
+    __aligned_u64 reference_puts;
+    __aligned_u64 reserved[2];
+};
+
+#define HDMI_COMPANION_CREATE_SESSION _IOWR('H', 1, struct hdmi_companion_create)
+/* These operations act on the returned session FD, not the control device. */
+#define HDMI_COMPANION_ENABLE_TIMING _IOW('H', 2, struct hdmi_companion_control)
+#define HDMI_COMPANION_GET_STATUS _IOWR('H', 3, struct hdmi_companion_status)
+#define HDMI_COMPANION_STOP_SESSION _IOW('H', 4, struct hdmi_companion_control)
+
 #endif
