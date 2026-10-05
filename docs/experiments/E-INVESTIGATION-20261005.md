@@ -102,3 +102,49 @@ diagnostic ABI marker to prevent an accidentally ordinary E-on test.
 `build-info.json`, `validation/xorg-e-diagnostic-build.json`, the source archive,
 and `SHA256SUMS` record the exact packaged sources and binaries. Physical
 validation of these diagnostic modes is pending.
+
+## First live diagnostic: finish-after
+
+The bounded 4K30 run verified `mode=finish-after` in Xorg's log and completed
+all 600 test frames. Xorg exited normally, Android was restored, and the
+companion reference count returned to zero. The user still saw the titlebar
+disappear during the early move-only phase; it was present after resizing
+in the second half. **The finish-after control failed physical correctness.**
+See [the result](E-FINISH-AFTER-4K30-20261005.json).
+
+Thus, waiting for the E copy to finish before returning to Xorg did not prevent
+the observed fault. This does not identify which rendering, damage, or copying
+operation is wrong. The run had already finished when screenshots were
+requested, so there are no screenshots of that occurrence.
+
+## Screenshot follow-up prepared
+
+`leased-pattern.py --screenshot-dir PATH` now takes root-image crops around
+the actual window-manager frame. `xroot_capture.py` follows the parent chain
+and translates frame/client geometry into root coordinates, rather than
+capturing only the client's clean viewport. Captures include:
+
+- The initially mapped window and the fixed reference at each phase.
+- An immediate image after each move/resize request.
+- Another image after approximately 150 ms of continued rendering, or at
+  phase end if the phase finishes first.
+
+Each record includes phase, step, capture duration, root crop, frame/client
+geometry and, for settled captures, the rendered frame serial. Immediate
+captures can precede window-manager processing; recorded geometry makes that
+visible. The helper encodes PNGs in memory, with a 128 MiB compressed-image
+budget, and writes them after the rendering workload. It needs no Pillow,
+new native build, module change or replacement GPU runtime.
+
+XGetImage can synchronize rendering and temporarily remove a software cursor.
+These captures can therefore affect a timing-dependent fault. They inspect
+the X desktop image, not the TearFree destination or physical HDMI scanout.
+A corrupt root screenshot narrows the issue to desktop contents; a clean
+screenshot does not disprove corruption seen on the monitor. Physical cadence
+and latency cannot be inferred from this screenshot run.
+
+The PNG encoder and capture geometry pass three tests, including a private
+Xvfb test with a reparented client, a distinct frame/title area, movement,
+resize, clipping and deferred image saving. The next proposed HDMI test keeps
+the same finish-after runtime and adds only capture instrumentation. It waits
+for the user's unplug confirmation before arming another bounded session.

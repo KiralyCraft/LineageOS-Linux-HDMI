@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "test": "E finish-after corrected-pattern control",
+  "mode": "3840x2160@30",
+  "mesa_commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+  "xorg_patch_commit": "acba53a55e0ed3375925ed2c1b051b9cfbcb0ef5",
+  "diagnostic_verified_in_xorg_log": true,
+  "physical_report": {
+    "user_report": "The title bars appeared after resizing. Initially, when the window moved to the center and back during the first half, the titlebar disappeared; in the second half it was there.",
+    "scope": "E finish-after diagnostic at 3840x2160@30",
+    "visual_smoke": "FAIL: titlebar loss persists despite glFinish after the E copy",
+    "screenshots_taken": false,
+    "physical_cadence_validated": false
+  },
+  "test_exit": 0,
+  "renderer": "FD740",
+  "workload_completed": true,
+  "frames_submitted_by_test": 600,
+  "phase_order": [
+    "stationary",
+    "move-only",
+    "resize-only",
+    "move-and-resize",
+    "stationary-after"
+  ],
+  "normal_xorg_exit": true,
+  "companion_refcnt_after": 0,
+  "android_restored": true,
+  "performance_result": false,
+  "interpretation": "Waiting for E copy completion before returning to Xorg did not prevent titlebar loss. The report associates recovery with resizing; cause remains unconfirmed."
+}

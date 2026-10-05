@@ -2,7 +2,8 @@
 """Visible pattern test on an already active leased X display.
 
 Uses the inherited private Mesa environment and owns only its two test windows.
-Does not arm, stop, modeset, read a DRM event queue, or read back GPU images.
+Does not arm, stop, modeset or read a DRM event queue. Optional screenshots
+read the X root image, including the window-manager frame, after transitions.
 The fixed X11 reference and GLX window have defined black backgrounds. Movement
 and resize are separate phases, and rendering uses actual configured geometry.
 Swap-call timings are not physical display cadence or input-to-display latency.
@@ -58,8 +59,11 @@ def main():
     ap.add_argument('output', type=pathlib.Path)
     ap.add_argument('--label', default='BCDEF')
     ap.add_argument('--phase-seconds', type=float, default=4.)
+    ap.add_argument('--screenshot-dir', type=pathlib.Path,
+                    help='Opt-in root screenshots; saved after rendering, changes timing')
     args = ap.parse_args()
     assert not args.output.exists()
+    assert not args.screenshot_dir or not args.screenshot_dir.exists()
     assert 1 <= args.phase_seconds <= 5
     X, G = C.CDLL('libX11.so.6'), C.CDLL('libGL.so.1')
 
@@ -156,9 +160,16 @@ def main():
     swap = bind(G, 'glXSwapBuffers', None, [V, L])
     error = bind(G, 'glGetError', U, [])
     map_window = bind(X, 'XMapWindow', I, [V, L])
+    capture = None
+    if args.screenshot_dir:
+        from xroot_capture import RootCapture
+        capture = RootCapture(d, X, root, screen_width, screen_height)
     result = {'renderer': renderer, 'loaded': loaded, 'label': args.label,
-              'background': 'defined black', 'readback': False, 'phases': [],
+              'background': 'defined black', 'readback': bool(capture), 'phases': [],
               'note': 'Swap-call timing is not physical display cadence or latency.'}
+    if capture:
+        result.update(screenshots=capture.records, performance_result=False,
+                      screenshot_note='Root readback can synchronize GPU work and conceal timing faults; PNG data stays in RAM until the workload ends.')
     try:
         store_name(d, window, (args.label + ' - mapping, black background').encode())
         map_window(d, reference)
@@ -172,6 +183,8 @@ def main():
             if not mapped:
                 time.sleep(.01)
         assert mapped, 'No MapNotify for test window'
+        if capture:
+            capture.capture(window, 'mapped-primary')
         serial = 0
         phases = ['stationary', 'move-only', 'resize-only', 'move-and-resize',
                   'stationary-after']
@@ -180,6 +193,9 @@ def main():
             move_resize(d, window, 120, 150, 800, 600)
             sync(d, 0)
             start, samples, changes, frames, previous = time.monotonic(), [], [], 0, -1
+            capture_due = None
+            if capture:
+                capture.capture(reference, phase + '-reference', {'phase': phase})
             while time.monotonic() - start < args.phase_seconds:
                 before_frame = time.monotonic()
                 step = int((before_frame - start) / .65)
@@ -195,6 +211,12 @@ def main():
                     sync(d, 0)
                     previous = step
                     changes.append({'seconds': before_frame - start, 'step': step})
+                    if capture and (step == 0 or phase in ('move-only', 'resize-only', 'move-and-resize')):
+                        capture.capture(window, f'{phase}-{step}-immediate',
+                                        {'phase': phase, 'step': step, 'kind': 'immediate',
+                                         'requested_xy': [x, y] if 'move' in phase else None,
+                                         'requested_size': [w, h] if 'resize' in phase else None})
+                        capture_due = (time.monotonic() + .15, step)
                 drain_events()
                 # Geometry replies follow the requests; re-query also handles
                 # WM-mediated configurations that arrive after the first reply.
@@ -215,7 +237,15 @@ def main():
                 samples.append((time.monotonic() - before_swap) * 1000)
                 assert error() == 0, (phase, frames)
                 serial, frames = serial + 1, frames + 1
+                if capture_due and time.monotonic() >= capture_due[0]:
+                    capture.capture(window, f'{phase}-{capture_due[1]}-settled',
+                                    {'phase': phase, 'step': capture_due[1], 'kind': 'settled',
+                                     'frame_serial': serial, 'actual_size': [width, height]})
+                    capture_due = None
                 time.sleep(max(0, 1 / 30 - (time.monotonic() - before_frame)))
+            if capture_due:
+                capture.capture(window, f'{phase}-{capture_due[1]}-phase-end',
+                                {'phase': phase, 'step': capture_due[1], 'kind': 'phase-end'})
             ordered = sorted(samples)
             entry = {'phase': phase, 'frames': frames,
                      'seconds': time.monotonic() - start, 'changes': changes,
@@ -235,6 +265,8 @@ def main():
         bind(X, 'XFreeColormap', I, [V, L])(d, colormap)
         bind(X, 'XFree', I, [V])(C.cast(visual, V))
         bind(X, 'XCloseDisplay', I, [V])(d)
+        if capture:
+            capture.save(args.screenshot_dir)
         args.output.write_text(json.dumps(result, indent=2) + '\n')
 
 
