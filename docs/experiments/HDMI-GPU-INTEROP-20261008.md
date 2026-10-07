@@ -96,3 +96,14 @@ A self-contained Downloads runtime includes complete Mesa patches on the
 vblank-minimal baseline, private Xorg patches, USB/Bluetooth code, launcher,
 matched binaries and checksum manifests. Broker 0.4.4 remains separately staged
 for manual installation; the current same-agent restart works with 0.4.3.
+
+The verified runtime was then copied to Downloads once and selected with a
+same-agent pause -> mount replacement -> resume, HDMI left connected. The
+original bundle was restored and hash-checked between the two read-only mounts.
+The resumed desktop retained 4K30. Another 24/24 resize-pattern frames passed
+without diagnostic readback, bringing software pattern checks to 140/140.
+The original agent path is temporarily mounted onto the new Downloads runtime;
+its underlying original files remain preserved. Future ordinary launches use
+the new folder's ./run-agent.sh. The explicit --resize-capacity 0 control and its
+environment equivalent are carried through sudo; a non-root launch with a
+capturing sudo substitute verified the forwarding without starting another agent.
