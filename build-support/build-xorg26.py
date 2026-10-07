@@ -145,7 +145,7 @@ def main():
          str(src)], env=sanitizer_env)
     for file, symbols in [
         (stage / 'usr/bin/Xorg', ['present_set_copy_release', 'present_drain_copy_releases',
-                                 'dri3_set_fd_export_fence']),
+                                 'dri3_set_fd_export_fence', 'dri3_has_fd_export_fence']),
         (stage / 'usr/lib/xorg/modules/libglamoregl.so',
          ['glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence'])]:
         exported = subprocess.check_output(['nm', '-D', str(file)], text=True)

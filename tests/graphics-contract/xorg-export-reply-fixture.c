@@ -36,6 +36,8 @@ typedef struct Screen {dri3_screen_priv_ptr priv;} *ScreenPtr;
 typedef struct Pixmap {struct {ScreenPtr pScreen;XID id;} drawable;} *PixmapPtr;
 typedef struct {ClientPtr client;} NewClientInfoRec;
 struct Priv {struct xorg_list fd_exports;int(*fd_export_fence)(ScreenPtr);unsigned fd_export_pending;OsTimerPtr fd_export_timer;Bool fd_export_timer_running,fd_export_callback_registered;};
+static int dri3_screen_private_key;
+static Bool dixPrivateKeyRegistered(int *key){return key==&dri3_screen_private_key;}
 static dri3_screen_priv_ptr dri3_screen_priv(ScreenPtr s){return s->priv;}
 struct Timer {CARD32(*fn)(OsTimerPtr,CARD32,void*);void *data;int active;};
 static CallbackListPtr ClientStateCallback;
@@ -70,9 +72,11 @@ int main(void){
  init(&p,&s);export_fd=fence(false,&w);int native=export_fd;fd=buffer_fd();assert(request(&s,&c,&fd,1,reply)==Success);assert(c.ignored&&!c.delivered&&p.fd_export_pending==1);
  memset(reply,0,sizeof(reply));assert(write(w,"x",1)==1);fire(native);assert(!c.ignored&&c.delivered==1&&c.bytes==32&&!c.errors&&!p.fd_export_pending&&c.reply[0]==0x5a);closed(fd);closed(native);close(w);dri3_stop_fd_exports(&p);
  // An already completed producer takes the immediate path.
- memset(&c,0,sizeof(c));init(&p,&s);export_fd=fence(true,&w);native=export_fd;fd=buffer_fd();assert(request(&s,&c,&fd,1,reply)==Success&&!c.ignored&&c.delivered==1);closed(fd);closed(native);close(w);dri3_stop_fd_exports(&p);
+ memset(&c,0,sizeof(c));init(&p,&s);assert(dri3_has_fd_export_fence(&s));export_fd=fence(true,&w);native=export_fd;fd=buffer_fd();int original=fd;assert(request(&s,&c,&fd,1,reply)==Success&&!c.ignored&&c.delivered==1);closed(original);closed(native);close(w);dri3_stop_fd_exports(&p);assert(!dri3_has_fd_export_fence(&s));
  // Error-completed fences never disclose storage or claim successful readiness.
- memset(&c,0,sizeof(c));init(&p,&s);native_status=-1;export_fd=fence(true,&w);fd=buffer_fd();assert(request(&s,&c,&fd,1,reply)==BadAlloc&&!c.delivered);closed(fd);close(w);native_status=1;dri3_stop_fd_exports(&p);
+ memset(&c,0,sizeof(c));init(&p,&s);native_status=-1;export_fd=fence(true,&w);fd=buffer_fd();original=fd;assert(request(&s,&c,&fd,1,reply)==BadAlloc&&!c.delivered);closed(original);close(w);native_status=1;dri3_stop_fd_exports(&p);
+ // A deferred native-fence error or failed status query must not expose the buffer.
+ for(int reason=0;reason<2;reason++){memset(&c,0,sizeof(c));init(&p,&s);export_fd=fence(false,&w);native=export_fd;fd=buffer_fd();assert(request(&s,&c,&fd,1,reply)==Success&&c.ignored);native_status=reason?1:-1;ioctl_error=reason;assert(write(w,"x",1)==1);fire(native);assert(c.errors==1&&!c.delivered&&!c.ignored&&!p.fd_export_pending);closed(fd);closed(native);close(w);native_status=1;ioctl_error=0;dri3_stop_fd_exports(&p);}
  // Disconnect, retained resources, timeout, and screen teardown each cancel a pending export.
  for(int reason=0;reason<4;reason++){memset(&c,0,sizeof(c));init(&p,&s);now=UINT32_MAX-10;export_fd=fence(false,&w);native=export_fd;fd=buffer_fd();assert(request(&s,&c,&fd,1,reply)==Success);
   if(reason<2){c.clientState=reason?ClientStateRetained:ClientStateGone;c.clientGone=1;NewClientInfoRec info={&c};state_callback(&ClientStateCallback,state_data,&info);assert(!c.delivered&&!c.errors);}
