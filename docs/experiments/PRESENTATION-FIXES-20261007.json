@@ -1,0 +1,94 @@
+{
+  "mesa_build": {
+    "commit": "557306b5c488632a9771346d3f12d23117c9cf5b",
+    "base": "cc190637b670f522f60a294caeb4412cee1ea477",
+    "seconds_this_run": 297.26773715019226,
+    "tests": {
+      "src/freedreno/drm/kgsl_bo_handle_test": "skipped: device unavailable",
+      "src/x11/kgsl_device_selection_test": "skipped: device unavailable"
+    },
+    "files": {
+      "usr/lib/libgbm.so.1.0.0": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+      "usr/lib/libgallium-26.2.0-devel.so": "4493331d54efa4151705ab8ca19e9040ecf20ae5cf2eea0561b6da04be6734ac",
+      "usr/lib/libGLX_mesa.so.0.0.0": "ba4583fb9caf7e1d3edad42496c022a71180b5a6db1441bb51ff118a76f80c1b",
+      "usr/lib/libEGL_mesa.so.0.0.0": "fbbd52b1fba70ece2606bff70570ff4d606e9422a315bf91fe6490c98ace4cb0",
+      "usr/lib/pkgconfig/dri.pc": "0ef0ad154b083686235bc2148b64f84e3cad3c02ab807179ea66c014c60e5b33",
+      "usr/lib/pkgconfig/gbm.pc": "dc758a99eedc7aae15ba56488d1aeec45beadfdc83421afaca17d852cc6927e6",
+      "usr/lib/dri/libdril_dri.so": "db3b5424b8bec640db4414ac9c620f02418489207476f869c658aae0b1def561",
+      "usr/lib/gbm/dri_gbm.so": "868e7656a0baff277ef4d2b31307dc0078f6de812e8f0ffc0244e700eb818fc7"
+    },
+    "note": "Not installed. Hardware allocation regression and live presentation still require validation."
+  },
+  "xorg_build": {
+    "base": "/build/xserver-tearfree-c16/src",
+    "configuration": "/build/xserver-perf-o2-20261002/build",
+    "optimization": "O2",
+    "compile_commands_sha256": "3004579c1d697da66574bb6178a63ce73fe4ea2088cb6fe7149e7d4dbd659ec4",
+    "patches": [
+      {
+        "name": "0001-present-disarm-wait-fence-callback.patch",
+        "sha256": "1ab2d247e6afe47bd73df738f66070f2d7da25fb47e2a50711e9de2b5b669b1b"
+      },
+      {
+        "name": "0002-glamor-prefer-render-node-for-dri3.patch",
+        "sha256": "8df0ef88bfe8fd9accc2577e8ec00a88ad35f12177ab13b48f12a3eb2cd74b72"
+      },
+      {
+        "name": "0003-modesetting-backport-upstream-tearfree.patch",
+        "sha256": "55f278c4cb93bffe1523a2fa1f2ca60bb40cb245296fc1ba936b78a1c0632f0c"
+      },
+      {
+        "name": "0004-modesetting-tearfree-region-cleanup.patch",
+        "sha256": "d8076b433610ef718a47e2bc941a3a1426cba3b540b6c85fd47162af48add3de"
+      },
+      {
+        "name": "0005-modesetting-fence-driven-tearfree.patch",
+        "sha256": "2d6cf82dac4e6921ebb0dd2517b8ac5ac19fb1576a5bef537b77ab7c91dc57b5"
+      },
+      {
+        "name": "0006-glamor-eligible-copy-blit.patch",
+        "sha256": "938dce805e6d50df865b5864dd04ae1b90bbb37c50cbbe3b760651b2b86dd5ef"
+      },
+      {
+        "name": "0007-modesetting-kernel-deferred-presenter.patch",
+        "sha256": "2b0dba8858e7ecd2e2782bbb915d419069b4117fabffea63fc7e6ba47d000b63"
+      },
+      {
+        "name": "0010-present-fence-gated-copy-release.patch",
+        "sha256": "270589a6e693f2b59eeac12947812d6b92023ea564233819d4edf7da03029bbc"
+      }
+    ],
+    "artifacts": {
+      "modesetting_drv.so": "e07dba0ffe96ec7b9dc1f5b2619424573b77cbb0a64338ced15ecbb8f383251f",
+      "libglamoregl.so": "756c33bc7173a9ddc7b70f776e48312e62fc45e2ce7b98375defc11895934e00",
+      "Xorg": "c7c9243536cd262f9c095bb8bb113b3ff1fac8737cc925588f8b26d375738a88"
+    },
+    "live_tested": false,
+    "compiled_units": 55
+  },
+  "offline_tests": {
+    "queue": [
+      "PASS interval-one FIFO order and original targets",
+      "PASS interval-zero targets and cross-generation admission bound",
+      "PASS interval change cannot overtake scheduled consumer-owned slot",
+      "PASS no ready frame overtakes an unfinished producer",
+      "PASS legacy admission and stop/fault escape",
+      "{\"pipeline_sha256\": \"b4fa5cf707b7cca11355ee83e300e5684e0f2a58aecc02261b1b34501ac631e6\", \"scope\": \"stubbed policy tests, no GPU or physical display\"}"
+    ],
+    "release": [
+      "PASS delayed idle survives Present completion and pixmap resource release",
+      "PASS destroyed window does not leave a callback window pointer",
+      "PASS teardown drains GPU before releasing all resources",
+      "PASS explicit finish diagnostic and legacy controls",
+      "PASS already-ready fence releases exactly once",
+      "PASS error, unsignaled, error-readiness and timeout never release idle",
+      "{\"present_execute_sha256\": \"c7e51abeb7726ca7f50c9e40b5f2400cc807e946683957125257fc28ba2926fa\", \"scope\": \"stubbed lifecycle and fence tests, not hardware validation\"}"
+    ],
+    "python_suite": "58 passed",
+    "full_patch_series": "applied with zero fuzz"
+  },
+  "physical_display_tested": false,
+  "GPU_visibility_tested": false,
+  "display_restarted": false,
+  "magisk_installation_needed": false
+}

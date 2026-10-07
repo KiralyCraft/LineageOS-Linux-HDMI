@@ -26,6 +26,8 @@ def main():
                         default=pathlib.Path('/build/xserver-tearfree-c16/src'))
     parser.add_argument('--build', type=pathlib.Path,
                         default=pathlib.Path('/build/xserver-perf-o2-20261002/build'))
+    parser.add_argument('--series', type=pathlib.Path, help='Explicit ordered patch list')
+    parser.add_argument('--copy-abi', type=int, choices=[1, 2], default=2)
     args = parser.parse_args()
     repo, output, base, build = (p.resolve() for p in
                                 (args.repository, args.output, args.base, args.build))
@@ -35,7 +37,7 @@ def main():
     src = output / 'src'
     shutil.copytree(repo / 'third_party/xserver', src, ignore=shutil.ignore_patterns('.git'))
     patches = []
-    for line in (repo / 'patches/xserver/series').read_text().splitlines():
+    for line in (args.series or repo / 'patches/xserver/series').read_text().splitlines():
         name = line.strip()
         if not name or name.startswith('#'):
             continue
@@ -53,7 +55,8 @@ def main():
         relative = oldsrc.relative_to(base)
         selected = (relative.is_relative_to('glamor') or
                     relative.is_relative_to('hw/xfree86/drivers/modesetting') or
-                    relative.is_relative_to('hw/xfree86/glamor_egl'))
+                    relative.is_relative_to('hw/xfree86/glamor_egl') or
+                    relative.is_relative_to('present'))
         if not selected:
             if digest(src / relative) != digest(oldsrc):
                 raise RuntimeError(f'unrebuilt source differs: {relative}')
@@ -88,39 +91,46 @@ def main():
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(compile_one, tasks))
-    archive = output / 'libglamor-full.a'
-    members = subprocess.check_output(['ar', 't', str(build / 'glamor/libglamor.a')],
-                                      text=True).splitlines()
-    replacement_members = []
-    for member in members:
-        relative = str(pathlib.Path(member).relative_to(build))
-        if relative not in objmap:
-            raise RuntimeError(f'unrebuilt glamor archive member: {relative}')
-        replacement_members.append(objmap[relative])
-    subprocess.run(['ar', 'rcs', str(archive), *replacement_members], check=True)
+    archives = {}
+    for old_archive in ('glamor/libglamor.a', 'present/liblibxserver_present.a'):
+        archive = output / pathlib.Path(old_archive).name
+        members = subprocess.check_output(['ar', 't', str(build / old_archive)],
+                                          text=True).splitlines()
+        replacement_members = []
+        for member in members:
+            relative = str(pathlib.Path(member).relative_to(build))
+            if relative not in objmap:
+                raise RuntimeError(f'unrebuilt archive member: {relative}')
+            replacement_members.append(objmap[relative])
+        subprocess.run(['ar', 'rcs', str(archive), *replacement_members], check=True)
+        archives[old_archive] = str(archive)
     outputs = {}
     for target in ('hw/xfree86/drivers/modesetting/modesetting_drv.so',
-                   'hw/xfree86/glamor_egl/libglamoregl.so'):
+                   'hw/xfree86/glamor_egl/libglamoregl.so', 'hw/xfree86/Xorg'):
         raw = subprocess.check_output(['ninja', '-C', str(build), '-t', 'commands', target],
                                       text=True).strip().splitlines()[-1]
         argv = shlex.split(raw)
         out = output / pathlib.Path(target).name
         argv[argv.index('-o') + 1] = str(out)
-        argv = [objmap.get(value, str(archive) if value == 'glamor/libglamor.a' else value)
+        argv = [objmap.get(value, archives.get(value, value))
                 for value in argv]
         subprocess.run(argv, cwd=build, check=True)
         outputs[out.name] = digest(out)
-    shutil.copy2(build / 'hw/xfree86/Xorg', output / 'Xorg')
-    outputs['Xorg'] = digest(output / 'Xorg')
     # The new entry points must be exported, not just present in local symbols.
     symbols = subprocess.check_output(['nm', '-D', str(output / 'libglamoregl.so')], text=True)
-    for symbol in ('glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence', 'glamor_copy_tearfree'):
+    for symbol in ('glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence') + (('glamor_copy_tearfree',) if args.copy_abi == 2 else ()):
         if not any(line.endswith(' T ' + symbol) for line in symbols.splitlines()):
             raise RuntimeError(f'missing exported native-fence entry point: {symbol}')
     if b'HDMI_LOS_XORG_ASYNC_ABI=1' not in (output / 'modesetting_drv.so').read_bytes():
         raise RuntimeError('missing modesetting ABI marker')
-    if b'HDMI_LOS_XORG_COPY_ABI=2' not in (output / 'libglamoregl.so').read_bytes():
+    if f'HDMI_LOS_XORG_COPY_ABI={args.copy_abi}'.encode() not in (output / 'libglamoregl.so').read_bytes():
         raise RuntimeError('missing restricted-copy ABI marker')
+    symbols = subprocess.check_output(['nm', '-D', str(output / 'Xorg')], text=True)
+    for symbol in ('present_set_copy_release', 'present_drain_copy_releases'):
+        if not any(line.endswith(' T ' + symbol) for line in symbols.splitlines()):
+            raise RuntimeError(f'missing exported Present entry point: {symbol}')
+    if b'HDMI_LOS_XORG_RELEASE_ABI=1' not in (output / 'modesetting_drv.so').read_bytes():
+        raise RuntimeError('missing consumer-release ABI marker')
     result = {'base': str(base), 'configuration': str(build), 'optimization': 'O2',
               'compile_commands_sha256': digest(commands_path), 'patches': patches,
               'artifacts': outputs, 'live_tested': False, 'compiled_units': len(tasks)}

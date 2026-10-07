@@ -1,0 +1,282 @@
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -63,6 +63,7 @@
+ #include <pciaccess.h>
+ #endif
+ #include "driver.h"
++#include "present.h"
+ 
+ static void AdjustFrame(ScrnInfoPtr pScrn, int x, int y);
+ static Bool CloseScreen(ScreenPtr pScreen);
+@@ -2261,6 +2262,8 @@
+     modesettingPtr ms = modesettingPTR(pScrn);
+     modesettingEntPtr ms_ent = ms_ent_priv(pScrn);
+ 
++    present_drain_copy_releases(pScreen);
++
+     /* Clear mask of assigned crtc's in this generation */
+     ms_ent->assigned_crtcs = 0;
+ 
+diff --git a/hw/xfree86/drivers/modesetting/present.c b/hw/xfree86/drivers/modesetting/present.c
+--- a/hw/xfree86/drivers/modesetting/present.c
++++ b/hw/xfree86/drivers/modesetting/present.c
+@@ -506,5 +506,24 @@
+         ms->drmmode.can_async_flip = TRUE;
+     }
+ 
+-    return present_screen_init(screen, &ms_present_screen_info);
++    if (!present_screen_init(screen, &ms_present_screen_info))
++        return FALSE;
++#ifdef GLAMOR_HAS_GBM
++    {
++        const char *release = getenv("HDMI_LOS_PRESENT_RELEASE");
++        if (release && strcmp(release, "legacy")) {
++            Bool fence = !strcmp(release, "fence");
++            if ((!fence && strcmp(release, "finish")) || !ms->drmmode.glamor ||
++                !ms->glamor.finish || !ms->glamor.native_fence_supported ||
++                !ms->glamor.export_native_fence ||
++                !ms->glamor.native_fence_supported(screen) ||
++                !present_set_copy_release(screen,
++                    fence ? ms->glamor.export_native_fence : NULL, ms->glamor.finish))
++                return FALSE;
++            xf86DrvMsg(scrn->scrnIndex, X_INFO,
++                       "HDMI_LOS_XORG_RELEASE_ABI=1 consumer release=%s\n", release);
++        }
++    }
++#endif
++    return TRUE;
+ }
+diff --git a/present/present.h b/present/present.h
+--- a/present/present.h
++++ b/present/present.h
+@@ -173,6 +173,12 @@
+ extern _X_EXPORT Bool
+ present_can_window_flip(WindowPtr window);
+ 
++/* Private matched-stack opt-in. No change to the public screen-info ABI. */
++extern _X_EXPORT Bool
++present_set_copy_release(ScreenPtr screen, int (*export_fence)(ScreenPtr),
++                         void (*finish)(ScreenPtr));
++extern _X_EXPORT void present_drain_copy_releases(ScreenPtr screen);
++
+ extern _X_EXPORT uint32_t FakeScreenFps;
+ 
+ #endif /* _PRESENT_H_ */
+diff --git a/present/present_execute.c b/present/present_execute.c
+--- a/present/present_execute.c
++++ b/present/present_execute.c
+@@ -21,6 +21,11 @@
+  */
+ 
+ #include "present_priv.h"
++#include <errno.h>
++#include <poll.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <linux/sync_file.h>
+ 
+ /*
+  * Called when the wait fence is triggered; just gets the current msc/ust and
+@@ -69,6 +74,139 @@
+     return FALSE;
+ }
+ 
++/* IdleNotify is normally paired with implicit DMA-BUF synchronization. KGSL
++ * needs an explicit consumer dependency: retain a separate record because the
++ * Present completion/vblank can be destroyed before GPU read completion. */
++struct present_copy_release {
++    struct xorg_list link;
++    PixmapPtr pixmap;
++    WindowPtr window;
++    CARD32 serial;
++    struct present_fence *idle_fence;
++    int fd;
++    OsTimerPtr timer;
++};
++
++static void
++present_copy_release_destroy(struct present_copy_release *release, Bool notify)
++{
++    RemoveNotifyFd(release->fd);
++    close(release->fd);
++    if (release->timer)
++        TimerFree(release->timer);
++    xorg_list_del(&release->link);
++    if (notify)
++        present_pixmap_idle(release->pixmap, release->window, release->serial,
++                            release->idle_fence);
++    present_fence_destroy(release->idle_fence);
++    dixDestroyPixmap(release->pixmap, release->pixmap->drawable.id);
++    free(release);
++}
++
++static void
++present_copy_release_ready(int fd, int ready, void *data)
++{
++    struct present_copy_release *release = data;
++    struct sync_file_info info = {0};
++    if (fd != release->fd || (ready & X_NOTIFY_ERROR) ||
++        ioctl(fd, SYNC_IOC_FILE_INFO, &info) < 0 || info.status <= 0)
++        FatalError("HDMI Present consumer fence failed; buffer not released\n");
++    present_copy_release_destroy(release, TRUE);
++}
++
++static CARD32
++present_copy_release_timeout(OsTimerPtr timer, CARD32 now, void *data)
++{
++    FatalError("HDMI Present consumer fence timed out; buffer not released\n");
++    return 0;
++}
++
++Bool
++present_set_copy_release(ScreenPtr screen, int (*export_fence)(ScreenPtr),
++                         void (*finish)(ScreenPtr))
++{
++    present_screen_priv_ptr priv = present_screen_priv(screen);
++    if (!priv || !finish || !xorg_list_is_empty(&priv->copy_releases))
++        return FALSE;
++    priv->copy_export_fence = export_fence;
++    priv->copy_finish = finish;
++    return TRUE;
++}
++
++void
++present_copy_release_forget_window(WindowPtr window)
++{
++    present_screen_priv_ptr priv = present_screen_priv(window->drawable.pScreen);
++    struct present_copy_release *release;
++    xorg_list_for_each_entry(release, &priv->copy_releases, link) {
++        if (release->window == window)
++            release->window = NULL;
++    }
++}
++
++void
++present_drain_copy_releases(ScreenPtr screen)
++{
++    present_screen_priv_ptr priv = present_screen_priv(screen);
++    struct present_copy_release *release, *tmp;
++    if (!priv || xorg_list_is_empty(&priv->copy_releases))
++        return;
++    /* Teardown only. Unregistering readiness does not cancel GPU work. */
++    priv->copy_finish(screen);
++    xorg_list_for_each_entry_safe(release, tmp, &priv->copy_releases, link) {
++        struct sync_file_info info = {0};
++        if (ioctl(release->fd, SYNC_IOC_FILE_INFO, &info) < 0 || info.status <= 0)
++            FatalError("HDMI Present consumer teardown fence failed\n");
++        present_copy_release_destroy(release, TRUE);
++    }
++}
++
++static void
++present_copy_idle(present_vblank_ptr vblank)
++{
++    ScreenPtr screen = vblank->window->drawable.pScreen;
++    present_screen_priv_ptr priv = present_screen_priv(screen);
++    struct present_copy_release *release;
++    struct pollfd pollfd;
++    int ret;
++    if (!priv->copy_finish) {
++        present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial,
++                            vblank->idle_fence);
++        return;
++    }
++    if (!priv->copy_export_fence) {
++        /* Explicit diagnostic control, never a silent fallback. */
++        priv->copy_finish(screen);
++        present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial,
++                            vblank->idle_fence);
++        return;
++    }
++    release = calloc(1, sizeof(*release));
++    if (!release)
++        FatalError("HDMI Present consumer release allocation failed\n");
++    release->fd = priv->copy_export_fence(screen);
++    if (release->fd < 0)
++        FatalError("HDMI Present consumer fence export failed\n");
++    release->pixmap = vblank->pixmap;
++    release->pixmap->refcnt++;
++    release->window = vblank->window;
++    release->serial = vblank->serial;
++    release->idle_fence = vblank->idle_fence;
++    vblank->idle_fence = NULL; /* record owns the Sync wrapper until release */
++    xorg_list_append(&release->link, &priv->copy_releases);
++    if (!SetNotifyFd(release->fd, present_copy_release_ready, X_NOTIFY_READ, release))
++        FatalError("HDMI Present consumer fence registration failed\n");
++    release->timer = TimerSet(NULL, 0, 5000, present_copy_release_timeout, release);
++    if (!release->timer)
++        FatalError("HDMI Present consumer timeout allocation failed\n");
++    pollfd = (struct pollfd){.fd = release->fd, .events = POLLIN};
++    do { ret = poll(&pollfd, 1, 0); } while (ret < 0 && errno == EINTR);
++    if (ret < 0 || (ret && !(pollfd.revents & POLLIN)))
++        FatalError("HDMI Present consumer fence poll failed\n");
++    if (ret)
++        present_copy_release_ready(release->fd, X_NOTIFY_READ, release);
++}
++
+ void
+ present_execute_copy(present_vblank_ptr vblank, uint64_t crtc_msc)
+ {
+@@ -95,7 +233,7 @@
+     vblank->update = NULL;
+     screen_priv->flush(window);
+ 
+-    present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial, vblank->idle_fence);
++    present_copy_idle(vblank);
+ }
+ 
+ void
+diff --git a/present/present_priv.h b/present/present_priv.h
+--- a/present/present_priv.h
++++ b/present/present_priv.h
+@@ -167,6 +167,11 @@
+ 
+     present_screen_info_ptr     info;
+ 
++    /* Copied pixmaps remain owned until the consumer GPU fence succeeds. */
++    struct xorg_list copy_releases;
++    int (*copy_export_fence)(ScreenPtr);
++    void (*copy_finish)(ScreenPtr);
++
+     /* Mode hooks */
+     present_priv_query_capabilities_ptr query_capabilities;
+     present_priv_get_crtc_ptr           get_crtc;
+@@ -335,6 +340,8 @@
+ Bool
+ present_execute_wait(present_vblank_ptr vblank, uint64_t crtc_msc);
+ 
++void present_copy_release_forget_window(WindowPtr window);
++
+ void
+ present_execute_copy(present_vblank_ptr vblank, uint64_t crtc_msc);
+ 
+diff --git a/present/present_screen.c b/present/present_screen.c
+--- a/present/present_screen.c
++++ b/present/present_screen.c
+@@ -56,6 +56,8 @@
+ {
+     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+ 
++    present_drain_copy_releases(screen);
++
+     if (screen_priv->flip_destroy)
+         screen_priv->flip_destroy(screen);
+ 
+@@ -93,6 +95,8 @@
+     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+     present_window_priv_ptr window_priv = present_window_priv(window);
+ 
++    present_copy_release_forget_window(window);
++
+     present_send_config_notify(window,
+                                window->drawable.x,
+                                window->drawable.y,
+@@ -181,6 +185,7 @@
+     if (!screen_priv)
+         return NULL;
+ 
++    xorg_list_init(&screen_priv->copy_releases);
+     wrap(screen_priv, screen, CloseScreen, present_close_screen);
+     wrap(screen_priv, screen, DestroyWindow, present_destroy_window);
+     wrap(screen_priv, screen, ConfigNotify, present_config_notify);

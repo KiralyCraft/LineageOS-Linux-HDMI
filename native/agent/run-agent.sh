@@ -14,12 +14,14 @@ NO_TIMEOUT=1
 DRM_TRACE=startup
 TIMING_GUARD=required
 TEARFREE_COMPLETION=async
+PRESENT_RELEASE=fence
+MESA_QUEUE=low-latency
 CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDF}
 PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
 usage() {
-    printf 'usage: %s [--candidate B|C|D|E|F|BCDF|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--candidate B|C|D|E|F|BCDF|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--present-release fence|finish|legacy] [--mesa-queue low-latency|fifo] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -27,6 +29,16 @@ while (($#)); do
         --candidate)
             (($# >= 2)) || { usage; exit 2; }
             CANDIDATE=$2
+            shift 2
+            ;;
+        --present-release)
+            (($# >= 2)) || { usage; exit 2; }
+            PRESENT_RELEASE=$2
+            shift 2
+            ;;
+        --mesa-queue)
+            (($# >= 2)) || { usage; exit 2; }
+            MESA_QUEUE=$2
             shift 2
             ;;
         --capture)
@@ -101,11 +113,18 @@ if [[ $CANDIDATE != B && ($XORG_ACCEL != kgsl-kms-bridge || $CLIENT_PRESENT != b
     printf 'Experimental profiles require the matched accelerated bridge, asynchronous TearFree and timing guard\n' >&2
     exit 2
 fi
+[[ $PRESENT_RELEASE == fence || $PRESENT_RELEASE == finish || $PRESENT_RELEASE == legacy ]] || { usage; exit 2; }
+[[ $MESA_QUEUE == low-latency || $MESA_QUEUE == fifo ]] || { usage; exit 2; }
+if [[ $PRESENT_RELEASE != legacy && $XORG_ACCEL != kgsl-kms-bridge ]]; then
+    printf 'Consumer release fencing requires --xorg-accel kgsl-kms-bridge\n' >&2
+    exit 2
+fi
 if ((EUID != 0)); then
     args=(--candidate "$CANDIDATE" --capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
           --client-present "$CLIENT_PRESENT" --session "$SESSION" \
           --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
           --tearfree-completion "$TEARFREE_COMPLETION")
+    args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE")
     if ((NO_TIMEOUT)); then
         args+=(--no-timeout)
     else
@@ -113,6 +132,21 @@ if ((EUID != 0)); then
     fi
     exec sudo -n -- "$0" "${args[@]}"
 fi
+
+export HDMI_LOS_PRESENT_RELEASE="$PRESENT_RELEASE"
+export MESA_KGSL_HDMI_QUEUE="$MESA_QUEUE"
+if [[ $PRESENT_RELEASE != legacy ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_RELEASE_ABI=1' "$BUNDLE/lib/xorg/modules/drivers/modesetting_drv.so" &&
+    LC_ALL=C grep -aFq 'present_set_copy_release' "$BUNDLE/libexec/Xorg" || {
+        printf 'Missing matched Xorg consumer-release support\n' >&2; exit 1;
+    }
+fi
+if [[ $MESA_QUEUE == low-latency ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_MESA_QUEUE_ABI=1' "$BUNDLE/lib/mesa/libgallium-26.2.0-devel.so" || {
+        printf 'Missing matched Mesa queue support\n' >&2; exit 1;
+    }
+fi
+printf 'HDMI presentation: release=%s queue=%s\n' "$PRESENT_RELEASE" "$MESA_QUEUE" >&2
 
 # Select experiments explicitly; inherited shell variables cannot mix profiles.
 unset MESA_KGSL_X11_PIPELINE MESA_KGSL_X11_INTEGRATED_RESOLVE HDMI_LOS_GLAMOR_COPY HDMI_LOS_PRESENTER MESA_KGSL_HDMI_BLIT_STATS

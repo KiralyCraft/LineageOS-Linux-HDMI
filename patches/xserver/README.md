@@ -47,3 +47,13 @@ correctness series. TearFree keeps two shadow scanout buffers per CRTC, copies
 accumulated damage into the next buffer, and flips it at vblank. This restores
 coherent output cadence when Xorg's visible software cursor makes direct
 Present flips ineligible; it does not suppress `DIRTYFB` or add a timer.
+
+
+Patch 0010 adds opt-in fence-gated release of copied Present pixmaps. It requires
+rebuilding the complete Present archive and relinking Xorg as well as modesetting
+and glamor. `HDMI_LOS_PRESENT_RELEASE=fence` delays IdleNotify until successful
+GPU read completion; `finish` is a blocking diagnostic and `legacy` leaves the
+old behavior. The companion kernel module and Present wire protocol are unchanged.
+The original E ABI 1 comparison uses patches 0001-0007 plus 0010; the complete
+series also includes the separate E ABI 2 experiments 0008/0009. Use the build
+script's explicit `--series` and `--copy-abi` arguments to identify that selection.
