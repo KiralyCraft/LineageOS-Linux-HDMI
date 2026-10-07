@@ -34,12 +34,20 @@ and physical scanout validation remain pending.
 
 The first 0.4.1 live pause released its timing reference (gets=1, puts=1), restored
 Android and retained connected 4K30. Re-acquisition failed because phase replies
-do not contain timing; dedicated STATUS queries now supply it. This is not a
-claim that 0.4.3 has completed a physical connected restart.
+do not contain timing; dedicated STATUS queries now supply it.
+
+Version 0.4.3 (`6d19c959b8c4`) passed a user-authorized connected restart at
+3840x2160@30 on October 7. Linux returned normally, confirmed by the user. The
+command completed in 4.28 seconds, Xorg received a new PID, generation 5 balanced
+its timing reference (gets=1/puts=1), and generation 6 started valid. Acceleration,
+asynchronous TearFree, E ABI 1 and the kernel presenter were active afterwards.
+The continuous desktop remained running. This validates one 4K30 restart;
+4K60, repeated restarts, runtime replacement and live failure injection remain
+untested. See `docs/experiments/CONNECTED-RESTART-20261007.md`.
 
 Install the candidate ZIP manually in Magisk and reboot once. A subsequent
 Linux desktop restart does not require an Android reboot or unplugging HDMI.
-Physical connected restart validation is pending. Native compilation and
+One connected restart at 4K30 is physically confirmed. Native compilation and
 socket-based lifecycle tests run on the authorized build server.
 
 Use the new Downloads copy named

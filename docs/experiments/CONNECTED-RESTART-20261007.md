@@ -4,7 +4,22 @@ The first live connected restart stopped Linux, balanced timing-reference
 ownership (generation 5, gets=1, puts=1), and restored Android at 4K30. Acquisition
 then failed because the broker treated a phase acknowledgement as a timing
 report. Commit a466390 changed that validation to dedicated STATUS requests.
-Physical restart acceptance of the revised implementation is still pending.
+Version 0.4.3 (`6d19c959b8c4`) subsequently passed one live connected restart
+at 3840x2160@30 with HDMI left plugged in. The user confirmed the Linux desktop
+returned normally. The restart command completed in 4281.18 ms; its correlated
+STOP acknowledgement took 2041 ms. Xorg PID changed from 10774 to 12441, and the
+old process was gone. Timing generation 5 stopped with gets=1/puts=1; generation
+6 started valid with gets=1/puts=0. Both sides used the matching Xorg 26 Downloads
+runtime with FD740 acceleration, asynchronous TearFree, release fences, E ABI 1,
+and the kernel presenter. The follow-up broker status remained active at 4K30
+in continuous mode, with no startup/restore failure or TearFree flip failure in
+the test logs. The desktop was left running.
+
+This validates one connected restart at 4K30. It does not validate 4K60, repeated
+restart stress, live fault injection, changing runtime while paused, or physical
+USB/Bluetooth input in this test. Those remain separate acceptance checks.
+Raw before/after snapshots and logs were kept on RAM-backed /tmp, not the SD card.
+The packaged manifests remain immutable records of their pre-deployment status.
 
 An offline review then reproduced four other defects with unprivileged host
 fixtures and identified a fifth in the startup failure path:
