@@ -1,0 +1,95 @@
+# HDMI lease CPU power guard
+
+This is a separate, additive `hdmi-los-power` Magisk module for the pinned
+XQ-DQ72 Lineage 22.2 build. Keep the existing `hdmi-los` module installed. It
+does not update Xorg, Mesa, USB/Bluetooth input, the Android application, the
+broker, or the graphics kernel companion. No launcher bundle changes are needed.
+
+## Behavior
+
+The existing broker's wake lock prevents suspend during a Linux lease, but does
+not prevent Qualcomm's separate display-off CPU policy. The installed kalama
+profile applies a 940 MHz performance-cluster cap, two-core limit, and zero
+available prime cores when the phone's panel turns off.
+
+The unchanged vendor PowerHAL runs through a small launcher and a private
+preload library. Its dynamically resolved `perf_hint` callback remembers the
+real Android display state. While the Linux HDMI lease is active, display-off
+CPU hints become display-on CPU hints. Android still controls the panel; this
+does not report a fake interactive state to Android's framework.
+
+The guard requests four performance cores and one prime core through a finite
+vendor performance request, renewed every 400 ms. It does not set a minimum
+frequency, write sysfs knobs, or bypass thermal controls. The cores remain
+subject to normal DVFS and thermal availability.
+
+A root monitor checks the existing broker every 200 ms. Only a connected,
+leased external CRTC authorizes a 1.5-second CLOCK_BOOTTIME deadline in
+`vendor.hdmi_los.cpu_lease`. Bad replies, timeouts, broker death, unplugging,
+and module disable/removal revoke it. Monitor death or a hang expires it without
+renewal. The PowerHAL worker checks every 100 ms; on expiry it releases its
+core request and replays the original Android display-off request if the phone
+is still off. If the phone is awake, it only releases the HDMI core request.
+Suspended time counts toward the deadline.
+
+Core requests additionally expire in one second if PowerHAL dies. Its existing
+init/Binder restart lifecycle must restore the framework's current display state;
+the guard does not replace that lifecycle or claim recovery from a stopped PerfHAL.
+
+## Packaging and boot gate
+
+All C artifacts are built on `root@192.168.104.201` with NDK 29/API 35. The
+manifest hashes source and binary artifacts. The ZIP privately includes an
+identical stock PowerHAL, not a modified Qualcomm library. Do not commit or
+publish the vendor binary or the generated ZIP.
+
+Installation and every boot check exact ROM properties and hashes of PowerHAL,
+both performance libraries, and the three CPU resource profiles. Before
+PowerHAL starts, the gate manually bind-mounts a read-only launcher over its
+executable. Magisk adds only the private library and stock service under new
+vendor filenames. Gate failure leaves the existing stock service untouched.
+The existing HDMI module's manual mounts remain separate. Magisk 29's mount
+implementation mirrors existing entries from their live paths, preserving
+those earlier bind mounts when adding new filenames.
+
+The library intercepts explicit-handle `dlsym` only for `perf_hint` from `libqti-perfd-client.so`;
+ordinary preloading of `perf_hint` alone would miss the HAL's explicit-handle
+lookup. Bionic's versioned real `dlsym` resolves all other symbols through an
+enforced tail call, retaining the original caller's namespace/RTLD_NEXT semantics.
+The extra SELinux rules permit reading the lease property and executing the
+unchanged stock service in the same PowerHAL domain.
+
+Magisk boot ordering and mount behavior references:
+[developer guide](https://topjohnwu.github.io/Magisk/guides.html#boot-scripts),
+[Magisk 29 module.cpp](https://github.com/topjohnwu/Magisk/blob/v29.0/native/src/core/module.cpp).
+
+## Validation and deployment
+
+Host ASan/UBSan fixtures exercise actual dynamic loading and the real guard
+and monitor: hint forwarding, sleeping/awake unplug, broker timeout/closure,
+fragmented/truncated stream replies, wrong opcode/version, Android-only mirror,
+no active mode, monitor death and expiry, invalid deadlines, rejected core
+requests, failed hint retry, and normal exit. These tests model the vendor API; they do not
+establish the installed vendor policy's physical behavior.
+
+A read-only native phone probe verified Bionic interception against a synthetic
+client, without calling the real performance service. The real broker query
+also correctly reported no active lease with HDMI disconnected. PowerHAL has
+not been restarted or modified during preparation.
+
+Install the prepared ZIP manually in Magisk and reboot with HDMI disconnected.
+Then verify the gate, guard load, and monitor before arming the normal HDMI
+agent. With the lease active, compare awake and phone-panel-off CPU policies,
+core_ctl state, scaling under workload, and thermal ceilings. Finally unplug
+while the phone remains off and verify Android's original cap/core policy
+returns with no new screen event. Also check an ordinary Android mirror without
+a Linux lease; it should retain normal Android policy.
+
+Logs: `/data/adb/hdmi-los-power/gate.log`, `monitor.log`, and Android logcat tag
+`HdmiCpuGuard`. Disable/remove **only** `hdmi-los-power` and reboot to restore
+the original service. Disabling it during a lease stops monitor renewal and
+restores policy through expiry; reboot removes the boot-time launcher mount.
+
+Physical screen-off, core-floor arbitration, Binder reconnection and boot
+activation remain pending manual installation and live testing. No improvement
+in Maps or display cadence is claimed by the CPU guard fixtures.

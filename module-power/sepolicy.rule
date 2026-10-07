@@ -1,0 +1,5 @@
+# Read the bounded root-monitor lease property; leave vendor power/thermal
+# services and their device-node permissions unchanged.
+allow hal_power_default vendor_default_prop file { getattr open read map }
+# The launcher execs the identical stock PowerHAL in the same SELinux domain.
+allow hal_power_default hal_power_default_exec file execute_no_trans
