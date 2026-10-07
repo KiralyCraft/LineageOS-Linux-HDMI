@@ -14,21 +14,15 @@
 #define DISPLAY_ON 0x1041
 typedef void *(*lookup_fn)(void *, const char *);
 typedef int (*hint_fn)(int, const char *, int, int);
-typedef int (*acquire_fn)(int, int, int *, int);
-typedef int (*release_fn)(int);
 static lookup_fn real_lookup;
 static pthread_once_t lookup_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
 static hint_fn real_hint;
-static acquire_fn acquire;
-static release_fn release;
 static pthread_t worker;
 static atomic_bool stopping;
 static bool enabled, worker_started, known, android_on, applied_known, applied_on;
-static int floor_handle;
 struct hint_args { char *data; int duration, type; bool seen; };
 static struct hint_args on_args = {.type = -1}, off_args = {.type = -1};
-static uint64_t last_floor_ms;
 __attribute__((used)) static const char abi[] = "HDMI_LOS_POWER_GUARD_ABI=1";
 static void note(const char *message) {
 #ifdef __ANDROID__
@@ -58,21 +52,14 @@ static bool lease_active(void) {
 #endif
   return hdmi_power_lease_valid(value, hdmi_power_now_ms());
 }
-static void drop_floor(void) {
-  if (floor_handle > 0) release(floor_handle);
-  floor_handle = 0; last_floor_ms = 0;
-}
 static void reconcile(bool active) {
-  if (!active) drop_floor();
   if (known) {
     bool desired = android_on || active;
     if (!applied_known || desired != applied_on) {
       const struct hint_args *args = desired ? &on_args : &off_args;
-      /* Display-state policy can reset core_ctl without clearing the vendor's
-       * cached resource vote. Retire our vote before that transition, then
-       * create a fresh one afterwards; renewing an old handle cannot reapply
-       * a vote that the backend still considers unchanged. */
-      drop_floor();
+      /* Only select the vendor's interactive CPU policy. core_ctl may idle
+       * unused cores; its normal maximums must allow them back under load.
+       * Do not force core minimums or frequency votes. */
       int result = real_hint(desired ? DISPLAY_ON : DISPLAY_OFF,
           args->seen ? args->data : "", args->duration, args->type);
       applied_known = result >= 0;
@@ -82,25 +69,8 @@ static void reconcile(bool active) {
       } else note("vendor display-policy request failed; retrying");
     }
   }
-  uint64_t now = hdmi_power_now_ms();
-  bool want_floor = active && known && applied_known && applied_on;
-  if (!want_floor) drop_floor();
-  if (want_floor && now && (!last_floor_ms || now - last_floor_ms >= 400)) {
-    /* Core availability only. WALT frequencies and thermal ceilings remain
-     * under the vendor policy. Screen-off maximums are removed by the hint
-     * selection above, never by racing sysfs writes. */
-    int resources[] = {0x41000000, 4, 0x41000200, 1};
-    int next = acquire(floor_handle, HDMI_CPU_FLOOR_MS, resources, 4);
-    if (next > 0) {
-      if (floor_handle > 0 && next != floor_handle) release(floor_handle);
-      floor_handle = next;
-    } else {
-      drop_floor();
-      note("core request rejected; normal vendor policy retained");
-    }
-    last_floor_ms = now;
-  }
 }
+
 static void *watch_lease(void *unused) {
   (void)unused;
   bool last = false;
@@ -132,7 +102,7 @@ static int guarded_hint(int id, const char *data, int duration, int type) {
   struct hint_args *args = android_on ? &on_args : &off_args;
   char *saved = data ? strdup(data) : NULL;
   if (data && !saved) {
-    enabled = false; known = false; drop_floor();
+    enabled = false; known = false;
     note("cannot retain Android policy; using stock hints until restart");
     int result = real_hint(id, data, duration, type);
     pthread_mutex_unlock(&state_lock);
@@ -141,12 +111,10 @@ static int guarded_hint(int id, const char *data, int duration, int type) {
   free(args->data); args->data = saved;
   args->duration = duration; args->type = type; args->seen = true;
   bool active = enabled && lease_active();
-  drop_floor();
   int effective = android_on || active ? DISPLAY_ON : DISPLAY_OFF;
   int result = real_hint(effective, data, duration, type);
   applied_known = result >= 0;
   if (applied_known) applied_on = effective == DISPLAY_ON;
-  else drop_floor();
   pthread_mutex_unlock(&state_lock);
   return result;
 }
@@ -175,9 +143,7 @@ void *dlsym(void *handle, const char *name) {
   pthread_mutex_lock(&state_lock);
   if (!real_hint) {
     real_hint = (hint_fn)symbol;
-    acquire = (acquire_fn)real_lookup(handle, "perf_lock_acq");
-    release = (release_fn)real_lookup(handle, "perf_lock_rel");
-    if (acquire && release && !pthread_create(&worker, NULL, watch_lease, NULL)) {
+    if (!pthread_create(&worker, NULL, watch_lease, NULL)) {
       worker_started = enabled = true;
       atexit(shutdown_guard);
       note(abi);

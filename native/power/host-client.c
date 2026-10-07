@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     if (!strcmp(command, "off\n")) hint(0x1040, NULL, 0, -1);
     else if (!strcmp(command, "on\n")) hint(0x1041, NULL, 0, -1);
     else if (!strcmp(command, "other\n")) hint(0x1080, "unrelated", 2, 3);
-    else if (!strcmp(command, "reject\n")) reject(1);
+    else if (!strcmp(command, "doze\n")) hint(0x1053, NULL, 0, -1);
     else if (!strcmp(command, "reject-hint\n")) reject(2);
     else if (!strcmp(command, "accept\n")) reject(0);
     else if (!strcmp(command, "state\n")) { state(); continue; }

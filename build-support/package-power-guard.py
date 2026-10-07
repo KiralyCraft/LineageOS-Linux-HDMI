@@ -92,13 +92,13 @@ def main():
                     validation={**manifest['validation'],
                                 'magisk_installed_layout_checksums': 'PASS after installer cleanup',
                                 'physical_hdmi_screen_off': 'pending manual install and test'},
-                    behavior=dict(lease_expiry_ms=1500, core_floor_duration_ms=1000,
-                                  performance_min_cores=4, prime_min_cores=1,
-                                  frequency_minimum='unchanged', frequency_maximum='unchanged',
+                    behavior=dict(lease_expiry_ms=1500, forced_core_minimums=False,
+                                  cpu_policy="interactive while Android awake or HDMI leased",
+                                  frequency_minimum='unchanged', frequency_maximum='vendor interactive policy while leased',
                                   thermal_policy='unchanged', broker_and_graphics_stack='unchanged'))
     (module / 'build-info.json').write_text(json.dumps(manifest, indent=2) + '\n')
     info = module / 'module.prop'
-    info.write_text(info.read_text().replace('version=0.1.3\n', f'version=0.1.3-{commit[:12]}\n'))
+    info.write_text(info.read_text().replace('version=0.1.4\n', f'version=0.1.4-{commit[:12]}\n'))
     # Magisk removes customize.sh after sourcing it. Verify the persisted
     # runtime, rather than referencing an installer-only file on every boot.
     (module / 'SHA256SUMS').write_text(''.join(

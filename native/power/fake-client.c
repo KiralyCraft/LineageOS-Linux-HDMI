@@ -3,8 +3,7 @@
 #include <pthread.h>
 #include <stdio.h>
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-static int mode = -1, floor, vote, calls_on, calls_off, other, rejected;
-static uint64_t expiry;
+static int mode = -1, core_calls, calls_on, calls_off, other, rejected;
 int perf_hint(int id, const char *data, int duration, int type) {
   (void)data; (void)duration; (void)type;
   pthread_mutex_lock(&lock);
@@ -12,35 +11,27 @@ int perf_hint(int id, const char *data, int duration, int type) {
     pthread_mutex_unlock(&lock); return -1;
   }
   if (id == 0x1040) { mode = 0; calls_off++; }
-  else if (id == 0x1041) {
-    mode = 1; calls_on++;
-    /* Model the live backend resetting hardware minimums while retaining its
-     * cached vote. An existing-handle refresh renews time, not application. */
-    floor = 0;
-  }
+  else if (id == 0x1041) { mode = 1; calls_on++; }
   else other = id;
   pthread_mutex_unlock(&lock);
   return 7;
 }
+/* Any request to force core counts is a regression. Count calls even when
+ * the caller ignores failure so the fixture detects accidental renewal. */
 int perf_lock_acq(int handle, int duration, int *resources, int count) {
-  pthread_mutex_lock(&lock);
-  bool valid = !(rejected & 1) && duration == HDMI_CPU_FLOOR_MS && count == 4 &&
-      resources[0] == 0x41000000 && resources[1] == 4 &&
-      resources[2] == 0x41000200 && resources[3] == 1;
-  if (valid) {
-    if (!handle || !vote) floor = 1;
-    vote = 123; expiry = hdmi_power_now_ms() + duration;
-  }
-  pthread_mutex_unlock(&lock);
-  return valid ? 123 : -1;
+  (void)handle; (void)duration; (void)resources; (void)count;
+  pthread_mutex_lock(&lock); core_calls++; pthread_mutex_unlock(&lock);
+  return -1;
 }
 int perf_lock_rel(int handle) {
-  pthread_mutex_lock(&lock); if (handle == 123) floor = vote = 0; pthread_mutex_unlock(&lock); return 0;
+  (void)handle;
+  pthread_mutex_lock(&lock); core_calls++; pthread_mutex_unlock(&lock);
+  return -1;
 }
 void fake_reject(int value) { pthread_mutex_lock(&lock); rejected = value; pthread_mutex_unlock(&lock); }
 void fake_state(void) {
   pthread_mutex_lock(&lock);
-  printf("{\"mode\":%d,\"floor\":%d,\"on_calls\":%d,\"off_calls\":%d,\"other\":%d}\n",
-      mode, floor && expiry > hdmi_power_now_ms(), calls_on, calls_off, other);
+  printf("{\"mode\":%d,\"core_calls\":%d,\"on_calls\":%d,\"off_calls\":%d,\"other\":%d}\n",
+      mode, core_calls, calls_on, calls_off, other);
   fflush(stdout); pthread_mutex_unlock(&lock);
 }

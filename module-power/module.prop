@@ -1,6 +1,6 @@
 id=hdmi-los-power
 name=HDMI lease CPU power guard
-version=0.1.3
-versionCode=202610073
+version=0.1.4
+versionCode=202610074
 author=KiralyCraft
 description=Keep normal CPU scaling and performance cores available for an active Linux HDMI lease, including with Android's panel off. Restore Android policy on lease loss.

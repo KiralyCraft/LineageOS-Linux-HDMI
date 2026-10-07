@@ -7,7 +7,6 @@
 #include <time.h>
 #define HDMI_CPU_LEASE_PROPERTY "vendor.hdmi_los.cpu_lease"
 #define HDMI_CPU_LEASE_MS 1500
-#define HDMI_CPU_FLOOR_MS 1000
 static inline uint64_t hdmi_power_now_ms(void) {
   struct timespec t;
   if (clock_gettime(CLOCK_BOOTTIME, &t)) return 0;

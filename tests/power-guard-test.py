@@ -120,73 +120,70 @@ def main():
             command('on')
             assert command('state')['mode'] == -1
             command('accept')
-            eventually(lambda s: s['mode'] == 1 and not s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             calls = command('state')['on_calls']
             time.sleep(.25)
             assert command('state')['on_calls'] == calls, 'Successful startup retry kept repeating'
             command('off')
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             condition['mode'] = 'active'
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             command('off')
             assert command('state')['mode'] == 1, 'Screen-off request escaped active HDMI policy'
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             time.sleep(.5)
-            assert command('state')['floor'], 'Core vote was lost after a display-state transition'
+            assert not command('state')['core_calls'], 'Guard forced a core minimum'
             command('on')
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             command('off')
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
+            command('doze')
+            assert command('state')['other'] == 0x1053, 'Separate Doze hint changed'
             command('other')
             assert command('state')['other'] == 0x1080, 'Unrelated hint changed'
             condition['mode'] = 'inactive'
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             # Unplug while dozing must not require another framework screen event.
             condition['mode'] = 'active'
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             condition['mode'] = 'blocked'
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             condition['mode'] = 'invalid'
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             time.sleep(.4)
             assert command('state')['mode'] == 0, 'Invalid active lease was accepted'
             for mode in ['wrong-opcode', 'mirror', 'no-mode', 'closed', 'truncated']:
                 condition['mode'] = 'active'
-                eventually(lambda s: s['mode'] == 1 and s['floor'])
+                eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
                 condition['mode'] = mode
-                eventually(lambda s: s['mode'] == 0 and not s['floor'])
+                eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             condition['mode'] = 'active'
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             monitor.kill(); monitor.wait(timeout=3)
             began = time.monotonic()
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             assert time.monotonic() - began < 2, 'Expired monitor lease lingered'
             # Malformed or implausibly distant deadlines never authorize a boost.
             for value in ['garbage', '-1', '999999999999999999999999999', '999999999999999']:
                 lease.write_text(value); time.sleep(.15)
                 assert command('state')['mode'] == 0
             lease.write_text(str(int(time.clock_gettime(time.CLOCK_BOOTTIME) * 1000) + 1000))
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             command('on')
             lease.write_text('0')
-            eventually(lambda s: s['mode'] == 1 and not s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             command('off')
             assert command('state')['mode'] == 0
-            command('reject')
-            lease.write_text(str(int(time.clock_gettime(time.CLOCK_BOOTTIME) * 1000) + 1000))
-            eventually(lambda s: s['mode'] == 1 and not s['floor'])
-            lease.write_text('0')
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
             command('reject-hint')
             lease.write_text(str(int(time.clock_gettime(time.CLOCK_BOOTTIME) * 1000) + 1000))
             time.sleep(.2)
-            assert command('state')['mode'] == 0 and not command('state')['floor']
+            assert command('state')['mode'] == 0 and not command('state')['core_calls']
             command('accept')
-            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            eventually(lambda s: s['mode'] == 1 and not s['core_calls'])
             lease.write_text('0')
-            eventually(lambda s: s['mode'] == 0 and not s['floor'])
+            eventually(lambda s: s['mode'] == 0 and not s['core_calls'])
             client.stdin.close(); assert client.wait(timeout=5) == 0
-            print('PASS: dynamic lookup, initial ON failure before first OFF, exact hint type/retry, core vote renewal after display reset, hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, rejected core request, failed hint retry and normal exit')
+            print('PASS: dynamic lookup, initial ON failure before first OFF, exact hint type/retry, no core/frequency votes, Doze and unrelated hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, failed hint retry and normal exit')
         finally:
             if monitor.poll() is None:
                 monitor.terminate(); monitor.wait(timeout=3)
