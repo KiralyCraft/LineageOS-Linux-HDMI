@@ -8,7 +8,7 @@ static uint64_t expiry;
 int perf_hint(int id, const char *data, int duration, int type) {
   (void)data; (void)duration; (void)type;
   pthread_mutex_lock(&lock);
-  if ((rejected & 2) && (id == 0x1040 || id == 0x1041)) {
+  if ((id == 0x1040 || id == 0x1041) && ((rejected & 2) || duration != 0 || type != -1)) {
     pthread_mutex_unlock(&lock); return -1;
   }
   if (id == 0x1040) { mode = 0; calls_off++; }

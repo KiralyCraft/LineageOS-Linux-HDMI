@@ -114,6 +114,16 @@ def main():
             assert reply() == 'READY'
             check = subprocess.check_output([str(build / 'monitor-test'), '--check'], env=env, text=True)
             assert 'broker_reply_valid=1 active_lease=0' in check
+            # PowerHAL may send its first ON before PerfHAL is ready. The
+            # retry must retain ON's type=-1 even before any OFF event exists.
+            command('reject-hint')
+            command('on')
+            assert command('state')['mode'] == -1
+            command('accept')
+            eventually(lambda s: s['mode'] == 1 and not s['floor'])
+            calls = command('state')['on_calls']
+            time.sleep(.25)
+            assert command('state')['on_calls'] == calls, 'Successful startup retry kept repeating'
             command('off')
             eventually(lambda s: s['mode'] == 0 and not s['floor'])
             condition['mode'] = 'active'
@@ -169,7 +179,7 @@ def main():
             lease.write_text('0')
             eventually(lambda s: s['mode'] == 0 and not s['floor'])
             client.stdin.close(); assert client.wait(timeout=5) == 0
-            print('PASS: dynamic lookup, hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, rejected core request, failed hint retry and normal exit')
+            print('PASS: dynamic lookup, initial ON failure before first OFF, exact hint type/retry, hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, rejected core request, failed hint retry and normal exit')
         finally:
             if monitor.poll() is None:
                 monitor.terminate(); monitor.wait(timeout=3)

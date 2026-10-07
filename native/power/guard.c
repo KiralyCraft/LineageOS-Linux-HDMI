@@ -25,8 +25,9 @@ static release_fn release;
 static pthread_t worker;
 static atomic_bool stopping;
 static bool enabled, worker_started, known, android_on, applied_known, applied_on;
-static int floor_handle, off_duration, off_type;
-static char *off_data;
+static int floor_handle;
+struct hint_args { char *data; int duration, type; bool seen; };
+static struct hint_args on_args = {.type = -1}, off_args = {.type = -1};
 static uint64_t last_floor_ms;
 __attribute__((used)) static const char abi[] = "HDMI_LOS_POWER_GUARD_ABI=1";
 static void note(const char *message) {
@@ -66,8 +67,9 @@ static void reconcile(bool active) {
   if (known) {
     bool desired = android_on || active;
     if (!applied_known || desired != applied_on) {
+      const struct hint_args *args = desired ? &on_args : &off_args;
       int result = real_hint(desired ? DISPLAY_ON : DISPLAY_OFF,
-          off_data, off_duration, off_type);
+          args->seen ? args->data : "", args->duration, args->type);
       applied_known = result >= 0;
       if (applied_known) {
         applied_on = desired;
@@ -114,25 +116,25 @@ static void shutdown_guard(void) {
   pthread_mutex_lock(&state_lock);
   if (enabled) reconcile(false);
   enabled = false;
-  free(off_data); off_data = NULL;
+  free(off_args.data); off_args.data = NULL;
+  free(on_args.data); on_args.data = NULL;
   pthread_mutex_unlock(&state_lock);
 }
 static int guarded_hint(int id, const char *data, int duration, int type) {
   if (id != DISPLAY_OFF && id != DISPLAY_ON) return real_hint(id, data, duration, type);
   pthread_mutex_lock(&state_lock);
   known = true; android_on = id == DISPLAY_ON;
-  if (!android_on) {
-    char *saved = data ? strdup(data) : NULL;
-    if (data && !saved) {
-      enabled = false; known = false; drop_floor();
-      note("cannot retain Android policy; using stock hints until restart");
-      int result = real_hint(id, data, duration, type);
-      pthread_mutex_unlock(&state_lock);
-      return result;
-    }
-    free(off_data); off_data = saved;
-    off_duration = duration; off_type = type;
+  struct hint_args *args = android_on ? &on_args : &off_args;
+  char *saved = data ? strdup(data) : NULL;
+  if (data && !saved) {
+    enabled = false; known = false; drop_floor();
+    note("cannot retain Android policy; using stock hints until restart");
+    int result = real_hint(id, data, duration, type);
+    pthread_mutex_unlock(&state_lock);
+    return result;
   }
+  free(args->data); args->data = saved;
+  args->duration = duration; args->type = type; args->seen = true;
   bool active = enabled && lease_active();
   if (!active) drop_floor();
   int effective = android_on || active ? DISPLAY_ON : DISPLAY_OFF;

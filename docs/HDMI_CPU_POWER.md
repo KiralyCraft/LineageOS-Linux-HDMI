@@ -51,6 +51,15 @@ included that deleted script. Live inspection confirmed stock PowerHAL was
 unchanged; the corrected 0.1.1 package supersedes it without rebuilding the
 native components.
 
+The 0.1.1 boot gate and preload activated successfully on the phone. Live
+inspection found startup retries using zero-initialized OFF metadata for ON
+before any OFF event arrived. A same-state native probe, with the phone awake
+and HDMI disconnected, returned handle 99 for an ON request with type -1.
+Version 0.1.2 caches ON and OFF parameters separately, with type -1 defaults
+for a synthetic request before its first framework event. The host fixture
+now rejects invalid display-hint types and exercises an initial ON failure
+before the first OFF event, followed by successful recovery without repeats.
+
 Installation and every boot check exact ROM properties and hashes of PowerHAL,
 both performance libraries, and the three CPU resource profiles. Before
 PowerHAL starts, the gate manually bind-mounts a read-only launcher over its
