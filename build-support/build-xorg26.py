@@ -141,8 +141,11 @@ def main():
     sanitizer_env['ASAN_OPTIONS'] = 'detect_leaks=0:halt_on_error=1'
     run(['python3', str(repo / 'tests/graphics-contract/xorg-copy-release-unit.py'),
          str(src / 'present/present_execute.c')], env=sanitizer_env)
+    run(['python3', str(repo / 'tests/graphics-contract/xorg-export-reply-fixture.py'),
+         str(src)], env=sanitizer_env)
     for file, symbols in [
-        (stage / 'usr/bin/Xorg', ['present_set_copy_release', 'present_drain_copy_releases']),
+        (stage / 'usr/bin/Xorg', ['present_set_copy_release', 'present_drain_copy_releases',
+                                 'dri3_set_fd_export_fence']),
         (stage / 'usr/lib/xorg/modules/libglamoregl.so',
          ['glamor_egl_native_fence_supported', 'glamor_egl_export_native_fence'])]:
         exported = subprocess.check_output(['nm', '-D', str(file)], text=True)
@@ -152,7 +155,8 @@ def main():
     for relative, markers in {
         'usr/lib/xorg/modules/drivers/modesetting_drv.so':
             ['HDMI_LOS_XORG_ASYNC_ABI=1', 'HDMI_LOS_XORG_RELEASE_ABI=1', 'HDMI_LOS_XORG_PRESENTER_ABI=1'],
-        'usr/lib/xorg/modules/libglamoregl.so': ['HDMI_LOS_XORG_COPY_ABI=1'],
+        'usr/lib/xorg/modules/libglamoregl.so': ['HDMI_LOS_XORG_COPY_ABI=1',
+                                               'HDMI_LOS_XORG_EXPORT_ABI=1'],
     }.items():
         for marker in markers:
             if marker.encode() not in (stage / relative).read_bytes():
