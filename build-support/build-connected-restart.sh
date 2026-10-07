@@ -14,6 +14,10 @@ for fixture in restart stop lifecycle; do
   runuser -u nobody -- "$BUILD/$fixture-selftest" >"$BUILD/$fixture-test.log" 2>&1
 done
 g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+  -pthread -Wall -Wextra -Werror -I"$SOURCE/native/common" \
+  "$SOURCE/native/broker/registration-selftest.cpp" -o "$BUILD/registration-selftest"
+"$BUILD/registration-selftest" >"$BUILD/registration-test.log" 2>&1
+g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
   -Wall -Wextra -Werror "$SOURCE/native/agent/child-selftest.cpp" -o "$BUILD/child-selftest"
 runuser -u nobody -- "$BUILD/child-selftest" >"$BUILD/child-test.log" 2>&1
 docker run --rm --platform linux/arm64 \
@@ -30,6 +34,7 @@ import hashlib,json,pathlib,sys
 source,build=map(pathlib.Path,sys.argv[1:])
 paths=['native/broker/main.cpp','native/broker/restart-selftest.cpp',
        'native/broker/stop-selftest.cpp','native/broker/lifecycle-selftest.cpp',
+       'native/broker/registration-selftest.cpp',
        'native/agent/main.cpp','native/agent/child-selftest.cpp',
        'native/common/hdmi_agent_reader.h','native/common/hdmi_child_process.h',
        'native/common/hdmi_los_trace.h','native/common/hdmi_los_protocol.h',
@@ -37,7 +42,7 @@ paths=['native/broker/main.cpp','native/broker/restart-selftest.cpp',
        'kernel/hdmi_companion/uapi.h','build-support/build-connected-restart.sh']
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 manifest=dict(target='aarch64-linux-android35',sources={p:sha(source/p) for p in paths},
-              artifacts={p:sha(build/p) for p in ['hdmi-losd','hdmi-los-agent','restart-test.log','stop-test.log','lifecycle-test.log','child-test.log','agent-help.txt']},
+              artifacts={p:sha(build/p) for p in ['hdmi-losd','hdmi-los-agent','restart-test.log','stop-test.log','lifecycle-test.log','registration-test.log','child-test.log','agent-help.txt']},
               validation=dict(host_lifecycle='PASS with ASan UBSan and LSan',physical_restart='pending'))
 (build/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY

@@ -1481,6 +1481,9 @@ class Broker {
         hdmi_los_message ready = Status(request.request_id);
         ready.status = HDMI_LOS_OK;
         ready.state = HDMI_LOS_STATE_AGENT_READY;
+        // Registration acknowledges the accepted agent capabilities even when
+        // Status describes an armed display or a paused connected restart.
+        if (agent_continuous_) ready.flags |= HDMI_LOS_FLAG_CONTINUOUS;
         if (agent_timing_required_) ready.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED;
         write_full(agent_fd_, &ready, sizeof(ready));
         log_line("info", "chroot agent registered");

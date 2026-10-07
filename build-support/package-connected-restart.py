@@ -45,7 +45,9 @@ def refresh_runtime(root, source, build, manifest, commit):
     validation = root / 'validation'
     validation.mkdir(exist_ok=True)
     shutil.copy2(build / 'manifest.json', validation / 'connected-restart-build.json')
-    for name in ['restart-test.log', 'stop-test.log', 'lifecycle-test.log', 'child-test.log']:
+    test_logs = ['restart-test.log', 'stop-test.log', 'lifecycle-test.log',
+                 'registration-test.log', 'child-test.log']
+    for name in test_logs:
         shutil.copy2(build / name, validation / name)
     archive = root / 'source' / f'connected-restart-{commit[:12]}.tar.gz'
     with tarfile.open(archive, 'w:gz') as tar:
@@ -61,7 +63,10 @@ def refresh_runtime(root, source, build, manifest, commit):
         graphics_preserved=True, launcher_preserved=True)
     info['changed_compiled_artifacts'] = sorted(set(info.get('changed_compiled_artifacts', []) + changes))
     (root / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
-    allowed = {*changes, 'android/SHA256SUMS', 'build-info.json', 'SHA256SUMS'}
+    allowed = {*changes, 'android/SHA256SUMS', 'build-info.json', 'SHA256SUMS',
+               'hdmi-control.sh', 'CONNECTED_RESTART.md',
+               'validation/connected-restart-build.json',
+               *(f'validation/{name}' for name in test_logs)}
     for name, want in original.items():
         if name not in allowed:
             assert sha(root / name) == want, name
@@ -132,8 +137,8 @@ def main():
     shutil.copy2(source / 'docs/CONNECTED_RESTART.md', root / 'README.txt')
     (root / 'module.prop').write_text(
         'id=hdmi-los\nname=HDMI BCDEF with connected session restart\n'
-        f'version=0.4.3-restart-{commit[:12]}\nversionCode=202610073\nauthor=KiralyCraft\n'
-        'description=Connected HDMI restart with acknowledged rollback, disconnect generations and prompt process cleanup.\n')
+        f'version=0.4.4-restart-{commit[:12]}\nversionCode=202610074\nauthor=KiralyCraft\n'
+        'description=Connected HDMI restart with correct agent capability acknowledgement during runtime replacement.\n')
     for name in ['hdmi-losd', 'hdmi-los-agent']:
         info['artifacts'][name] = dict(sha256=sha(build / name), size=(build / name).stat().st_size,
                                        repository_commit=commit)

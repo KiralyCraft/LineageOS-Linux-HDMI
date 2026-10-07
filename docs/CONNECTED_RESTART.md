@@ -24,6 +24,16 @@ Version 0.4.3 includes the corrected acquisition acknowledgement handling from
   on zombies. The leader remains unreaped until remaining group members have
   been terminated, preventing PID/group reuse during cleanup.
 
+Version 0.4.4 also acknowledges a new agent's continuous-session capability
+while the display is armed or paused. Version 0.4.3 omitted this flag from the
+paused registration reply, causing a replacement `--no-timeout` agent to refuse
+startup with "installed broker does not support continuous sessions". A separate
+host fixture exercises the real AcceptClient handler with idle, armed and
+paused states, continuous and bounded agents, and invalid registration flags.
+This fixture uses root credentials only on the build server; it performs no
+display or kernel-device operation. The installed 0.4.3 desktop can stay running
+while the 0.4.4 module awaits manual installation.
+
 Host fixtures run a complete pause/resume through the production event dispatch
 and inject faults at agent preparation, every composer acquire phase, and Xorg
 startup. They test delayed STOP acknowledgement, stale/failed replies, partial
@@ -43,8 +53,11 @@ command completed in 4.28 seconds, Xorg received a new PID, generation 5 balance
 its timing reference (gets=1/puts=1), and generation 6 started valid. Acceleration,
 asynchronous TearFree, E ABI 1 and the kernel presenter were active afterwards.
 The continuous desktop remained running. This validates one 4K30 restart;
-4K60, repeated restarts, runtime replacement and live failure injection remain
-untested. See `docs/experiments/CONNECTED-RESTART-20261007.md`.
+4K60, repeated restarts, successful paused runtime replacement and live failure
+injection remain untested. The October 7 paused replacement attempt exposed
+the registration bug described above; disarming and using the existing root
+diagnostic Start restored the desktop without a reboot. See
+`docs/experiments/CONNECTED-RESTART-20261007.md`.
 
 Install the candidate ZIP manually in Magisk and reboot once. A subsequent
 Linux desktop restart does not require an Android reboot or unplugging HDMI.
