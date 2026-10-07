@@ -1,0 +1,86 @@
+{
+  "runtime_mesa": "170a56fa943cc475472d170157efe58d7dd9b8c1",
+  "glxgears_upstream_tag": "mesa-demos-9.0.0",
+  "build_host": "root@192.168.104.201",
+  "compiler_flags": [
+    "-std=c11",
+    "-O1",
+    "-g",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fsanitize=address,undefined"
+  ],
+  "exit_code": 0,
+  "results": [
+    {
+      "case": "interval_zero_submission",
+      "last_completed_msc_fixture": 100,
+      "first_target": 102,
+      "last_target": 110,
+      "submitted": 9,
+      "fifo_order": true,
+      "async_options": true
+    },
+    {
+      "case": "oldest_not_ready",
+      "later_ready": 8,
+      "submitted": 0
+    },
+    {
+      "case": "interval_zero_full_slots",
+      "condition_wait_called": true
+    },
+    {
+      "case": "glxgears_event_replay",
+      "configure_events": 120,
+      "draws_expose_each": 120,
+      "draws_single_final_expose": 1
+    },
+    {
+      "sources_sha256": {
+        "pipeline": "3d80e4460807ba2a591a4e4858431405a19468650af3890c18e3be579267a62a",
+        "glxgears": "344a03aff01708350d90603fd6b841bccd295157670f519b459bbf3874acf847"
+      },
+      "scope": "production control-flow fragments with stubs; no physical display or GPU timing"
+    }
+  ],
+  "interpretation": "Control-flow probes with fake resources/events only. No live HDMI, no GPU fence/scanout validation and no latency measurement.",
+  "newer_mesa_control": {
+    "commit": "e04c1852d386046548676e7004cc9855b3e6bd66",
+    "exit_code": 0,
+    "results": [
+      {
+        "case": "interval_zero_submission",
+        "last_completed_msc_fixture": 100,
+        "first_target": 102,
+        "last_target": 110,
+        "submitted": 9,
+        "fifo_order": true,
+        "async_options": true
+      },
+      {
+        "case": "oldest_not_ready",
+        "later_ready": 8,
+        "submitted": 0
+      },
+      {
+        "case": "interval_zero_full_slots",
+        "condition_wait_called": true
+      },
+      {
+        "case": "glxgears_event_replay",
+        "configure_events": 120,
+        "draws_expose_each": 120,
+        "draws_single_final_expose": 1
+      },
+      {
+        "sources_sha256": {
+          "pipeline": "09ddb44808463e19c2f7e863029f1e6096a156985a2518ecfb413e94614b8ffe",
+          "glxgears": "344a03aff01708350d90603fd6b841bccd295157670f519b459bbf3874acf847"
+        },
+        "scope": "production control-flow fragments with stubs; no physical display or GPU timing"
+      }
+    ]
+  }
+}
