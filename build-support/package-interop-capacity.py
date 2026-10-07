@@ -27,6 +27,45 @@ def verify_build(build):
     return result
 
 
+def interop_launcher(launcher):
+    # sudo resets Mesa variables on this device. Parse before escalation and
+    # carry the chosen value through an argument, then export it in the parent.
+    defaults = 'CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDEF}'
+    assert launcher.count(defaults) == 1
+    launcher = launcher.replace(defaults, defaults + '\nRESIZE_CAPACITY=${MESA_KGSL_HDMI_RESIZE_CAPACITY:-1}')
+    launcher = launcher.replace('[--mesa-queue low-latency|fifo]',
+                                '[--mesa-queue low-latency|fifo] [--resize-capacity 0|1]')
+    parser = '        --candidate)'
+    assert launcher.count(parser) == 1
+    launcher = launcher.replace(parser, '''        --resize-capacity)
+            (($# >= 2)) || { usage; exit 2; }
+            RESIZE_CAPACITY=$2
+            shift 2
+            ;;
+''' + parser)
+    escalation = 'if ((EUID != 0)); then'
+    assert launcher.count(escalation) == 1
+    launcher = launcher.replace(escalation,
+        '[[ $RESIZE_CAPACITY == 0 || $RESIZE_CAPACITY == 1 ]] || { usage; exit 2; }\n' + escalation)
+    args = 'args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE")'
+    assert launcher.count(args) == 1
+    launcher = launcher.replace(args,
+        'args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE" --resize-capacity "$RESIZE_CAPACITY")')
+    anchor = """printf 'HDMI experimental candidate: %s\\n' "$CANDIDATE" >&2"""
+    assert launcher.count(anchor) == 1
+    return launcher.replace(anchor, anchor + '''
+# The private HDMI pipeline requires producer-ready Xorg allocation replies.
+export MESA_KGSL_HDMI_RESIZE_CAPACITY="$RESIZE_CAPACITY"
+unset MESA_KGSL_HDMI_ALLOC_READBACK_CONTROL
+if [[ ${MESA_KGSL_X11_PIPELINE:-0} == 1 ]]; then
+    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_EXPORT_ABI=1' "$BUNDLE/lib/xorg/modules/libglamoregl.so" &&
+    LC_ALL=C grep -aFq 'dri3_has_fd_export_fence' "$BUNDLE/libexec/Xorg" || {
+        printf 'Missing matched producer-ready Xorg exports\\n' >&2; exit 1;
+    }
+fi
+''')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     for name in ('base', 'mesa_build', 'xorg_build', 'mesa_source', 'repository', 'output'):
@@ -63,22 +102,7 @@ def main():
     for name, marker in [('lib/xorg/modules/libglamoregl.so', b'HDMI_LOS_XORG_EXPORT_ABI=1'),
                           ('lib/mesa/libgallium-26.2.0-devel.so', b'HDMI_LOS_MESA_CAPACITY_ABI=1')]:
         assert marker in (out / name).read_bytes(), name
-    launcher = (base / 'run-agent.sh').read_text()
-    anchor = """printf 'HDMI experimental candidate: %s\\n' "$CANDIDATE" >&2"""
-    assert launcher.count(anchor) == 1
-    control = """
-# The private HDMI pipeline requires producer-ready Xorg allocation replies.
-# Retain an independent control for the exact-size comparison.
-export MESA_KGSL_HDMI_RESIZE_CAPACITY=${MESA_KGSL_HDMI_RESIZE_CAPACITY:-1}
-unset MESA_KGSL_HDMI_ALLOC_READBACK_CONTROL
-if [[ ${MESA_KGSL_X11_PIPELINE:-0} == 1 ]]; then
-    LC_ALL=C grep -aFq 'HDMI_LOS_XORG_EXPORT_ABI=1' "$BUNDLE/lib/xorg/modules/libglamoregl.so" &&
-    LC_ALL=C grep -aFq 'dri3_has_fd_export_fence' "$BUNDLE/libexec/Xorg" || {
-        printf 'Missing matched producer-ready Xorg exports\\n' >&2; exit 1;
-    }
-fi
-"""
-    (out / 'run-agent.sh').write_text(launcher.replace(anchor, anchor + '\n' + control))
+    (out / 'run-agent.sh').write_text(interop_launcher((base / 'run-agent.sh').read_text()))
     subprocess.run(['bash', '-n', str(out / 'run-agent.sh')], check=True)
     # Native lease/input integration, installed companion and prior launch controls survive.
     for top in ('bin', 'android', 'companion', 'lib/mesa-baseline'):
@@ -145,7 +169,8 @@ Mesa keeps shared resolve destinations in 128-pixel capacity buckets. Applicatio
 render targets and logical viewport stay exact. Each Present carries a logical
 valid/update region. Fullscreen storage remains exact for flip eligibility.
 Three cached generations and a 512 MiB backing-size budget remain enforced.
-MESA_KGSL_HDMI_RESIZE_CAPACITY=0 ./run-agent.sh selects exact-size storage.
+./run-agent.sh --resize-capacity 0 selects exact-size storage. The equivalent
+MESA_KGSL_HDMI_RESIZE_CAPACITY=0 environment control survives sudo escalation.
 No diagnostic allocation readback is enabled by the launcher.
 
 Both Mesa and Xorg/modules were built on root@192.168.104.201. Validation records
