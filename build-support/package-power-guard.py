@@ -98,7 +98,7 @@ def main():
                                   thermal_policy='unchanged', broker_and_graphics_stack='unchanged'))
     (module / 'build-info.json').write_text(json.dumps(manifest, indent=2) + '\n')
     info = module / 'module.prop'
-    info.write_text(info.read_text().replace('version=0.1.2\n', f'version=0.1.2-{commit[:12]}\n'))
+    info.write_text(info.read_text().replace('version=0.1.3\n', f'version=0.1.3-{commit[:12]}\n'))
     # Magisk removes customize.sh after sourcing it. Verify the persisted
     # runtime, rather than referencing an installer-only file on every boot.
     (module / 'SHA256SUMS').write_text(''.join(

@@ -60,6 +60,18 @@ for a synthetic request before its first framework event. The host fixture
 now rejects invalid display-hint types and exercises an initial ON failure
 before the first OFF event, followed by successful recovery without repeats.
 
+With the installed 0.1.1 initialized and a 4K30 lease active, both awake and
+Dozing workloads reached 2.803 GHz on the performance cluster. The display-off
+940.8 MHz cap remained absent. However, the phone's OFF transition reset
+minimum cores from 4/1 to 3/0 while the guard continued renewing a positive
+vendor handle. A fresh overlapping probe also left hardware minimums unchanged,
+consistent with a retained cached vote rather than absence of the request.
+Version 0.1.3 retires its own core vote before each display-policy submission,
+then acquires a new vote afterwards. A fixture reproduces a hardware reset
+with cached votes intact and checks renewal through repeated ON/OFF events.
+This ordering change still needs live verification after manual installation;
+the existing version's frequency result is not proof of persistent core floors.
+
 Installation and every boot check exact ROM properties and hashes of PowerHAL,
 both performance libraries, and the three CPU resource profiles. Before
 PowerHAL starts, the gate manually bind-mounts a read-only launcher over its

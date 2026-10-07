@@ -130,6 +130,13 @@ def main():
             eventually(lambda s: s['mode'] == 1 and s['floor'])
             command('off')
             assert command('state')['mode'] == 1, 'Screen-off request escaped active HDMI policy'
+            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            time.sleep(.5)
+            assert command('state')['floor'], 'Core vote was lost after a display-state transition'
+            command('on')
+            eventually(lambda s: s['mode'] == 1 and s['floor'])
+            command('off')
+            eventually(lambda s: s['mode'] == 1 and s['floor'])
             command('other')
             assert command('state')['other'] == 0x1080, 'Unrelated hint changed'
             condition['mode'] = 'inactive'
@@ -179,7 +186,7 @@ def main():
             lease.write_text('0')
             eventually(lambda s: s['mode'] == 0 and not s['floor'])
             client.stdin.close(); assert client.wait(timeout=5) == 0
-            print('PASS: dynamic lookup, initial ON failure before first OFF, exact hint type/retry, hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, rejected core request, failed hint retry and normal exit')
+            print('PASS: dynamic lookup, initial ON failure before first OFF, exact hint type/retry, core vote renewal after display reset, hint forwarding, asleep unplug, awake unplug, broker timeout/closure, fragmented/truncated replies, wrong opcode/version, Android mirror, no active mode, monitor death/expiry, malformed lease, rejected core request, failed hint retry and normal exit')
         finally:
             if monitor.poll() is None:
                 monitor.terminate(); monitor.wait(timeout=3)

@@ -68,6 +68,11 @@ static void reconcile(bool active) {
     bool desired = android_on || active;
     if (!applied_known || desired != applied_on) {
       const struct hint_args *args = desired ? &on_args : &off_args;
+      /* Display-state policy can reset core_ctl without clearing the vendor's
+       * cached resource vote. Retire our vote before that transition, then
+       * create a fresh one afterwards; renewing an old handle cannot reapply
+       * a vote that the backend still considers unchanged. */
+      drop_floor();
       int result = real_hint(desired ? DISPLAY_ON : DISPLAY_OFF,
           args->seen ? args->data : "", args->duration, args->type);
       applied_known = result >= 0;
@@ -136,7 +141,7 @@ static int guarded_hint(int id, const char *data, int duration, int type) {
   free(args->data); args->data = saved;
   args->duration = duration; args->type = type; args->seen = true;
   bool active = enabled && lease_active();
-  if (!active) drop_floor();
+  drop_floor();
   int effective = android_on || active ? DISPLAY_ON : DISPLAY_OFF;
   int result = real_hint(effective, data, duration, type);
   applied_known = result >= 0;
