@@ -170,7 +170,7 @@ def main():
         check_sums(trial)
         names = {line.split('  ', 1)[1] for line in (trial / 'SHA256SUMS').read_text().splitlines()}
         assert names == {str(p.relative_to(trial)) for p in trial.rglob('*')
-                         if p.is_file() and p.name != 'SHA256SUMS'}
+                         if p.is_file() and p.relative_to(trial).as_posix() != 'SHA256SUMS'}
     (a.output / 'SHA256SUMS').write_text(f'{sha(target)}  {target.name}\n')
     print(target)
     print(bundle)
