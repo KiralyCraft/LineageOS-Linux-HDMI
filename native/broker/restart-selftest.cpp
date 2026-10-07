@@ -61,7 +61,7 @@ static void pause_test(bool acknowledge) {
   if(acknowledge){assert(b.PauseConnected(&detail)==HDMI_LOS_OK);}
   close(composer[0]);close(agent[0]);child_ok(child);
 }
-static void acquire_guard_test(bool changed,bool unplug_replug) {
+static void acquire_guard_test(bool changed,bool unplug_replug,uint32_t phase,bool missing_timing=false) {
   int sockets[2];assert(socketpair(AF_UNIX,SOCK_SEQPACKET,0,sockets)==0);
   pid_t child=fork();assert(child>=0);
   if(!child){
@@ -73,15 +73,29 @@ static void acquire_guard_test(bool changed,bool unplug_replug) {
       assert(send_with_fd(sockets[1],event,-1));
       event.flags=reply.flags;assert(send_with_fd(sockets[1],event,-1));
     }
+    // Match the deployed composer contract: phase replies carry no timing.
+    auto ack=make_message(request.opcode|HDMI_LOS_OP_RESPONSE);ack.version=HDMI_LOS_VERSION;
+    ack.flags=phase;ack.request_id=request.request_id;ack.state=HDMI_LOS_STATE_DRAINING;
+    ack.connector_id=79;ack.crtc_id=235;ack.plane_id=31;
+    int lease[2]={-1,-1};
+    if(phase==HDMI_LOS_ACQUIRE_CREATE)assert(pipe(lease)==0);
+    assert(send_with_fd(sockets[1],ack,lease[0]));
+    if(lease[0]>=0){close(lease[0]);close(lease[1]);}
+    assert(recv_with_fd(sockets[1],&request,&fd));assert(request.opcode==HDMI_LOS_OP_STATUS);
     if(changed)reply.active_refresh_millihz=60000;
+    if(missing_timing){reply.flags&=~HDMI_LOS_FLAG_ACTIVE_MODE;reply.active_width=0;}
     reply.opcode=request.opcode|HDMI_LOS_OP_RESPONSE;reply.request_id=request.request_id;
     assert(send_with_fd(sockets[1],reply,-1));_exit(0);
   }
   close(sockets[1]);Broker b;b.composer_fd_=sockets[0];b.connected_start_=true;
   assert(b.restart_.Remember(mode(),monotonic_ms()));
-  hdmi_los_message reply={};
-  assert(b.ComposerRequest(HDMI_LOS_OP_ACQUIRE,&reply,nullptr,HDMI_LOS_ACQUIRE_PREPARE));
-  assert(reply.status==((changed||unplug_replug)?HDMI_LOS_ERR_STATE:HDMI_LOS_OK));
+  hdmi_los_message reply={};int passed=-1;
+  assert(b.ComposerRequest(HDMI_LOS_OP_ACQUIRE,&reply,&passed,phase));
+  assert(reply.flags==phase && reply.active_width==0); // Original ACK preserved.
+  assert(reply.connector_id==79 && reply.crtc_id==235 && reply.plane_id==31);
+  assert((passed>=0)==(phase==HDMI_LOS_ACQUIRE_CREATE));
+  if(passed>=0){assert(fcntl(passed,F_GETFD)&FD_CLOEXEC);close(passed);}
+  assert(reply.status==((changed||unplug_replug||missing_timing)?HDMI_LOS_ERR_STATE:HDMI_LOS_OK));
   close(sockets[0]);child_ok(child);
 }
 static void resume_gate_test(bool changed) {
@@ -117,7 +131,10 @@ int main(){
   token.Cancel();assert(!token.Matches(mode()));
   status=mode();status.flags&=~HDMI_LOS_FLAG_CONNECTED;assert(!token.Remember(status,0));
   pause_test(true);pause_test(false);
-  acquire_guard_test(false,false);acquire_guard_test(true,false);acquire_guard_test(false,true);
+  for(uint32_t phase: {HDMI_LOS_ACQUIRE_PREPARE,HDMI_LOS_ACQUIRE_PAUSE,HDMI_LOS_ACQUIRE_CREATE}) {
+    acquire_guard_test(false,false,phase);acquire_guard_test(true,false,phase);
+    acquire_guard_test(false,true,phase);acquire_guard_test(false,false,phase,true);
+  }
   resume_gate_test(true);resume_gate_test(false);
   {
     Broker waiting;std::string detail;

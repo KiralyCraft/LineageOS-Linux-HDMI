@@ -4,6 +4,14 @@ This candidate updates the `hdmi-los` broker. The verified installed BCDEF
 composer payloads, kernel companion, redesigned Android app and bundled runtime
 are preserved byte for byte. `hdmi-los-power` remains a separate module.
 The new broker is compatible with the existing Downloads-based agents and APK.
+Version 0.4.2 corrects the first live restart failure in 0.4.1: acquisition
+acknowledgements report transition phase and lease objects, not display timing.
+The broker now requests actual STATUS after each acquire phase while preserving
+the acquisition reply and lease FD. Tests exercise the deployed reply contract
+at prepare, pause and create, including changed/missing timing and unplug/replug.
+The first live pause released its timing reference (gets=1, puts=1), restored
+Android and retained the connected 4K30 mode; re-acquisition was rejected before
+Xorg launched. Connected restart acceptance remains pending this correction.
 
 Install the candidate ZIP manually in Magisk and reboot once. A subsequent
 Linux desktop restart does not require an Android reboot or unplugging HDMI.

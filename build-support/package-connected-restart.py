@@ -30,7 +30,7 @@ def main():
  shutil.copy2(build/'hdmi-losd',root/'bin/hdmi-losd');(root/'bin/hdmi-losd').chmod(0o755)
  shutil.copy2(source/'docs/CONNECTED_RESTART.md',root/'README.txt')
  (root/'module.prop').write_text('id=hdmi-los\nname=HDMI BCDEF with connected session restart\n'
-  f'version=0.4.1-restart-{commit[:12]}\nversionCode=202610071\nauthor=KiralyCraft\n'
+  f'version=0.4.2-restart-{commit[:12]}\nversionCode=202610072\nauthor=KiralyCraft\n'
   'description=Restart or switch the Linux runtime without unplugging HDMI; preserve negotiated timing and restore Android on failure.\n')
  info=json.loads((root/'build-info.json').read_text())
  info['artifacts']['hdmi-losd']={'sha256':sha(root/'bin/hdmi-losd'),'repository_commit':commit}

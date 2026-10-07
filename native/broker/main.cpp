@@ -200,7 +200,7 @@ bool recv_with_fd(int fd, hdmi_los_message *message, int *passed_fd) {
   header.msg_controllen = sizeof(control);
   ssize_t result;
   do {
-    result = recvmsg(fd, &header, MSG_WAITALL);
+    result = recvmsg(fd, &header, MSG_WAITALL | MSG_CMSG_CLOEXEC);
   } while (result < 0 && errno == EINTR);
   if (result != static_cast<ssize_t>(sizeof(*message))) return false;
   if (passed_fd) *passed_fd = -1;
@@ -583,10 +583,18 @@ class Broker {
       else if (received_fd >= 0) close(received_fd);
       CacheComposerStatus(*response);
       if (opcode == HDMI_LOS_OP_ACQUIRE && connected_start_ &&
-          response->status == HDMI_LOS_OK &&
-          (restart_.Expired(monotonic_ms()) || !restart_.Matches(*response))) {
-        response->status = HDMI_LOS_ERR_STATE;
-        snprintf(response->detail, sizeof(response->detail), "connected restart timing changed during takeover");
+          response->status == HDMI_LOS_OK) {
+        // Acquire replies contain phase/object identity, not timing. Preserve
+        // that reply (and its received lease FD) and query the composer's real
+        // status after each successful phase. Never infer mode from a phase ACK.
+        hdmi_los_message timing_status = {};
+        bool queried = ComposerRequest(HDMI_LOS_OP_STATUS, &timing_status);
+        if (!queried || timing_status.status != HDMI_LOS_OK ||
+            restart_.Expired(monotonic_ms()) || !restart_.Matches(timing_status)) {
+          response->status = queried ? HDMI_LOS_ERR_STATE : HDMI_LOS_ERR_IO;
+          snprintf(response->detail, sizeof(response->detail),
+                   "cannot verify connected restart timing after composer acquire");
+        }
       }
       return !composer_disconnect_pending_;
     }
