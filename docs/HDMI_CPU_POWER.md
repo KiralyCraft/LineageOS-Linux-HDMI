@@ -123,3 +123,8 @@ restores policy through expiry; reboot removes the boot-time launcher mount.
 Physical screen-off, core-floor arbitration, Binder reconnection and boot
 activation remain pending manual installation and live testing. No improvement
 in Maps or display cadence is claimed by the CPU guard fixtures.
+
+See [live October 7 results](experiments/CPU-POWER-20261007.md): the initialized
+0.1.1 preserved the normal frequency ceiling while dozing and restored Android
+policy after unplug. It lost its minimum-core vote on the OFF transition.
+The 0.1.3 core-vote correction still awaits manual installation and live testing.
