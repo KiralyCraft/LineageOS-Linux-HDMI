@@ -29,6 +29,7 @@
 
 #include "hdmi_los_protocol.h"
 #include "hdmi_los_trace.h"
+#include "hdmi_child_process.h"
 
 namespace {
 
@@ -278,21 +279,7 @@ std::string xorg_binary() {
 }
 
 void terminate_group(pid_t *pid) {
-  if (!pid || *pid <= 1) return;
-  pid_t target = *pid;
-  if (process_alive(target)) {
-    pid_t group = getpgid(target);
-    if (group == target) kill(-target, SIGTERM);
-    else kill(target, SIGTERM);
-    int64_t end = monotonic_ms() + 2000;
-    while (process_alive(target) && monotonic_ms() < end) usleep(50000);
-    if (process_alive(target)) {
-      if (group == target) kill(-target, SIGKILL);
-      else kill(target, SIGKILL);
-    }
-  }
-  while (waitpid(target, nullptr, 0) < 0 && errno == EINTR) {}
-  *pid = -1;
+  hdmi_terminate_group(pid);
 }
 
 int run_wait(const std::vector<std::string> &arguments, uid_t uid = 0, gid_t gid = 0,

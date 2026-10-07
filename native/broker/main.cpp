@@ -31,6 +31,7 @@
 #include "hdmi_los_protocol.h"
 #include "hdmi_timing_session.h"
 #include "hdmi_connected_restart.h"
+#include "hdmi_agent_reader.h"
 
 namespace {
 
@@ -447,6 +448,7 @@ struct VolumeGuard {
 
 class Broker {
  public:
+  virtual ~Broker() = default;
   int Run() {
     LoadConfiguredMode();
     RecoverPreferredMode("broker startup");
@@ -457,48 +459,9 @@ class Broker {
     }
     log_line("info", "broker ready");
     while (!g_stop) {
-      pollfd fds[5] = {
-          {listen_fd_, POLLIN, 0},
-          {composer_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
-          {agent_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
-          {volumes_.down, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
-          {volumes_.up, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
-      };
-      int result = poll(fds, 5, (active_ || armed_) ? 100 : 1000);
-      if (result < 0 && errno == EINTR) continue;
-      if (result < 0) break;
-      if (fds[0].revents & POLLIN) AcceptClient();
-      if (composer_fd_ >= 0 && (fds[1].revents & (POLLERR | POLLHUP | POLLNVAL))) {
-        close(composer_fd_);
-        composer_fd_ = -1;
-        if (active_) Release("composer disconnected", false);
-        if (restart_.ready()) Disarm("connected restart cancelled: composer disconnected");
-      } else if (composer_fd_ >= 0 && (fds[1].revents & POLLIN)) {
-        ComposerHotplug hotplug = HandleComposerReadable();
-        if (hotplug == ComposerHotplug::kInvalid) {
-          if (active_) Release("invalid composer hotplug event", true);
-          else if (armed_) Disarm("invalid composer hotplug event");
-        } else if (hotplug == ComposerHotplug::kDisconnected) {
-          if (active_) Release("composer hotplug/disconnect event", true);
-          else if (armed_) PreserveArmAcrossDisconnect();
-        }
-      }
-      if (agent_fd_ >= 0 && (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
-        close(agent_fd_);
-        agent_fd_ = -1;
-        agent_continuous_ = false;
-        agent_timing_required_ = false;
-        if (active_) Release("chroot agent disconnected", true);
-      } else if (agent_fd_ >= 0 && (fds[2].revents & POLLIN)) {
-        hdmi_los_message event = {};
-        if (!read_full(agent_fd_, &event, sizeof(event)) || !valid_message(event) ||
-            !HandleAgentEvent(event)) {
-          if (active_) Release("Xorg agent reported failure", true);
-        }
-      }
-      if (active_ && volumes_.Update(fds[3].revents, fds[4].revents)) {
-        Release("both-volume escape or volume input loss", true);
-      }
+      if (!PollOnce()) break;
+      if (active_ && session_disconnect_generation_ != disconnect_generation_)
+        Release("HDMI disconnected during a broker request", true);
       if (active_ && composer_renewable_ &&
           monotonic_ms() >= composer_heartbeat_ms_) {
         hdmi_los_message response = {};
@@ -532,6 +495,83 @@ class Broker {
   }
 
  private:
+  // Dispatch one readiness snapshot only. Commands, restore and watchdog
+  // helpers can drain or replace other descriptors; always poll again after
+  // them. Run still checks timers after every dispatch, including client work.
+  bool PollOnce() {
+    pollfd fds[5] = {
+        {listen_fd_, POLLIN, 0},
+        {composer_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+        {agent_fd_, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+        {volumes_.down, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+        {volumes_.up, static_cast<short>(POLLIN | POLLERR | POLLHUP), 0},
+    };
+    int result = poll(fds, 5, (active_ || armed_) ? 100 : 1000);
+    if (result < 0) return errno == EINTR;
+    if (active_ && volumes_.Update(fds[3].revents, fds[4].revents)) {
+      Release("both-volume escape or volume input loss", true);
+      return true;
+    }
+    if (fds[0].revents & POLLIN) { AcceptClient(); return true; }
+    if (composer_fd_ >= 0 && (fds[1].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+      close(composer_fd_);
+      composer_fd_ = -1;
+      if (active_) Release("composer disconnected", false);
+      if (restart_.ready()) Disarm("connected restart cancelled: composer disconnected");
+      return true;
+    }
+    if (composer_fd_ >= 0 && (fds[1].revents & POLLIN)) {
+      ComposerHotplug hotplug = HandleComposerReadable();
+      if (hotplug == ComposerHotplug::kInvalid) {
+        if (active_) Release("invalid composer hotplug event", true);
+        else if (armed_ || restart_.ready()) Disarm("invalid composer hotplug event");
+      } else if (hotplug == ComposerHotplug::kDisconnected) {
+        if (active_) Release("composer hotplug/disconnect event", true);
+        else if (armed_) PreserveArmAcrossDisconnect();
+      }
+      return true;
+    }
+    if (agent_fd_ >= 0 && (fds[2].revents & POLLIN)) {
+      hdmi_los_message event = {};
+      auto read = agent_reader_.ReadAvailable(agent_fd_, &event);
+      if (read == HdmiAgentReader::Result::kError ||
+          (read == HdmiAgentReader::Result::kMessage && !valid_message(event))) {
+        ForgetAgent();
+        if (active_) Release("invalid or disconnected Xorg agent", true);
+      } else if (read == HdmiAgentReader::Result::kMessage && !HandleAgentEvent(event)) {
+        if (active_) Release("Xorg agent reported failure", true);
+      }
+      return true;
+    }
+    if (agent_fd_ >= 0 && (fds[2].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+      ForgetAgent();
+      if (active_) Release("chroot agent disconnected", true);
+    }
+    return true;
+  }
+
+  void ForgetAgent() {
+    if (agent_fd_ >= 0) close(agent_fd_);
+    agent_fd_ = -1;
+    agent_reader_.Reset();
+    agent_continuous_ = false;
+    agent_timing_required_ = false;
+  }
+
+  void ObserveHotplug(const hdmi_los_message &event) {
+    const bool connected = event.flags & HDMI_LOS_FLAG_CONNECTED;
+    if (!connected) {
+      ++disconnect_generation_;
+      bool paused = restart_.ready() && !active_ && !starting_;
+      restart_.Cancel();
+      // Startup rollback must stop Xorg/release the lease before restoring
+      // Android's preferred mode; never run that recovery in an acquire read.
+      if (paused) Disarm("connected restart cancelled: HDMI unplugged");
+    }
+    CacheComposerStatus(event);
+    composer_disconnect_pending_ = !connected;
+  }
+
   bool EnsureComposer() {
     if (composer_fd_ >= 0) return true;
     composer_fd_ = connect_abstract(HDMI_LOS_COMPOSER_SOCKET, SOCK_SEQPACKET);
@@ -565,12 +605,7 @@ class Broker {
       }
       if (response->opcode == HDMI_LOS_OP_HOTPLUG && response->request_id == 0) {
         if (received_fd >= 0) close(received_fd);
-        if (!(response->flags & HDMI_LOS_FLAG_CONNECTED) && restart_.ready()) {
-          restart_.Cancel();
-          if (!active_) Disarm("connected restart cancelled: HDMI unplugged");
-        }
-        CacheComposerStatus(*response);
-        composer_disconnect_pending_ = !(response->flags & HDMI_LOS_FLAG_CONNECTED);
+        ObserveHotplug(*response);
         continue;
       }
       if (response->request_id != request.request_id) {
@@ -618,10 +653,8 @@ class Broker {
       return ComposerHotplug::kInvalid;
     }
     if (passed_fd >= 0) close(passed_fd);
-    CacheComposerStatus(event);
+    ObserveHotplug(event);
     bool connected = event.flags & HDMI_LOS_FLAG_CONNECTED;
-    if (!connected && restart_.ready()) Disarm("connected restart cancelled: HDMI unplugged");
-    composer_disconnect_pending_ = !connected;
     log_transition(connected ? "composer reports external display connected" :
                                "composer reports external display disconnected");
     return connected ? ComposerHotplug::kConnected : ComposerHotplug::kDisconnected;
@@ -671,9 +704,12 @@ class Broker {
       }
       if (!stopping && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_) return false;
       if (fds[0].revents & POLLIN) {
-        if (!read_full(agent_fd_, response, sizeof(*response)) || !valid_message(*response)) {
-          return false;
-        }
+        auto read = agent_reader_.ReadAvailable(agent_fd_, response);
+        if (read == HdmiAgentReader::Result::kError) return false;
+        if (read == HdmiAgentReader::Result::kPending) continue;
+        if (!valid_message(*response) || monotonic_ms() >= end ||
+            (!stopping && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_)) return false;
+        if (stopping && response->opcode == HDMI_LOS_OP_AGENT_FAILED) continue;
         if (response->opcode == HDMI_LOS_OP_AGENT_PROGRESS) {
           if (!HandleAgentEvent(*response)) return false;
           continue;
@@ -939,13 +975,9 @@ class Broker {
     }
   }
 
-  int Start(uint32_t probe_mode, std::string *detail) {
-    if (active_) return HDMI_LOS_ERR_BUSY;
-    if (probe_mode != HDMI_LOS_PROBE_XORG_LEGACY &&
-        probe_mode != HDMI_LOS_PROBE_XORG_ATOMIC) {
-      *detail = "invalid Xorg probe mode";
-      return HDMI_LOS_ERR_PROTOCOL;
-    }
+  // Platform boundary: host lifecycle fixtures replace only these Android
+  // prerequisites, while running the production state machine and sockets.
+  virtual int AcquireStartupGuards(std::string *detail) {
     if (!compatible()) {
       *detail = "module compatibility gate is closed";
       return HDMI_LOS_ERR_INCOMPATIBLE;
@@ -953,10 +985,6 @@ class Broker {
     if (!diagnostic_dump_ready()) {
       *detail = "display recovery dump gate is not enabled";
       return HDMI_LOS_ERR_INCOMPATIBLE;
-    }
-    if (agent_fd_ < 0) {
-      *detail = "start the chroot agent first";
-      return HDMI_LOS_ERR_AGENT;
     }
     if (!volumes_.Acquire()) {
       *detail = "both physical volume inputs are required";
@@ -967,6 +995,32 @@ class Broker {
       CleanupGuards();
       return HDMI_LOS_ERR_UNAVAILABLE;
     }
+    return HDMI_LOS_OK;
+  }
+
+  int AbortStart(int failure, const std::string &message, std::string *detail) {
+    // Keep the originating error separate from STOP/RELEASE replies.
+    bool restored = Release(message.c_str(), true);
+    *detail = message;
+    if (!restored) *detail += "; forced recovery after stop/restore failure";
+    return failure;
+  }
+
+  int Start(uint32_t probe_mode, std::string *detail) {
+    if (active_) return HDMI_LOS_ERR_BUSY;
+    if (probe_mode != HDMI_LOS_PROBE_XORG_LEGACY &&
+        probe_mode != HDMI_LOS_PROBE_XORG_ATOMIC) {
+      *detail = "invalid Xorg probe mode";
+      return HDMI_LOS_ERR_PROTOCOL;
+    }
+    if (agent_fd_ < 0) {
+      *detail = "start the chroot agent first";
+      return HDMI_LOS_ERR_AGENT;
+    }
+    int gate = AcquireStartupGuards(detail);
+    if (gate != HDMI_LOS_OK) return gate;
+    starting_ = true;
+    session_disconnect_generation_ = disconnect_generation_;
     session_continuous_ = agent_continuous_;
     // The user's session limit and the composer's crash watchdog have separate
     // lifetimes. Renew the latter for timing-guard sessions, including bounded
@@ -987,11 +1041,8 @@ class Broker {
     hdmi_los_message response = {};
     if (!write_full(agent_fd_, &request, sizeof(request)) ||
         !WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentPrepareMs, &response, false, request.request_id)) {
-      *detail = "chroot agent preparation failed";
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      write_full(agent_fd_, &stop, sizeof(stop));
-      CleanupGuards();
-      return HDMI_LOS_ERR_AGENT;
+      return AbortStart(HDMI_LOS_ERR_AGENT,
+          response.detail[0] ? response.detail : "chroot agent preparation failed", detail);
     }
     log_transition("takeover agent-prepare complete");
 
@@ -1004,11 +1055,7 @@ class Broker {
       *detail = response.detail[0] ? response.detail : "composer lease request failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
       log_transition("takeover composer-prepare failed");
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      write_full(agent_fd_, &stop, sizeof(stop));
-      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-      CleanupGuards();
-      return failure_status;
+      return AbortStart(failure_status, *detail, detail);
     }
     log_transition("takeover composer-prepare complete");
 
@@ -1020,11 +1067,7 @@ class Broker {
       *detail = response.detail[0] ? response.detail : "composer display pause failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
       log_transition("takeover composer-pause failed");
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      write_full(agent_fd_, &stop, sizeof(stop));
-      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-      CleanupGuards();
-      return failure_status;
+      return AbortStart(failure_status, *detail, detail);
     }
     log_transition("takeover composer-pause complete");
 
@@ -1037,12 +1080,8 @@ class Broker {
       *detail = response.detail[0] ? response.detail : "composer lease creation failed";
       int failure_status = response.status ? response.status : HDMI_LOS_ERR_IO;
       log_transition("takeover composer-create failed");
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      write_full(agent_fd_, &stop, sizeof(stop));
       if (lease_fd >= 0) close(lease_fd);
-      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-      CleanupGuards();
-      return failure_status;
+      return AbortStart(failure_status, *detail, detail);
     }
     log_transition("takeover composer-create complete");
 
@@ -1050,11 +1089,7 @@ class Broker {
       if (!timing_.Start(lease_fd, response.connector_id, response.crtc_id,
                          response.plane_id, detail)) {
         close(lease_fd);
-        hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-        write_full(agent_fd_, &stop, sizeof(stop));
-        ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-        CleanupGuards();
-        return HDMI_LOS_ERR_INCOMPATIBLE;
+        return AbortStart(HDMI_LOS_ERR_INCOMPATIBLE, *detail, detail);
       }
       std::string message = "timing session valid, " + timing_.Describe();
       log_line("info", message.c_str());
@@ -1069,26 +1104,22 @@ class Broker {
     request.flags = probe_mode;
     if (!send_with_fd(agent_fd_, request, lease_fd)) {
       close(lease_fd);
-      StopTiming();
-      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-      CleanupGuards();
-      *detail = "could not deliver lease fd to chroot agent";
-      return HDMI_LOS_ERR_AGENT;
+      return AbortStart(HDMI_LOS_ERR_AGENT, "could not deliver lease fd to chroot agent", detail);
     }
     close(lease_fd);
+    response = {};
     if (!WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentStartMs, &response, false, request.request_id)) {
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      write_full(agent_fd_, &stop, sizeof(stop));
-      StopTiming();
-      ComposerRequest(HDMI_LOS_OP_RELEASE, &response);
-      CleanupGuards();
-      *detail = response.opcode == HDMI_LOS_OP_AGENT_FAILED && response.detail[0] ?
-          response.detail : "Xorg did not complete verified scanout within 15 seconds";
-      return response.opcode == HDMI_LOS_OP_AGENT_FAILED ? HDMI_LOS_ERR_AGENT :
-                                                          HDMI_LOS_ERR_TIMEOUT;
+      bool failed = response.opcode == HDMI_LOS_OP_AGENT_FAILED;
+      return AbortStart(failed ? HDMI_LOS_ERR_AGENT : HDMI_LOS_ERR_TIMEOUT,
+          failed && response.detail[0] ? response.detail :
+              "Xorg did not complete verified scanout within 15 seconds", detail);
     }
+    if (session_disconnect_generation_ != disconnect_generation_ ||
+        (connected_start_ && (!restart_.ready() || restart_.Expired(monotonic_ms()))))
+      return AbortStart(HDMI_LOS_ERR_STATE, "HDMI session changed during startup", detail);
     log_transition("takeover agent-start complete");
 
+    starting_ = false;
     active_ = true;
     if (composer_renewable_) {
       composer_heartbeat_ms_ = monotonic_ms() + kComposerHeartbeatSeconds * 1000;
@@ -1229,21 +1260,26 @@ class Broker {
     composer_renewable_ = false;
   }
 
+  bool StopAgent(int timeout_ms = kAgentStopMs) {
+    if (agent_fd_ < 0) return true;
+    hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
+    hdmi_los_message response = {};
+    log_transition("restore agent-stop begin");
+    bool stopped = write_full(agent_fd_, &stop, sizeof(stop)) &&
+        WaitAgent(HDMI_LOS_OP_AGENT_READY, timeout_ms, &response, true, stop.request_id);
+    log_transition(stopped ? "restore agent-stop complete" : "restore agent-stop timeout/failure");
+    // Do not reuse a connection whose stop was not acknowledged. The agent's
+    // independent disconnect cleanup is the fallback before forced revocation.
+    if (!stopped) ForgetAgent();
+    return stopped;
+  }
+
   bool Release(const char *reason, bool tell_composer, bool keep_preferred_mode = false) {
-    if (!active_ && volumes_.down < 0 && volumes_.up < 0 && !timing_.generation()) return true;
-    bool stopped = agent_fd_ < 0;
-    bool restored = !tell_composer;
+    if (!active_ && !starting_ && volumes_.down < 0 && volumes_.up < 0 && !timing_.generation()) return true;
     log_line("warning", reason);
     log_transition("restore begin");
-    if (agent_fd_ >= 0) {
-      hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
-      hdmi_los_message response = {};
-      if (write_full(agent_fd_, &stop, sizeof(stop))) {
-        log_transition("restore agent-stop begin");
-        stopped = WaitAgent(HDMI_LOS_OP_AGENT_READY, kAgentStopMs, &response, true, stop.request_id);
-        log_transition(stopped ? "restore agent-stop complete" : "restore agent-stop timeout/failure");
-      }
-    }
+    bool stopped = StopAgent();
+    bool restored = !tell_composer;
     StopTiming();
     if (tell_composer && composer_fd_ >= 0) {
       hdmi_los_message response = {};
@@ -1251,6 +1287,7 @@ class Broker {
                  response.status == HDMI_LOS_OK && response.state == HDMI_LOS_STATE_ANDROID;
     }
     active_ = false;
+    starting_ = false;
     CleanupGuards();
     if (armed_) {
       armed_ = false;
@@ -1260,7 +1297,7 @@ class Broker {
       if (!keep_preferred_mode) RecoverPreferredMode(reason);
     }
     state_detail_ = reason;
-    log_transition("restore complete");
+    log_transition(stopped && restored ? "restore complete" : "restore forced or incomplete");
     return stopped && restored;
   }
 
@@ -1272,8 +1309,12 @@ class Broker {
     if (!active_) { *detail = "connected session already paused"; return HDMI_LOS_OK; }
     hdmi_los_message status = {};
     if (!ComposerRequest(HDMI_LOS_OP_STATUS, &status) ||
+        status.status != HDMI_LOS_OK ||
+        session_disconnect_generation_ != disconnect_generation_ ||
         !restart_.Remember(status, monotonic_ms())) {
-      *detail = "cannot snapshot the connected session timing";
+      Release("cannot snapshot the original connected session timing", true);
+      Disarm("connected pause cancelled: session changed or status unavailable");
+      *detail = state_detail_;
       return HDMI_LOS_ERR_STATE;
     }
     if (!Release("explicit connected session pause", true, true) || !restart_.ready()) {
@@ -1302,7 +1343,7 @@ class Broker {
     while (!g_stop && monotonic_ms() < end) {
       if (restart_.Expired(monotonic_ms())) break;
       hdmi_los_message status = {};
-      if (!ComposerRequest(HDMI_LOS_OP_STATUS, &status) || !restart_.ready() ||
+      if (!ComposerRequest(HDMI_LOS_OP_STATUS, &status) || status.status != HDMI_LOS_OK || !restart_.ready() ||
           !(status.flags & HDMI_LOS_FLAG_CONNECTED)) break;
       if ((status.flags & HDMI_LOS_FLAG_ACTIVE_MODE) && !restart_.Matches(status)) break;
       if (restart_.Matches(status) && (status.flags & HDMI_LOS_FLAG_LEASE_READY)) {
@@ -1382,11 +1423,12 @@ class Broker {
     return status;
   }
 
-  void AcceptClient() {
+  virtual void AcceptClient() {
     int client = accept4(listen_fd_, nullptr, nullptr, SOCK_CLOEXEC);
     if (client < 0) return;
     timeval timeout = {1, 0};
     setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     ucred credentials = {};
     socklen_t length = sizeof(credentials);
     if (getsockopt(client, SOL_SOCKET, SO_PEERCRED, &credentials, &length) < 0) {
@@ -1433,6 +1475,7 @@ class Broker {
         close(client);
       } else {
         agent_fd_ = client;
+        agent_reader_.Reset();
         agent_continuous_ = request.flags & HDMI_LOS_FLAG_CONTINUOUS;
         agent_timing_required_ = request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED;
         hdmi_los_message ready = Status(request.request_id);
@@ -1532,6 +1575,10 @@ class Broker {
   int composer_fd_ = -1;
   int agent_fd_ = -1;
   bool active_ = false;
+  bool starting_ = false;
+  uint64_t disconnect_generation_ = 0;
+  uint64_t session_disconnect_generation_ = 0;
+  HdmiAgentReader agent_reader_;
   bool probing_ = false;
   bool agent_continuous_ = false;
   bool session_continuous_ = false;
