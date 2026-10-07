@@ -9,11 +9,38 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import zipfile
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def verify_installed_layout(archive_path):
+    """Check the ZIP after Magisk 29's documented installer cleanup.
+
+    customize.sh is sourced during installation and then deleted. README.md,
+    .git* and system/placeholder are also installer-only paths. README.txt is
+    deliberately retained. Runtime checks must still cover every retained file.
+    """
+    with tempfile.TemporaryDirectory(prefix='hdmi-power-install-layout-') as directory:
+        root = Path(directory)
+        with zipfile.ZipFile(archive_path) as archive:
+            archive.extractall(root)
+        for path in [root / 'customize.sh', root / 'README.md',
+                     root / 'system/placeholder', *root.glob('.git*')]:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+        subprocess.run(['sha256sum', '--strict', '-c', 'SHA256SUMS'], cwd=root,
+                       check=True, stdout=subprocess.DEVNULL)
+        retained = {str(p.relative_to(root)) for p in root.rglob('*')
+                    if p.is_file() and p.name != 'SHA256SUMS'}
+        covered = {line.split('  ', 1)[1] for line in (root / 'SHA256SUMS').read_text().splitlines()}
+        assert covered == retained, 'Runtime checksum list must cover every retained file'
+        assert (root / 'README.txt').is_file()
 
 
 def main():
@@ -38,7 +65,7 @@ def main():
     commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
     paths = ['native/power', 'module-power', 'tests/power-guard-test.py',
              'build-support/build-power-guard.sh', 'build-support/package-power-guard.py',
-             'module/mount-utils.sh', 'docs/HDMI_CPU_POWER.md']
+             'module/mount-utils.sh', 'docs/HDMI_CPU_POWER.md', 'tests/power-package-test.py']
     assert not subprocess.check_output(
         ['git', '-C', str(source), 'status', '--porcelain', '--', *paths], text=True), 'Commit CPU guard sources first'
     a.output.mkdir(parents=True, exist_ok=False)
@@ -62,16 +89,21 @@ def main():
         path.chmod(0o755)
     manifest.update(source_commit=commit, magisk_id='hdmi-los-power', installed=False,
                     original_powerhal_sha256=digest(a.stock_powerhal),
-                    validation={**manifest['validation'], 'physical_hdmi_screen_off': 'pending manual install and test'},
+                    validation={**manifest['validation'],
+                                'magisk_installed_layout_checksums': 'PASS after installer cleanup',
+                                'physical_hdmi_screen_off': 'pending manual install and test'},
                     behavior=dict(lease_expiry_ms=1500, core_floor_duration_ms=1000,
                                   performance_min_cores=4, prime_min_cores=1,
                                   frequency_minimum='unchanged', frequency_maximum='unchanged',
                                   thermal_policy='unchanged', broker_and_graphics_stack='unchanged'))
     (module / 'build-info.json').write_text(json.dumps(manifest, indent=2) + '\n')
     info = module / 'module.prop'
-    info.write_text(info.read_text().replace('version=0.1\n', f'version=0.1-{commit[:12]}\n'))
+    info.write_text(info.read_text().replace('version=0.1.1\n', f'version=0.1.1-{commit[:12]}\n'))
+    # Magisk removes customize.sh after sourcing it. Verify the persisted
+    # runtime, rather than referencing an installer-only file on every boot.
     (module / 'SHA256SUMS').write_text(''.join(
-        f'{digest(p)}  {p.relative_to(module)}\n' for p in sorted(module.rglob('*')) if p.is_file()))
+        f'{digest(p)}  {p.relative_to(module)}\n' for p in sorted(module.rglob('*'))
+        if p.is_file() and p.relative_to(module) != Path('customize.sh')))
     subprocess.run(['sha256sum', '--strict', '-c', 'SHA256SUMS'], cwd=module,
                    check=True, stdout=subprocess.DEVNULL)
     target = a.output / f'hdmi-los-cpu-power-{commit[:12]}-magisk.zip'
@@ -89,6 +121,7 @@ def main():
         assert archive.testzip() is None
         assert not any(p in archive.namelist() for p in ('skip_mount', 'system/vendor/bin/hw/android.hardware.power-service-qti'))
         assert archive.read('system/vendor/bin/hw/android.hardware.power-service-qti.hdmi-stock') == a.stock_powerhal.read_bytes()
+    verify_installed_layout(target)
     (a.output / 'SHA256SUMS').write_text(f'{digest(target)}  {target.name}\n')
     print(target)
 

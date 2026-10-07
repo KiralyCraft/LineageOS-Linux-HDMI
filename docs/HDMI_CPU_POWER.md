@@ -43,6 +43,14 @@ manifest hashes source and binary artifacts. The ZIP privately includes an
 identical stock PowerHAL, not a modified Qualcomm library. Do not commit or
 publish the vendor binary or the generated ZIP.
 
+The runtime checksum list excludes the installer-only `customize.sh`, which
+Magisk deletes after installation. Packaging simulates the installer's cleanup
+and verifies both checksums and complete coverage of all retained files.
+The initial a90311d package remained inactive because its boot checksum list
+included that deleted script. Live inspection confirmed stock PowerHAL was
+unchanged; the corrected 0.1.1 package supersedes it without rebuilding the
+native components.
+
 Installation and every boot check exact ROM properties and hashes of PowerHAL,
 both performance libraries, and the three CPU resource profiles. Before
 PowerHAL starts, the gate manually bind-mounts a read-only launcher over its
@@ -61,7 +69,8 @@ unchanged stock service in the same PowerHAL domain.
 
 Magisk boot ordering and mount behavior references:
 [developer guide](https://topjohnwu.github.io/Magisk/guides.html#boot-scripts),
-[Magisk 29 module.cpp](https://github.com/topjohnwu/Magisk/blob/v29.0/native/src/core/module.cpp).
+[Magisk 29 module.cpp](https://github.com/topjohnwu/Magisk/blob/v29.0/native/src/core/module.cpp),
+[installer cleanup](https://github.com/topjohnwu/Magisk/blob/v29.0/scripts/util_functions.sh#L687).
 
 ## Validation and deployment
 
