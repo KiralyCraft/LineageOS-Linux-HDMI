@@ -58,8 +58,11 @@ def main():
     ap.add_argument('output', type=pathlib.Path)
     ap.add_argument('--workload', choices=['ordering', 'resize-pattern', 'unique-resize'], default='ordering')
     ap.add_argument('--samples', type=int, choices=[0,4], default=0)
+    ap.add_argument('--large-resize', action='store_true',
+                    help='Unmanaged full-screen and near-full-screen allocation boundaries')
     ap.add_argument('--flush-control', action='store_true', help='Diagnostic glFlush before swap; never glFinish')
     args = ap.parse_args()
+    assert not args.large_resize or args.workload == 'resize-pattern'
     args.output.mkdir(exist_ok=False, parents=True)
     X, G = C.CDLL('libX11.so.6'), C.CDLL('libGL.so.1')
 
@@ -82,11 +85,13 @@ def main():
         d, screen, (I * len(visual_attributes))(*visual_attributes))
     assert vi
     cmap = bind(X, 'XCreateColormap', L, [V, L, V, I])(d, root, vi.contents.visual, 0)
-    attrs = pattern.Attributes(background_pixel=0, colormap=cmap, event_mask=(1 << 15) | (1 << 17))
+    attrs = pattern.Attributes(background_pixel=0, colormap=cmap, event_mask=(1 << 15) | (1 << 17),
+                               override_redirect=int(args.large_resize))
     window = bind(X, 'XCreateWindow', L,
                   [V, L, I, I, U, U, U, I, U, V, L, C.POINTER(pattern.Attributes)])(
-                      d, root, 160, 180, 800, 600, 0, vi.contents.depth, 1,
-                      vi.contents.visual, (1 << 1) | (1 << 13) | (1 << 11), C.byref(attrs))
+                      d, root, 0 if args.large_resize else 160, 0 if args.large_resize else 180,
+                      800, 600, 0, vi.contents.depth, 1,
+                      vi.contents.visual, (1 << 1) | (1 << 13) | (1 << 11) | (1 << 9), C.byref(attrs))
     context = bind(G, 'glXCreateContext', V, [V, C.POINTER(pattern.Visual), V, I])(d, vi, None, 1)
     make = bind(G, 'glXMakeCurrent', I, [V, L, V])
     assert window and context
@@ -135,6 +140,7 @@ def main():
     result = dict(renderer=renderer, samples=samples.value, loaded=loaded, screen=[sw, sh], workload=args.workload,
                   pipeline_config={name:os.environ.get(name) for name in ['MESA_KGSL_X11_PIPELINE','MESA_KGSL_X11_INTEGRATED_RESOLVE','MESA_KGSL_HDMI_QUEUE','MESA_KGSL_HDMI_RESIZE_CAPACITY']},
                   flush_control=args.flush_control, records=records, physical_scanout_tested=False,
+                  large_resize=args.large_resize,
                   note='Ordering screenshots synchronize server readback; unique-resize timings do not measure displayed FPS.')
 
     def drain_and_size():
@@ -177,6 +183,9 @@ def main():
         if capture:
             sizes = [(639,479),(640,480),(641,481),(767,511),(768,512),(769,513),
                      (895,639),(896,640),(897,641),(800,600),(641,479),(800,600)]*2
+            if args.large_resize:
+                sizes = [(sw,sh),(sw-1,sh-1),(sw-127,sh-127),
+                         (sw,sh),(sw-128,sh-128),(sw,sh)]*2
             quadrants = args.workload == 'resize-pattern'
             for serial in range(1, len(sizes)+1 if quadrants else 9):
                 if quadrants:
