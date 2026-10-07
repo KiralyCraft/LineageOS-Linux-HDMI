@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -29,6 +30,10 @@ def main():
                                       ('base', 'build', 'archives', 'repository', 'output'))
     if out.exists():
         ap.error('refusing to overwrite existing bundle')
+    destination = out
+    out = destination.with_name('.' + destination.name + '.staging')
+    if out.exists():
+        ap.error('an unfinished staging directory already exists')
     verify(base)
     result = json.loads((build / 'result.json').read_text())
     stage = build / 'stage'
@@ -77,7 +82,27 @@ done
     shutil.copy2(build / 'result.json', out / 'validation/xorg26-build.json')
     for name in ('testlog.json', 'testlog.txt'):
         shutil.copy2(build / 'build/meson-logs' / name, out / 'validation' / name)
+    for name in ('host-release-unit.log', 'final-validation.log'):
+        shutil.copy2(build / name, out / 'validation' / name)
     shutil.copy2(build / 'build/meson-info/intro-dependencies.json', out / 'validation/dependencies.json')
+    # -version exits before starting a display or touching the lease.
+    env = os.environ.copy()
+    env.pop('LD_PRELOAD', None)
+    env['LD_LIBRARY_PATH'] = str(out / 'lib/mesa')
+    version = subprocess.run([str(out / 'libexec/Xorg'), '-version'], env=env,
+                             capture_output=True, text=True, check=True)
+    version_text = version.stdout + version.stderr
+    if result['sources']['xserver']['version'] not in version_text:
+        raise RuntimeError('unexpected server version')
+    (out / 'validation/xorg-version.txt').write_text(version_text)
+    dependencies = []
+    for p in [out / 'libexec/Xorg', *sorted((out / 'lib/xorg/modules').rglob('*.so'))]:
+        check = subprocess.run(['ldd', str(p)], env=env, capture_output=True,
+                               text=True, check=True)
+        if 'not found' in check.stdout + check.stderr:
+            raise RuntimeError(f'unresolved runtime dependency: {p}')
+        dependencies.append(str(p.relative_to(out)) + '\n' + check.stdout + check.stderr)
+    (out / 'validation/runtime-dependencies.txt').write_text('\n'.join(dependencies))
     source = out / 'source/hdmi'
     shutil.rmtree(source)
     source.mkdir()
@@ -98,7 +123,8 @@ done
         'source_commit': commit, 'build': 'validation/xorg26-build.json',
         'compiled_units': result['compiled_units'], 'clean_build': True,
         'evdev': result['sources']['evdev']['version']}
-    info['validation'] = {'build_and_upstream_tests': 'PASS; see validation',
+    info['validation'] = {'build_and_upstream_tests': 'PASS; optional XTS skipped; see validation',
+        'native_version_and_runtime_dependencies': 'PASS',
         'physical_display_tested': False, 'installed': False, 'display_restarted': False}
     info['comparison'].update(base_bundle=str(base), xorg_only_rebase=True,
         kernel_native_input_unchanged=True, xorg_input_module_rebuilt=True)
@@ -144,6 +170,8 @@ SHA256SUMS covers the complete folder; source archives and patches are included.
     files = sorted(p for p in out.rglob('*') if p.is_file() and p != out / 'SHA256SUMS')
     (out / 'SHA256SUMS').write_text(''.join(sha(p) + '  ' + str(p.relative_to(out)) + '\n' for p in files))
     verify(out)
+    out.rename(destination)
+    out = destination
     print(json.dumps({'output': str(out), 'source_commit': commit, 'files': len(files), 'hardware_tested': False}, indent=2))
 
 
