@@ -56,7 +56,7 @@ def screenshot_samples(png, coordinates):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('output', type=pathlib.Path)
-    ap.add_argument('--workload', choices=['ordering', 'unique-resize'], default='ordering')
+    ap.add_argument('--workload', choices=['ordering', 'resize-pattern', 'unique-resize'], default='ordering')
     ap.add_argument('--samples', type=int, choices=[0,4], default=0)
     ap.add_argument('--flush-control', action='store_true', help='Diagnostic glFlush before swap; never glFinish')
     args = ap.parse_args()
@@ -127,13 +127,13 @@ def main():
     swap = bind(G, 'glXSwapBuffers', None, [V, L])
     get_error = bind(G, 'glGetError', U, [])
     event = pattern.Event()
-    capture = RootCapture(d, X, root, sw, sh) if args.workload == 'ordering' else None
+    capture = RootCapture(d, X, root, sw, sh) if args.workload != 'unique-resize' else None
     records = []
     samples = I()
     bind(G, 'glGetIntegerv', None, [U, C.POINTER(I)])(0x80a9, C.byref(samples))
     assert samples.value == args.samples, samples.value
     result = dict(renderer=renderer, samples=samples.value, loaded=loaded, screen=[sw, sh], workload=args.workload,
-                  pipeline_config={name:os.environ.get(name) for name in ['MESA_KGSL_X11_PIPELINE','MESA_KGSL_X11_INTEGRATED_RESOLVE','MESA_KGSL_HDMI_QUEUE']},
+                  pipeline_config={name:os.environ.get(name) for name in ['MESA_KGSL_X11_PIPELINE','MESA_KGSL_X11_INTEGRATED_RESOLVE','MESA_KGSL_HDMI_QUEUE','MESA_KGSL_HDMI_RESIZE_CAPACITY']},
                   flush_control=args.flush_control, records=records, physical_scanout_tested=False,
                   note='Ordering screenshots synchronize server readback; unique-resize timings do not measure displayed FPS.')
 
@@ -145,42 +145,61 @@ def main():
         assert geometry(d, window, C.byref(r), C.byref(x), C.byref(y), C.byref(w), C.byref(h), C.byref(border), C.byref(depth))
         return w.value, h.value, count
 
-    def draw(serial, width, height):
+    def draw(serial, width, height, quadrants=False):
         viewport(0, 0, width, height)
         clear_color(229/255, 17/255, 173/255, 1.)
         clear(0x4000)
         rgb = [(serial * factor + 41) % 192 + 32 for factor in [37, 71, 29]]
-        color(*rgb)
         # Keep the last draw in the compatibility vertex cache: no GL query,
         # state change or explicit flush intervenes between glEnd and swap.
-        begin(0x0007)
-        for x, y in [(-1., -1.), (1., -1.), (1., 1.), (-1., 1.)]:
-            vertex(x, y)
-        end()
+        colors = [rgb]
+        boxes = [(-1., -1., 1., 1.)]
+        if quadrants:
+            # X screenshots have a top-left origin. These four colors identify
+            # both axes, the frame serial, and the current logical extent.
+            colors = [[(c+offset) % 192+32 for c in rgb] for offset in [0,41,83,127]]
+            boxes = [(-1.,0.,0.,1.), (0.,0.,1.,1.), (-1.,-1.,0.,0.), (0.,-1.,1.,0.)]
+        for shade, (x0,y0,x1,y1) in zip(colors,boxes):
+            color(*shade)
+            begin(0x0007)
+            for x,y in [(x0,y0),(x1,y0),(x1,y1),(x0,y1)]: vertex(x,y)
+            end()
         if args.flush_control:
             flush()
         before_swap = time.monotonic_ns()
         swap(d, window)
         swap_ms = (time.monotonic_ns() - before_swap) / 1e6
         assert get_error() == 0
-        return rgb, swap_ms
+        return colors if quadrants else rgb, swap_ms
 
     try:
         time.sleep(.15)
         if capture:
-            for serial in range(1, 9):
+            sizes = [(639,479),(640,480),(641,481),(767,511),(768,512),(769,513),
+                     (895,639),(896,640),(897,641),(800,600),(641,479),(800,600)]*2
+            quadrants = args.workload == 'resize-pattern'
+            for serial in range(1, len(sizes)+1 if quadrants else 9):
+                if quadrants:
+                    resize(d,window,*sizes[serial-1]); sync(d,0)
                 width, height, events = drain_and_size()
-                rgb, swap_ms = draw(serial, width, height)
+                if quadrants:
+                    deadline=time.monotonic()+2
+                    while (width,height)!=sizes[serial-1] and time.monotonic()<deadline:
+                        time.sleep(.005);sync(d,0)
+                        width,height,new_events=drain_and_size();events+=new_events
+                    assert (width,height)==sizes[serial-1], 'WM did not settle on requested test geometry'
+                rgb, swap_ms = draw(serial, width, height, quadrants)
                 time.sleep(.20)
                 rec = capture.capture(window, f'frame-{serial}', dict(serial=serial, expected_rgb=rgb))
                 cx, cy, cw, ch = rec['client_bounds']
                 rx, ry, _, _ = rec['root_crop']
-                coordinates = [(cx-rx+int(cw*x), cy-ry+int(ch*y))
-                               for x, y in [(.1, .1), (.5, .1), (.9, .1), (.1, .5), (.5, .5), (.9, .5), (.1, .9), (.5, .9), (.9, .9)]]
+                positions = [(.03,.03),(.25,.25),(.75,.25),(.97,.03),(.03,.97),(.25,.75),(.75,.75),(.97,.97)] if quadrants else [(.1,.1),(.5,.1),(.9,.1),(.1,.5),(.5,.5),(.9,.5),(.1,.9),(.5,.9),(.9,.9)]
+                coordinates = [(cx-rx+int(cw*x), cy-ry+int(ch*y)) for x,y in positions]
                 samples = screenshot_samples(capture.images[-1][1], coordinates)
+                expected = [rgb[int(y>=.5)*2+int(x>=.5)] for x,y in positions] if quadrants else [rgb]*len(positions)
                 records.append(dict(serial=serial, geometry=[width, height], drained_events=events,
-                                    swap_ms=swap_ms, expected_rgb=rgb, samples=samples,
-                                    passed=rec['geometry_stable'] and all(all(abs(a-b)<=1 for a,b in zip(pixel,rgb)) for pixel in samples)))
+                                    swap_ms=swap_ms, expected_rgb=rgb, expected_samples=expected, samples=samples,
+                                    passed=rec['geometry_stable'] and all(all(abs(a-b)<=1 for a,b in zip(pixel,shade)) for pixel,shade in zip(samples,expected))))
         else:
             start, serial = time.monotonic(), 1
             while time.monotonic()-start < 10:

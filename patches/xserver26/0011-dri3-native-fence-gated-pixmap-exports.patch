@@ -1,0 +1,387 @@
+diff --git a/dri3/dri3.c b/dri3/dri3.c
+index f9c5172..3b7568f 100644
+--- a/dri3/dri3.c
++++ b/dri3/dri3.c
+@@ -36,6 +36,7 @@ dri3_close_screen(ScreenPtr screen)
+ 
+     unwrap(screen_priv, screen, CloseScreen);
+ 
++    dri3_stop_fd_exports(screen_priv);
+     free(screen_priv);
+     return (*screen->CloseScreen) (screen);
+ }
+@@ -55,6 +56,7 @@ dri3_screen_init(ScreenPtr screen, const dri3_screen_info_rec *info)
+ 
+         wrap(screen_priv, screen, CloseScreen, dri3_close_screen);
+ 
++        xorg_list_init(&screen_priv->fd_exports);
+         screen_priv->info = info;
+ 
+         dixSetPrivate(&screen->devPrivates, &dri3_screen_private_key, screen_priv);
+diff --git a/dri3/dri3.h b/dri3/dri3.h
+index 14f9a1e..b6d0fba 100644
+--- a/dri3/dri3.h
++++ b/dri3/dri3.h
+@@ -142,6 +142,9 @@ typedef struct dri3_screen_info {
+ extern _X_EXPORT Bool
+ dri3_screen_init(ScreenPtr screen, const dri3_screen_info_rec *info);
+ 
++extern _X_EXPORT Bool
++dri3_set_fd_export_fence(ScreenPtr screen, int (*export_fence)(ScreenPtr));
++
+ extern _X_EXPORT int
+ dri3_send_open_reply(ClientPtr client, int fd);
+ 
+diff --git a/dri3/dri3_fd_reply.c b/dri3/dri3_fd_reply.c
+new file mode 100644
+index 0000000..9bf9ff0
+--- /dev/null
++++ b/dri3/dri3_fd_reply.c
+@@ -0,0 +1,228 @@
++/* SPDX-License-Identifier: MIT
++ * KGSL has no implicit DMA-BUF producer fence. Keep a pixmap export reply
++ * private until the exporting GPU context has finished its preceding writes.
++ * Only this client's input is held; the server never waits for GPU completion.
++ */
++#include "dri3_priv.h"
++#include "dix.h"
++#include "os.h"
++#include <errno.h>
++#include <poll.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#ifdef __linux__
++#include <linux/sync_file.h>
++#endif
++
++#define DRI3_EXPORT_LIMIT 128
++#define DRI3_EXPORT_TIMEOUT_MS 5000
++#define DRI3_EXPORT_REPLY_BYTES 64
++
++struct dri3_fd_export {
++    struct xorg_list link;
++    dri3_screen_priv_ptr priv;
++    ClientPtr client;
++    int fence_fd, fds[4], num_fds;
++    unsigned reply_bytes;
++    unsigned char reply[DRI3_EXPORT_REPLY_BYTES];
++    CARD32 started;
++    XID resource;
++    unsigned major, minor;
++};
++
++static void
++dri3_close_export_fds(int *fds, int count)
++{
++    for (int i = 0; i < count; i++) {
++        if (fds[i] >= 0) close(fds[i]);
++        fds[i] = -1;
++    }
++}
++
++static int
++dri3_write_export_reply(ClientPtr client, int *fds, int count,
++                       const void *reply, unsigned bytes)
++{
++    for (int i = 0; i < count; i++) {
++        if (WriteFdToClient(client, fds[i], TRUE) < 0) {
++            /* Earlier descriptors already belong to the server's output
++             * queue; never close them again after transferring ownership. */
++            dri3_close_export_fds(fds + i, count - i);
++            return BadAlloc;
++        }
++        fds[i] = -1;
++    }
++    WriteToClient(client, bytes, reply);
++    return Success;
++}
++
++static int
++dri3_export_fence_status(int fd)
++{
++#ifdef __linux__
++    struct pollfd p = { .fd = fd, .events = POLLIN };
++    struct sync_file_info info = {0};
++    int ret = poll(&p, 1, 0);
++    if (!ret || (ret < 0 && errno == EINTR)) return 0;
++    if (ret < 0 || !(p.revents & POLLIN) ||
++        ioctl(fd, SYNC_IOC_FILE_INFO, &info) < 0 || info.status == 0)
++        return -1;
++    return info.status > 0 ? 1 : -1;
++#else
++    return -1;
++#endif
++}
++
++static void
++dri3_finish_fd_export(struct dri3_fd_export *job, Bool success, Bool notify)
++{
++    dri3_screen_priv_ptr priv = job->priv;
++    ClientPtr client = job->client;
++    /* Detach before any output: client-state callbacks may cancel exports. */
++    xorg_list_del(&job->link);
++    priv->fd_export_pending--;
++    RemoveNotifyFd(job->fence_fd);
++    close(job->fence_fd);
++    if (!priv->fd_export_pending && priv->fd_export_timer_running) {
++        TimerCancel(priv->fd_export_timer);
++        priv->fd_export_timer_running = FALSE;
++    }
++    int status = BadAlloc;
++    if (notify && !client->clientGone) {
++        if (success)
++            status = dri3_write_export_reply(client, job->fds, job->num_fds,
++                                            job->reply, job->reply_bytes);
++        if (status != Success)
++            SendErrorToClient(client, job->major, job->minor, job->resource, status);
++        AttendClient(client);
++    }
++    dri3_close_export_fds(job->fds, job->num_fds);
++    free(job);
++}
++
++static void
++dri3_fd_export_ready(int fd, int ready, void *data)
++{
++    struct dri3_fd_export *job = data;
++    int status = dri3_export_fence_status(fd);
++    if (!status && !(ready & X_NOTIFY_ERROR)) return;
++    dri3_finish_fd_export(job, status > 0, TRUE);
++}
++
++static CARD32
++dri3_fd_export_timeout(OsTimerPtr timer, CARD32 now, void *data)
++{
++    dri3_screen_priv_ptr priv = data;
++    struct dri3_fd_export *job, *next;
++    (void) timer;
++    xorg_list_for_each_entry_safe(job, next, &priv->fd_exports, link) {
++        if ((CARD32)(now - job->started) >= DRI3_EXPORT_TIMEOUT_MS)
++            dri3_finish_fd_export(job, FALSE, TRUE);
++    }
++    priv->fd_export_timer_running = priv->fd_export_pending != 0;
++    return priv->fd_export_timer_running ? 250 : 0;
++}
++
++static void
++dri3_fd_export_client_state(CallbackListPtr *list, void *data, void *call_data)
++{
++    dri3_screen_priv_ptr priv = data;
++    NewClientInfoRec *info = call_data;
++    struct dri3_fd_export *job, *next;
++    (void) list;
++    if (info->client->clientState != ClientStateGone &&
++        info->client->clientState != ClientStateRetained) return;
++    xorg_list_for_each_entry_safe(job, next, &priv->fd_exports, link) {
++        if (job->client == info->client)
++            dri3_finish_fd_export(job, FALSE, FALSE);
++    }
++}
++
++Bool
++dri3_set_fd_export_fence(ScreenPtr screen, int (*export_fence)(ScreenPtr))
++{
++    dri3_screen_priv_ptr priv = dri3_screen_priv(screen);
++    if (!priv || !export_fence || priv->fd_export_pending) return FALSE;
++    if (!priv->fd_export_callback_registered) {
++        if (!AddCallback(&ClientStateCallback, dri3_fd_export_client_state, priv))
++            return FALSE;
++        priv->fd_export_callback_registered = TRUE;
++    }
++    priv->fd_export_fence = export_fence;
++    return TRUE;
++}
++
++void
++dri3_stop_fd_exports(dri3_screen_priv_ptr priv)
++{
++    struct dri3_fd_export *job, *next;
++    if (priv->fd_export_callback_registered)
++        DeleteCallback(&ClientStateCallback, dri3_fd_export_client_state, priv);
++    priv->fd_export_callback_registered = FALSE;
++    xorg_list_for_each_entry_safe(job, next, &priv->fd_exports, link)
++        dri3_finish_fd_export(job, FALSE, TRUE);
++    if (priv->fd_export_timer) TimerFree(priv->fd_export_timer);
++    priv->fd_export_timer = NULL;
++    priv->fd_export_fence = NULL;
++}
++
++/* Consumes all supplied descriptors on every return path. Payloads have
++ * already been byte-swapped by the request handler and are snapshotted here. */
++int
++dri3_send_pixmap_export_reply(ClientPtr client, PixmapPtr pixmap,
++                             unsigned major, unsigned minor,
++                             int *fds, int count, const void *reply, unsigned bytes)
++{
++    ScreenPtr screen = pixmap->drawable.pScreen;
++    dri3_screen_priv_ptr priv = dri3_screen_priv(screen);
++    int fence_fd, status;
++    struct dri3_fd_export *job;
++    if (count < 1 || count > 4 || bytes > DRI3_EXPORT_REPLY_BYTES) {
++        dri3_close_export_fds(fds, count >= 0 && count <= 4 ? count : 0);
++        return BadAlloc;
++    }
++    if (!priv->fd_export_fence)
++        return dri3_write_export_reply(client, fds, count, reply, bytes);
++    fence_fd = priv->fd_export_fence(screen);
++    if (fence_fd < 0) {
++        dri3_close_export_fds(fds, count);
++        return BadAlloc;
++    }
++    status = dri3_export_fence_status(fence_fd);
++    if (status) {
++        close(fence_fd);
++        if (status > 0)
++            return dri3_write_export_reply(client, fds, count, reply, bytes);
++        dri3_close_export_fds(fds, count);
++        return BadAlloc;
++    }
++    job = priv->fd_export_pending < DRI3_EXPORT_LIMIT ? calloc(1, sizeof(*job)) : NULL;
++    if (!job) {
++        close(fence_fd);
++        dri3_close_export_fds(fds, count);
++        return BadAlloc;
++    }
++    job->priv = priv; job->client = client; job->fence_fd = fence_fd;
++    job->num_fds = count; job->reply_bytes = bytes;
++    job->major = major; job->minor = minor; job->resource = pixmap->drawable.id;
++    job->started = GetTimeInMillis();
++    memcpy(job->fds, fds, count * sizeof(*fds));
++    memcpy(job->reply, reply, bytes);
++    xorg_list_append(&job->link, &priv->fd_exports);
++    priv->fd_export_pending++;
++    if (!SetNotifyFd(fence_fd, dri3_fd_export_ready, X_NOTIFY_READ, job)) goto fail;
++    if (!priv->fd_export_timer_running) {
++        OsTimerPtr timer = TimerSet(priv->fd_export_timer, 0, 250,
++                                    dri3_fd_export_timeout, priv);
++        if (!timer) goto fail;
++        priv->fd_export_timer = timer;
++        priv->fd_export_timer_running = TRUE;
++    }
++    IgnoreClient(client);
++    return Success;
++fail:
++    dri3_finish_fd_export(job, FALSE, FALSE);
++    return BadAlloc;
++}
+diff --git a/dri3/dri3_priv.h b/dri3/dri3_priv.h
+index 71d2da9..e326929 100644
+--- a/dri3/dri3_priv.h
++++ b/dri3/dri3_priv.h
+@@ -32,6 +32,7 @@
+ #include "dixstruct.h"
+ #include <randrstr.h>
+ #include "dri3.h"
++#include "os.h"
+ 
+ extern DevPrivateKeyRec dri3_screen_private_key;
+ 
+@@ -50,6 +51,12 @@ typedef struct dri3_screen_priv {
+     CARD32                      num_formats;
+     dri3_dmabuf_format_ptr      formats;
+ 
++    struct xorg_list             fd_exports;
++    int                       (*fd_export_fence)(ScreenPtr);
++    unsigned                    fd_export_pending;
++    OsTimerPtr                  fd_export_timer;
++    Bool                        fd_export_timer_running;
++    Bool                        fd_export_callback_registered;
+     const dri3_screen_info_rec *info;
+ } dri3_screen_priv_rec, *dri3_screen_priv_ptr;
+ 
+@@ -68,6 +75,10 @@ dri3_screen_priv(ScreenPtr screen)
+     return (dri3_screen_priv_ptr)dixLookupPrivate(&(screen)->devPrivates, &dri3_screen_private_key);
+ }
+ 
++void dri3_stop_fd_exports(dri3_screen_priv_ptr priv);
++int dri3_send_pixmap_export_reply(ClientPtr, PixmapPtr, unsigned, unsigned,
++                                 int *, int, const void *, unsigned);
++
+ int
+ proc_dri3_dispatch(ClientPtr client);
+ 
+diff --git a/dri3/dri3_request.c b/dri3/dri3_request.c
+index 020d5cc..90dd060 100644
+--- a/dri3/dri3_request.c
++++ b/dri3/dri3_request.c
+@@ -286,14 +286,9 @@ proc_dri3_buffer_from_pixmap(ClientPtr client)
+         swaps(&rep.height);
+         swaps(&rep.stride);
+     }
+-    if (WriteFdToClient(client, fd, TRUE) < 0) {
+-        close(fd);
+-        return BadAlloc;
+-    }
+-
+-    WriteToClient(client, sizeof(rep), &rep);
+-
+-    return Success;
++    return dri3_send_pixmap_export_reply(client, pixmap,
++                                         stuff->reqType, stuff->dri3ReqType,
++                                         &fd, 1, &rep, sizeof(rep));
+ }
+ 
+ static int
+@@ -559,19 +554,15 @@ proc_dri3_buffers_from_pixmap(ClientPtr client)
+         }
+     }
+ 
+-    for (i = 0; i < num_fds; i++) {
+-        if (WriteFdToClient(client, fds[i], TRUE) < 0) {
+-            while (i--)
+-                close(fds[i]);
+-            return BadAlloc;
+-        }
+-    }
+-
+-    WriteToClient(client, sizeof(rep), &rep);
+-    WriteToClient(client, num_fds * sizeof(CARD32), strides);
+-    WriteToClient(client, num_fds * sizeof(CARD32), offsets);
+-
+-    return Success;
++    unsigned char payload[sizeof(rep) + 8 * sizeof(CARD32)];
++    unsigned bytes = sizeof(rep) + num_fds * 2 * sizeof(CARD32);
++    memcpy(payload, &rep, sizeof(rep));
++    memcpy(payload + sizeof(rep), strides, num_fds * sizeof(CARD32));
++    memcpy(payload + sizeof(rep) + num_fds * sizeof(CARD32), offsets,
++           num_fds * sizeof(CARD32));
++    return dri3_send_pixmap_export_reply(client, pixmap,
++                                         stuff->reqType, stuff->dri3ReqType,
++                                         fds, num_fds, payload, bytes);
+ }
+ 
+ static int
+diff --git a/dri3/meson.build b/dri3/meson.build
+index 8179c1d..366773b 100644
+--- a/dri3/meson.build
++++ b/dri3/meson.build
+@@ -1,6 +1,7 @@
+ srcs_dri3 = [
+ 	'dri3.c',
+ 	'dri3_request.c',
++	'dri3_fd_reply.c',
+ 	'dri3_screen.c',
+ ]
+ 
+diff --git a/glamor/glamor_egl.c b/glamor/glamor_egl.c
+index ef49d53..edd87a6 100644
+--- a/glamor/glamor_egl.c
++++ b/glamor/glamor_egl.c
+@@ -1032,6 +1032,15 @@ glamor_egl_screen_init(ScreenPtr screen, struct glamor_context *glamor_ctx)
+         if (!dri3_screen_init(screen, &glamor_dri3_info)) {
+             xf86DrvMsg(scrn->scrnIndex, X_ERROR,
+                        "Failed to initialize DRI3.\n");
++        } else {
++            const char *driver = getenv("MESA_LOADER_DRIVER_OVERRIDE");
++            if (driver && !strcmp(driver, "kgsl")) {
++                if (!glamor_egl_native_fence_supported(screen) ||
++                    !dri3_set_fd_export_fence(screen, glamor_egl_export_native_fence))
++                    FatalError("KGSL requires native-fence-gated pixmap exports\n");
++                xf86DrvMsg(scrn->scrnIndex, X_INFO,
++                           "HDMI_LOS_XORG_EXPORT_ABI=1 fence-gated DRI3 pixmap replies\n");
++            }
+         }
+     }
+ #endif
