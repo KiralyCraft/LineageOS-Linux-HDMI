@@ -29,8 +29,9 @@ and inject faults at agent preparation, every composer acquire phase, and Xorg
 startup. They test delayed STOP acknowledgement, stale/failed replies, partial
 stream framing, disconnects before/during the snapshot and during startup,
 prompt process exit, surviving descendants, and forced termination. Android
-startup gates are replaced only in the host fixture; real kernel/composer/input
-and physical scanout validation remain pending.
+startup gates are replaced only in the host fixture. The live check below covers
+the normal kernel/composer path and physical desktop return at 4K30; physical
+input and injected failures on the device remain separate acceptance checks.
 
 The first 0.4.1 live pause released its timing reference (gets=1, puts=1), restored
 Android and retained connected 4K30. Re-acquisition failed because phase replies
