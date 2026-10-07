@@ -1,0 +1,11 @@
+--- a/src/xdemos/glxgears.c
++++ b/src/xdemos/glxgears.c
+@@ -764,7 +764,7 @@
+          op = handle_event(dpy, win, &event);
+          if (op == EXIT)
+             return;
+-         else if (op == DRAW)
++         else if (op == DRAW && !animate)
+             break;
+       }
+ 
