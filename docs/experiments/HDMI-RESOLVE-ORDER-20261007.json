@@ -1,0 +1,4122 @@
+{
+  "mesa_before": "557306b5c488632a9771346d3f12d23117c9cf5b",
+  "mesa_after": "c31019a886f955f516eb2c7af2ceb9279ee43d20",
+  "output_mode": "3840x2160@30",
+  "physical_desktop_return": "user confirmed Linux desktop",
+  "physical_cadence_tested": false,
+  "captures_on_ram": true,
+  "first_frame_black_unresolved": true,
+  "records": {
+    "ordering-baseline-r3": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "82bdbb978158d7494bb7a1cdb836f6b984c55e3bba314e68d2591f3189fb9925",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-baseline-r3/result.json",
+      "total_frames": 8,
+      "passed_frames": 0,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        }
+      ],
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=3 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=12711 max_us=12711 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=76475 max_us=14880 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=5044 max_us=1319 p95_bucket_us=2048"
+      ]
+    },
+    "ordering-flush-control-r3": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": true,
+      "completed": true,
+      "result_sha256": "4239f95ec723b512e856d30bee27d965272ee9baebd1c13ae2d9c13da96afb93",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-flush-control-r3/result.json",
+      "total_frames": 8,
+      "passed_frames": 7,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ]
+          ],
+          "passed": true
+        }
+      ],
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=4 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=10941 max_us=10941 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=88135 max_us=14935 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=3645 max_us=825 p95_bucket_us=1024"
+      ]
+    },
+    "ordering-worker-control": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "0dddb48fb71be9c0af6bc2e76bb26a9d7270643b2e78f16850627f4d707013d0",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-worker-control/result.json",
+      "total_frames": 8,
+      "passed_frames": 7,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ]
+          ],
+          "passed": true
+        }
+      ],
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=8 integrated_resolves=0",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=6 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=3050 max_us=3050 p95_bucket_us=4096",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=fence_export count=0 total_us=0 max_us=0 p95_bucket_us=0"
+      ]
+    },
+    "ordering-mapped-baseline": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "05eb2d04a85fc8f8e427b28df5c96d5113a3979a87db66020297d2fd67d6f9a2",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-mapped-baseline/result.json",
+      "total_frames": 8,
+      "passed_frames": 0,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ],
+            [
+              229,
+              17,
+              173
+            ]
+          ],
+          "passed": false
+        }
+      ],
+      "msaa_samples": 0,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=2 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=7602 max_us=7602 p95_bucket_us=8192",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=105366 max_us=15205 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=4481 max_us=682 p95_bucket_us=1024"
+      ]
+    },
+    "ordering-mapped-flush-control": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": true,
+      "completed": true,
+      "result_sha256": "e5f10e10bc82e1c37f0ecd05d4f09c51c70f5e92a6b024047e113abb8311316d",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-mapped-flush-control/result.json",
+      "total_frames": 8,
+      "passed_frames": 7,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ]
+          ],
+          "passed": true
+        }
+      ],
+      "msaa_samples": 0,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=1 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=4058 max_us=4058 p95_bucket_us=4096",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=97135 max_us=14655 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=3754 max_us=1093 p95_bucket_us=2048"
+      ]
+    },
+    "ordering-msaa-baseline": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "d607c232e7d98dfade1813ce84a143b074e601646d80235f63976e3405d589f0",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-msaa-baseline/result.json",
+      "total_frames": 8,
+      "passed_frames": 0,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ],
+            [
+              110,
+              144,
+              102
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": false
+        }
+      ],
+      "msaa_samples": 4,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=3 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=5410 max_us=5410 p95_bucket_us=8192",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=107181 max_us=15583 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=14632 max_us=10294 p95_bucket_us=16384"
+      ]
+    },
+    "ordering-fixed": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "76e1a4fbbb6bf320b6b5484063f01cef6f480f511283f664ac46dad043674e26",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-fixed/result.json",
+      "total_frames": 8,
+      "passed_frames": 7,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ]
+          ],
+          "passed": true
+        }
+      ],
+      "msaa_samples": 0,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=1 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=8260 max_us=8260 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=17 max_us=3 p95_bucket_us=4",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=5966 max_us=1436 p95_bucket_us=2048",
+        "MESA: info: DRI3: HDMI stage=drawable_prepare count=8 total_us=1838 max_us=1650 p95_bucket_us=2048"
+      ]
+    },
+    "ordering-msaa-fixed": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "ordering",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "32a8d59a70280a0c3073196a60c8593ff6bb2e842652e0bf78c59aad597366cd",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/ordering-msaa-fixed/result.json",
+      "total_frames": 8,
+      "passed_frames": 7,
+      "frames": [
+        {
+          "serial": 1,
+          "expected_rgb": [
+            110,
+            144,
+            102
+          ],
+          "samples": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ],
+          "passed": false
+        },
+        {
+          "serial": 2,
+          "expected_rgb": [
+            147,
+            215,
+            131
+          ],
+          "samples": [
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ],
+            [
+              147,
+              215,
+              131
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 3,
+          "expected_rgb": [
+            184,
+            94,
+            160
+          ],
+          "samples": [
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 4,
+          "expected_rgb": [
+            221,
+            165,
+            189
+          ],
+          "samples": [
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 5,
+          "expected_rgb": [
+            66,
+            44,
+            218
+          ],
+          "samples": [
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 6,
+          "expected_rgb": [
+            103,
+            115,
+            55
+          ],
+          "samples": [
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 7,
+          "expected_rgb": [
+            140,
+            186,
+            84
+          ],
+          "samples": [
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ],
+          "passed": true
+        },
+        {
+          "serial": 8,
+          "expected_rgb": [
+            177,
+            65,
+            113
+          ],
+          "samples": [
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ],
+            [
+              177,
+              65,
+              113
+            ]
+          ],
+          "passed": true
+        }
+      ],
+      "msaa_samples": 4,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=8 completed=8 worker_copies=0 integrated_resolves=8",
+        "MESA: info: DRI3: HDMI resize generations=1 cache_hits=7 evictions=0",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=8 total_us=5 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=1 total_us=6843 max_us=6843 p95_bucket_us=8192",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=8 total_us=9 max_us=2 p95_bucket_us=2",
+        "MESA: info: DRI3: HDMI stage=fence_export count=8 total_us=21421 max_us=15851 p95_bucket_us=16384",
+        "MESA: info: DRI3: HDMI stage=drawable_prepare count=8 total_us=1111 max_us=975 p95_bucket_us=1024"
+      ]
+    },
+    "unique-resize-baseline": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "unique-resize",
+      "flush_control": true,
+      "completed": true,
+      "result_sha256": "4a5e8f598d50bb10dbded88e90d56f6d4c5a0b7749c1d9633c1823b9eb1dcf77",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/unique-resize-baseline/result.json",
+      "phases": {
+        "fixed-before": {
+          "frames": 30,
+          "unique_sizes": 1,
+          "configure": {
+            "count": 30,
+            "mean_ms": 2.7955851,
+            "p50_ms": 2.23599,
+            "p95_ms": 10.029531,
+            "max_ms": 12.507031
+          },
+          "swap": {
+            "count": 30,
+            "mean_ms": 3.9757101,
+            "p50_ms": 2.885052,
+            "p95_ms": 10.760573,
+            "max_ms": 17.550729
+          },
+          "draw_swap": {
+            "count": 30,
+            "mean_ms": 4.797045166666667,
+            "p50_ms": 3.768177,
+            "p95_ms": 11.696146,
+            "max_ms": 22.691928
+          }
+        },
+        "unique-resize": {
+          "frames": 165,
+          "unique_sizes": 152,
+          "configure": {
+            "count": 165,
+            "mean_ms": 1.865034987878788,
+            "p50_ms": 1.017396,
+            "p95_ms": 7.396406,
+            "max_ms": 12.359427
+          },
+          "swap": {
+            "count": 165,
+            "mean_ms": 26.365229412121213,
+            "p50_ms": 27.231198,
+            "p95_ms": 52.351927,
+            "max_ms": 67.745
+          },
+          "draw_swap": {
+            "count": 165,
+            "mean_ms": 27.068391424242428,
+            "p50_ms": 27.609896,
+            "p95_ms": 52.719583,
+            "max_ms": 70.087448
+          }
+        },
+        "fixed-after": {
+          "frames": 89,
+          "unique_sizes": 2,
+          "configure": {
+            "count": 89,
+            "mean_ms": 2.44360897752809,
+            "p50_ms": 1.905156,
+            "p95_ms": 6.260209,
+            "max_ms": 10.577656
+          },
+          "swap": {
+            "count": 89,
+            "mean_ms": 3.4269798202247186,
+            "p50_ms": 2.936771,
+            "p95_ms": 5.138594,
+            "max_ms": 30.664011
+          },
+          "draw_swap": {
+            "count": 89,
+            "mean_ms": 3.974707898876405,
+            "p50_ms": 3.571302,
+            "p95_ms": 5.712448,
+            "max_ms": 30.891094
+          }
+        }
+      },
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=284 completed=284 worker_copies=0 integrated_resolves=284",
+        "MESA: info: DRI3: HDMI resize generations=147 cache_hits=137 evictions=144",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=284 total_us=406 max_us=212 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=144 total_us=134841 max_us=5083 p95_bucket_us=4096",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=147 total_us=3866429 max_us=64208 p95_bucket_us=65536",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=144 total_us=77076 max_us=4099 p95_bucket_us=2048",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=284 total_us=546836 max_us=8429 p95_bucket_us=4096",
+        "MESA: info: DRI3: HDMI stage=fence_export count=284 total_us=144989 max_us=4633 p95_bucket_us=2048"
+      ]
+    },
+    "unique-resize-fixed": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "unique-resize",
+      "flush_control": false,
+      "completed": true,
+      "result_sha256": "1f195a1d1ebdf927d7c3f666e7ed19c870b3aa716900593815d93c83e885f6fa",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/unique-resize-fixed/result.json",
+      "phases": {
+        "fixed-before": {
+          "frames": 30,
+          "unique_sizes": 1,
+          "configure": {
+            "count": 30,
+            "mean_ms": 1.2775624333333333,
+            "p50_ms": 0.65,
+            "p95_ms": 7.084739,
+            "max_ms": 8.726355
+          },
+          "swap": {
+            "count": 30,
+            "mean_ms": 1.2825277666666668,
+            "p50_ms": 1.009167,
+            "p95_ms": 2.041511,
+            "max_ms": 8.618125
+          },
+          "draw_swap": {
+            "count": 30,
+            "mean_ms": 1.4380434000000002,
+            "p50_ms": 1.167708,
+            "p95_ms": 2.197188,
+            "max_ms": 9.177031
+          }
+        },
+        "unique-resize": {
+          "frames": 180,
+          "unique_sizes": 179,
+          "configure": {
+            "count": 180,
+            "mean_ms": 0.6027303055555555,
+            "p50_ms": 0.520937,
+            "p95_ms": 0.922604,
+            "max_ms": 8.482761
+          },
+          "swap": {
+            "count": 180,
+            "mean_ms": 15.996778383333334,
+            "p50_ms": 16.266354,
+            "p95_ms": 20.376094,
+            "max_ms": 26.943385
+          },
+          "draw_swap": {
+            "count": 180,
+            "mean_ms": 16.28180325,
+            "p50_ms": 16.45276,
+            "p95_ms": 21.478489,
+            "max_ms": 30.1325
+          }
+        },
+        "fixed-after": {
+          "frames": 89,
+          "unique_sizes": 2,
+          "configure": {
+            "count": 89,
+            "mean_ms": 0.6154236966292135,
+            "p50_ms": 0.554791,
+            "p95_ms": 1.07401,
+            "max_ms": 1.500156
+          },
+          "swap": {
+            "count": 89,
+            "mean_ms": 1.2668844719101124,
+            "p50_ms": 0.951042,
+            "p95_ms": 1.431979,
+            "max_ms": 21.939271
+          },
+          "draw_swap": {
+            "count": 89,
+            "mean_ms": 1.444183584269663,
+            "p50_ms": 1.145052,
+            "p95_ms": 1.703698,
+            "max_ms": 22.083229
+          }
+        }
+      },
+      "msaa_samples": 0,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=299 completed=299 worker_copies=0 integrated_resolves=299",
+        "MESA: info: DRI3: HDMI resize generations=180 cache_hits=119 evictions=177",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=299 total_us=113 max_us=2 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=177 total_us=55897 max_us=791 p95_bucket_us=1024",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=180 total_us=2605160 max_us=25772 p95_bucket_us=32768",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=177 total_us=40038 max_us=657 p95_bucket_us=512",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=299 total_us=318 max_us=3 p95_bucket_us=2",
+        "MESA: info: DRI3: HDMI stage=fence_export count=299 total_us=317975 max_us=2287 p95_bucket_us=2048",
+        "MESA: info: DRI3: HDMI stage=drawable_prepare count=299 total_us=11788 max_us=1399 p95_bucket_us=64"
+      ]
+    },
+    "unique-resize-fixed-flush-control": {
+      "renderer": "FD740",
+      "screen": [
+        3840,
+        2160
+      ],
+      "workload": "unique-resize",
+      "flush_control": true,
+      "completed": true,
+      "result_sha256": "7f149d971048e9ff206e254cb79d3393b67772d7b54119495aabed8155bef54f",
+      "result_file": "/tmp/hdmi-graphics-resume-20261007/unique-resize-fixed-flush-control/result.json",
+      "phases": {
+        "fixed-before": {
+          "frames": 30,
+          "unique_sizes": 1,
+          "configure": {
+            "count": 30,
+            "mean_ms": 1.4688924,
+            "p50_ms": 0.732344,
+            "p95_ms": 4.920625,
+            "max_ms": 5.798177
+          },
+          "swap": {
+            "count": 30,
+            "mean_ms": 0.9523107,
+            "p50_ms": 0.73802,
+            "p95_ms": 1.459375,
+            "max_ms": 5.144375
+          },
+          "draw_swap": {
+            "count": 30,
+            "mean_ms": 1.2360780666666666,
+            "p50_ms": 1.019062,
+            "p95_ms": 1.784948,
+            "max_ms": 6.472812
+          }
+        },
+        "unique-resize": {
+          "frames": 180,
+          "unique_sizes": 179,
+          "configure": {
+            "count": 180,
+            "mean_ms": 0.7855781,
+            "p50_ms": 0.624375,
+            "p95_ms": 1.780364,
+            "max_ms": 7.027136
+          },
+          "swap": {
+            "count": 180,
+            "mean_ms": 17.002201394444445,
+            "p50_ms": 17.61625,
+            "p95_ms": 20.717031,
+            "max_ms": 24.969427
+          },
+          "draw_swap": {
+            "count": 180,
+            "mean_ms": 17.331481766666666,
+            "p50_ms": 17.834583,
+            "p95_ms": 21.478958,
+            "max_ms": 26.174531
+          }
+        },
+        "fixed-after": {
+          "frames": 89,
+          "unique_sizes": 2,
+          "configure": {
+            "count": 89,
+            "mean_ms": 0.6489008988764046,
+            "p50_ms": 0.561563,
+            "p95_ms": 1.086979,
+            "max_ms": 2.177604
+          },
+          "swap": {
+            "count": 89,
+            "mean_ms": 1.297278157303371,
+            "p50_ms": 0.914166,
+            "p95_ms": 1.563854,
+            "max_ms": 23.032864
+          },
+          "draw_swap": {
+            "count": 89,
+            "mean_ms": 1.5252352359550563,
+            "p50_ms": 1.151041,
+            "p95_ms": 1.954531,
+            "max_ms": 23.197656
+          }
+        }
+      },
+      "msaa_samples": 0,
+      "pipeline_statistics": [
+        "MESA: info: DRI3: HDMI pipeline submitted=299 completed=299 worker_copies=0 integrated_resolves=299",
+        "MESA: info: DRI3: HDMI resize generations=178 cache_hits=121 evictions=175",
+        "MESA: info: DRI3: HDMI stage=admission_lock count=299 total_us=100 max_us=1 p95_bucket_us=1",
+        "MESA: info: DRI3: HDMI stage=generation_wait count=175 total_us=70775 max_us=1239 p95_bucket_us=1024",
+        "MESA: info: DRI3: HDMI stage=allocate_import count=178 total_us=2925172 max_us=24104 p95_bucket_us=32768",
+        "MESA: info: DRI3: HDMI stage=generation_retire count=175 total_us=54277 max_us=831 p95_bucket_us=1024",
+        "MESA: info: DRI3: HDMI stage=slot_wait count=0 total_us=0 max_us=0 p95_bucket_us=0",
+        "MESA: info: DRI3: HDMI stage=resolve_submit count=299 total_us=421 max_us=4 p95_bucket_us=4",
+        "MESA: info: DRI3: HDMI stage=fence_export count=299 total_us=165856 max_us=1911 p95_bucket_us=2048",
+        "MESA: info: DRI3: HDMI stage=drawable_prepare count=299 total_us=1077 max_us=34 p95_bucket_us=8"
+      ]
+    }
+  }
+}
