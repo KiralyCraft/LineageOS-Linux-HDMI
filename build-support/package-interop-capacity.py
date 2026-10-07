@@ -64,7 +64,7 @@ def main():
                           ('lib/mesa/libgallium-26.2.0-devel.so', b'HDMI_LOS_MESA_CAPACITY_ABI=1')]:
         assert marker in (out / name).read_bytes(), name
     launcher = (base / 'run-agent.sh').read_text()
-    anchor = 'printf 'HDMI experimental candidate: %s\\n' "$CANDIDATE" >&2'
+    anchor = """printf 'HDMI experimental candidate: %s\\n' "$CANDIDATE" >&2"""
     assert launcher.count(anchor) == 1
     control = """
 # The private HDMI pipeline requires producer-ready Xorg allocation replies.
