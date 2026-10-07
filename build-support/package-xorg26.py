@@ -92,7 +92,11 @@ done
     version = subprocess.run([str(out / 'libexec/Xorg'), '-version'], env=env,
                              capture_output=True, text=True, check=True)
     version_text = version.stdout + version.stderr
-    if result['sources']['xserver']['version'] not in version_text:
+    # Upstream include/meson.build encodes only the first three release
+    # components after a leading 1; RC3's banner is therefore 1.26.0.99.
+    # The full RC identity is pinned by the source archive and SDK manifest.
+    banner = 'X.Org X Server 1.' + '.'.join(result['sources']['xserver']['version'].split('.')[:3])
+    if banner not in version_text:
         raise RuntimeError('unexpected server version')
     (out / 'validation/xorg-version.txt').write_text(version_text)
     dependencies = []
@@ -140,7 +144,7 @@ done
     for p in (out / 'lib/xorg/modules').rglob('*'):
         if p.is_file():
             info['artifacts'][str(p.relative_to(out))] = {'sha256': sha(p), 'size': p.stat().st_size}
-    info['changed_compiled_artifacts'] = sorted(set(changed) | {
+    info['changed_compiled_artifacts'] = sorted((set(changed) - {'run-agent.sh'}) | {
         str(p.relative_to(out)) for p in (out / 'lib/xorg/modules').rglob('*') if p.is_file()})
     (out / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
     (out / 'control-info.json').write_text(json.dumps(info['comparison'], indent=2) + '\n')
