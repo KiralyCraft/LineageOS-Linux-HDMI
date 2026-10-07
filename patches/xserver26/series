@@ -1,0 +1,6 @@
+0001-present-disarm-wait-fence-callback.patch
+0004-modesetting-tearfree-region-cleanup.patch
+0005-modesetting-fence-driven-tearfree.patch
+0006-glamor-eligible-copy-blit.patch
+0007-modesetting-kernel-deferred-presenter.patch
+0010-present-fence-gated-copy-release.patch

@@ -1,0 +1,363 @@
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.c b/hw/xfree86/drivers/modesetting/drmmode_display.c
+index c11c4ad..34d6c3e 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -1658,6 +1658,16 @@ drmmode_destroy_tearfree_shadow(xf86CrtcPtr crtc)
+         trf->copy_timer = NULL;
+     }
+ #endif
++    /* A delegated submitted flip owns a real DRM event and scanout storage.
++     * Drain it before destroying either buffer; aborting its queue entry is
++     * not cancellation of the driver's already accepted commit. */
++    while (trf->kernel_fd >= 0 && trf->flip_seq)
++        ms_drain_drm_events(xf86ScrnToScreen(crtc->scrn));
++    if (trf->kernel_fd >= 0) {
++        RemoveNotifyFd(trf->kernel_fd);
++        close(trf->kernel_fd);
++        trf->kernel_fd = -1;
++    }
+     if (trf->flip_seq)
+         ms_drm_abort_seq(crtc->scrn, trf->flip_seq);
+ 
+@@ -2631,6 +2641,8 @@ drmmode_crtc_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, drmModeResPtr mode_res
+         return 0;
+     drmmode_crtc = XNFcallocarray(1, sizeof(drmmode_crtc_private_rec));
+     crtc->driver_private = drmmode_crtc;
++    drmmode_crtc->tearfree.kernel_fd = -1;
++    drmmode_crtc->tearfree.copy_fd = -1;
+     drmmode_crtc->mode_crtc =
+         drmModeGetCrtc(drmmode->fd, mode_res->crtcs[num]);
+     drmmode_crtc->drmmode = drmmode;
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.h b/hw/xfree86/drivers/modesetting/drmmode_display.h
+index 7d521a7..95bd73e 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.h
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.h
+@@ -186,6 +186,9 @@ typedef struct {
+     /* A pending GPU copy is never entered in the DRM event queue. */
+     Bool copy_pending;
+     int copy_fd;
++    int kernel_fd;
++    uint32_t kernel_seq;
++    uint64_t kernel_generation;
+     uint32_t copy_idx;
+     RegionRec copy_damage;
+     OsTimerPtr copy_timer;
+diff --git a/hw/xfree86/drivers/modesetting/hdmi_companion_uapi.h b/hw/xfree86/drivers/modesetting/hdmi_companion_uapi.h
+new file mode 100644
+index 0000000..256979a
+--- /dev/null
++++ b/hw/xfree86/drivers/modesetting/hdmi_companion_uapi.h
+@@ -0,0 +1,145 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef HDMI_COMPANION_UAPI_H
++#define HDMI_COMPANION_UAPI_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++#define HDMI_COMPANION_ABI_VERSION 1
++#define HDMI_COMPANION_FEATURE_PROBE_ONLY (1ULL << 0)
++#define HDMI_COMPANION_FEATURE_TIMING_GUARD (1ULL << 1)
++#define HDMI_COMPANION_FEATURE_PRESENTER (1ULL << 2)
++
++/* These bits report imported interfaces, never kernel addresses. */
++#define HDMI_COMPANION_IMPORTS(X) \
++    X(drm_crtc_vblank_get, 0) \
++    X(drm_crtc_vblank_put, 1) \
++    X(drm_crtc_vblank_count_and_time, 2) \
++    X(drm_crtc_vblank_waitqueue, 3) \
++    X(drm_mode_object_find, 4) \
++    X(drm_mode_object_put, 5) \
++    X(drm_file_get_master, 6) \
++    X(drm_master_get, 7) \
++    X(drm_master_put, 8) \
++    X(drm_is_current_master, 9) \
++    X(drm_ioctl, 10) \
++    X(drm_dev_get, 11) \
++    X(drm_dev_put, 12) \
++    X(fget, 13) \
++    X(fput, 14) \
++    X(anon_inode_getfile, 15) \
++    X(get_unused_fd_flags, 16) \
++    X(put_unused_fd, 17) \
++    X(fd_install, 18) \
++    X(register_pm_notifier, 19) \
++    X(unregister_pm_notifier, 20) \
++    X(drm_modeset_lock, 21) \
++    X(drm_modeset_unlock, 22) \
++    X(drm_modeset_acquire_init, 23) \
++    X(drm_modeset_acquire_fini, 24) \
++    X(drm_modeset_backoff, 25) \
++    X(drm_modeset_drop_locks, 26)
++
++#define HDMI_COMPANION_IMPORT_COUNT 27
++#define HDMI_COMPANION_REQUIRED_IMPORTS ((1ULL << HDMI_COMPANION_IMPORT_COUNT) - 1)
++
++struct hdmi_companion_caps {
++    __u32 size;
++    __u32 abi_version;
++    __aligned_u64 features;
++    __aligned_u64 imports;
++    __u32 reserved[2];
++    char kernel_release[64];
++    char build_id[80];
++};
++
++#define HDMI_COMPANION_QUERY_CAPS _IOWR('H', 0, struct hdmi_companion_caps)
++
++enum hdmi_companion_state {
++    HDMI_COMPANION_CREATED = 0,
++    HDMI_COMPANION_STARTING = 1,
++    HDMI_COMPANION_TIMING_VALID = 2,
++    HDMI_COMPANION_STOPPED = 3,
++};
++
++enum hdmi_companion_stop_reason {
++    HDMI_COMPANION_REASON_NONE = 0,
++    HDMI_COMPANION_REASON_USER = 1,
++    HDMI_COMPANION_REASON_FD_CLOSED = 2,
++    HDMI_COMPANION_REASON_LEASE_REVOKED = 3,
++    HDMI_COMPANION_REASON_CRTC_INACTIVE = 4,
++    HDMI_COMPANION_REASON_MODE_CHANGED = 5,
++    HDMI_COMPANION_REASON_TIMING_LOST = 6,
++    HDMI_COMPANION_REASON_SUSPEND = 7,
++    HDMI_COMPANION_REASON_START_TIMEOUT = 8,
++};
++
++struct hdmi_companion_create {
++    __u32 size;
++    __u32 abi_version;
++    __s32 lease_fd;
++    __s32 session_fd; /* Input -1; output O_CLOEXEC descriptor. */
++    __u32 connector_id;
++    __u32 crtc_id;
++    __u32 plane_id;
++    __u32 flags; /* Must be zero. */
++    __aligned_u64 generation; /* Input zero; output session identity. */
++    __aligned_u64 reserved[3];
++};
++
++struct hdmi_companion_control {
++    __u32 size;
++    __u32 abi_version;
++    __aligned_u64 reserved;
++};
++
++struct hdmi_companion_status {
++    __u32 size;
++    __u32 abi_version;
++    __u32 state;
++    __u32 reason;
++    __u32 connector_id;
++    __u32 crtc_id;
++    __u32 plane_id;
++    __u32 reserved0;
++    __aligned_u64 generation;
++    __aligned_u64 msc;
++    __aligned_u64 timestamp_ns;
++    __aligned_u64 sampled_ns;
++    __aligned_u64 reference_gets;
++    __aligned_u64 reference_puts;
++    __aligned_u64 reserved[2];
++};
++
++#define HDMI_COMPANION_CREATE_SESSION _IOWR('H', 1, struct hdmi_companion_create)
++/* These operations act on the returned session FD, not the control device. */
++#define HDMI_COMPANION_ENABLE_TIMING _IOW('H', 2, struct hdmi_companion_control)
++#define HDMI_COMPANION_GET_STATUS _IOWR('H', 3, struct hdmi_companion_status)
++#define HDMI_COMPANION_STOP_SESSION _IOW('H', 4, struct hdmi_companion_control)
++
++/* Presenter FDs cannot control the broker's timing session. Creation requires
++ * the exact lease file and object set of a currently valid timing generation. */
++#define HDMI_COMPANION_CREATE_PRESENTER _IOWR('H', 5, struct hdmi_companion_create)
++enum hdmi_present_state {
++    HDMI_PRESENT_EMPTY=0, HDMI_PRESENT_WAITING=1, HDMI_PRESENT_SUBMITTED=2,
++    HDMI_PRESENT_COMPLETE=3, HDMI_PRESENT_CANCELLED=4, HDMI_PRESENT_FAILED=5
++};
++struct hdmi_present_request {
++    __u32 size, abi_version;
++    __u32 framebuffer_id;
++    __s32 acquire_fd;
++    __aligned_u64 generation, serial;
++    __aligned_u64 reserved[2];
++};
++struct hdmi_present_status {
++    __u32 size, abi_version;
++    __u32 state;
++    __s32 error;
++    __aligned_u64 generation, serial;
++    __aligned_u64 accepted_ns, submitted_ns, completed_ns;
++    __aligned_u64 reserved;
++};
++#define HDMI_COMPANION_PRESENT _IOW('H', 6, struct hdmi_present_request)
++#define HDMI_COMPANION_PRESENT_STATUS _IOWR('H', 7, struct hdmi_present_status)
++#define HDMI_COMPANION_CANCEL_PRESENT _IOWR('H', 8, struct hdmi_present_status)
++#endif
+diff --git a/hw/xfree86/drivers/modesetting/pageflip.c b/hw/xfree86/drivers/modesetting/pageflip.c
+index 4508b1d..f690e84 100644
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -30,6 +30,8 @@
+ 
+ #include <xf86drm.h>
+ #include <unistd.h>
++#include <fcntl.h>
++#include "hdmi_companion_uapi.h"
+ #include <sys/ioctl.h>
+ #include <linux/sync_file.h>
+ 
+@@ -78,6 +80,9 @@ ms_flush_drm_events(ScreenPtr screen)
+ void
+ ms_drain_drm_events(ScreenPtr screen)
+ {
++#ifdef HAVE_GBM
++    ms_tearfree_cancel_copies(screen);
++#endif
+     while (!ms_drm_queue_is_empty())
+         ms_flush_drm_events_timeout(screen, -1);
+ }
+@@ -642,6 +647,17 @@ ms_tearfree_dri_notify(drmmode_tearfree_ptr trf, uint64_t msc, uint64_t usec)
+     }
+ }
+ 
++static void ms_tearfree_copy_clear(xf86CrtcPtr crtc, Bool restore);
++static void
++ms_tearfree_kernel_event(xf86CrtcPtr crtc)
++{
++    drmmode_crtc_private_ptr dc=crtc->driver_private;
++    drmmode_tearfree_ptr trf=&dc->tearfree;
++    if (trf->kernel_seq && trf->copy_pending)
++        ms_tearfree_copy_clear(crtc,FALSE);
++    trf->kernel_seq=0;
++}
++
+ static void
+ ms_tearfree_flip_abort(void *data)
+ {
+@@ -649,6 +665,7 @@ ms_tearfree_flip_abort(void *data)
+     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+ 
++    ms_tearfree_kernel_event(crtc);
+     trf->flip_seq = 0;
+     ms_tearfree_dri_abort_all(crtc);
+ }
+@@ -660,6 +677,7 @@ ms_tearfree_flip_handler(uint64_t msc, uint64_t usec, void *data)
+     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+ 
++    ms_tearfree_kernel_event(crtc);
+     /* Swap the buffers and complete the flip */
+     trf->back_idx ^= 1;
+     trf->flip_seq = 0;
+@@ -687,6 +705,76 @@ ms_tearfree_copy_clear(xf86CrtcPtr crtc, Bool restore)
+     trf->copy_pending = FALSE;
+ }
+ 
++static Bool
++ms_kernel_present_status(xf86CrtcPtr crtc, Bool cancel, struct hdmi_present_status *status)
++{
++    drmmode_crtc_private_ptr dc=crtc->driver_private;
++    *status=(struct hdmi_present_status){.size=sizeof(*status),.abi_version=HDMI_COMPANION_ABI_VERSION};
++    return ioctl(dc->tearfree.kernel_fd,cancel ? HDMI_COMPANION_CANCEL_PRESENT : HDMI_COMPANION_PRESENT_STATUS,status)==0;
++}
++
++static void
++ms_kernel_present_ready(int fd, int ready, void *data)
++{
++    xf86CrtcPtr crtc=data;
++    drmmode_crtc_private_ptr dc=crtc->driver_private;
++    drmmode_tearfree_ptr trf=&dc->tearfree;
++    struct hdmi_present_status status;
++    if (!ms_kernel_present_status(crtc,FALSE,&status) || (ready & X_NOTIFY_ERROR))
++        FatalError("HDMI kernel presenter status failed\n");
++    if (!trf->kernel_seq) return;
++    if (status.generation != trf->kernel_generation || status.serial != trf->kernel_seq)
++        FatalError("HDMI kernel presenter generation/serial mismatch\n");
++    if (status.state == HDMI_PRESENT_SUBMITTED || status.state == HDMI_PRESENT_COMPLETE) {
++        /* This transition happens only after the driver accepted a real flip.
++         * Actual completion still arrives exclusively through the DRM queue. */
++        trf->flip_seq=trf->kernel_seq;
++        if (trf->copy_pending) ms_tearfree_copy_clear(crtc,FALSE);
++    } else if (status.state == HDMI_PRESENT_FAILED || status.state == HDMI_PRESENT_CANCELLED) {
++        uint32_t seq=trf->kernel_seq; trf->kernel_seq=0;
++        ms_drm_abort_seq(crtc->scrn,seq);
++        if (trf->copy_pending) ms_tearfree_copy_clear(crtc,TRUE);
++        FatalError("HDMI kernel presenter rejected deferred flip: %d\n",status.error);
++    }
++}
++
++static Bool
++ms_kernel_present_start(xf86CrtcPtr crtc)
++{
++    drmmode_crtc_private_ptr dc=crtc->driver_private;
++    drmmode_tearfree_ptr trf=&dc->tearfree;
++    xf86CrtcConfigPtr config=XF86_CRTC_CONFIG_PTR(crtc->scrn);
++    struct hdmi_companion_create bind={.size=sizeof(bind),.abi_version=HDMI_COMPANION_ABI_VERSION,
++        .lease_fd=dc->drmmode->fd,.session_fd=-1,.crtc_id=dc->mode_crtc->crtc_id,.plane_id=dc->plane_id};
++    struct hdmi_present_request request;
++    if (trf->kernel_fd < 0) {
++        int control=open("/dev/hdmi_companion",O_RDWR|O_CLOEXEC);
++        if (control < 0) return FALSE;
++        for (int i=0;i<config->num_output;i++) if (config->output[i]->crtc==crtc) {
++            drmmode_output_private_ptr output=config->output[i]->driver_private;
++            if (bind.connector_id) { close(control); return FALSE; }
++            bind.connector_id=output->mode_output->connector_id;
++        }
++        if (!bind.connector_id || !bind.plane_id || ioctl(control,HDMI_COMPANION_CREATE_PRESENTER,&bind)<0) {
++            close(control); return FALSE;
++        }
++        close(control); trf->kernel_fd=bind.session_fd; trf->kernel_generation=bind.generation;
++        if (!SetNotifyFd(trf->kernel_fd,ms_kernel_present_ready,X_NOTIFY_READ,crtc)) return FALSE;
++        xf86DrvMsg(crtc->scrn->scrnIndex,X_INFO,"HDMI_LOS_XORG_PRESENTER_ABI=1 kernel deferred presenter generation=%llu\n",(unsigned long long)bind.generation);
++    }
++    /* The reserved queue entry has no submitted-flip state yet. Every drain
++     * first cancels copy-pending work, resolving whether a DRM event exists. */
++    trf->kernel_seq=ms_drm_queue_alloc(crtc,crtc,ms_tearfree_flip_handler,ms_tearfree_flip_abort);
++    if (!trf->kernel_seq) return FALSE;
++    request=(struct hdmi_present_request){.size=sizeof(request),.abi_version=HDMI_COMPANION_ABI_VERSION,
++        .framebuffer_id=trf->buf[trf->copy_idx].fb_id,.acquire_fd=trf->copy_fd,
++        .generation=trf->kernel_generation,.serial=trf->kernel_seq};
++    if (ioctl(trf->kernel_fd,HDMI_COMPANION_PRESENT,&request)<0) {
++        uint32_t seq=trf->kernel_seq; trf->kernel_seq=0; ms_drm_abort_seq(crtc->scrn,seq); return FALSE;
++    }
++    return TRUE;
++}
++
+ void
+ ms_tearfree_cancel_copy(xf86CrtcPtr crtc)
+ {
+@@ -697,6 +785,19 @@ ms_tearfree_cancel_copy(xf86CrtcPtr crtc)
+     /* Disable/modeset/teardown may destroy the destination. Drain only here;
+      * closing a native fence does not cancel the submitted GPU work. */
+     modesettingPTR(crtc->scrn)->glamor.finish(xf86ScrnToScreen(crtc->scrn));
++    if (trf->kernel_seq) {
++        struct hdmi_present_status status;
++        uint32_t seq=trf->kernel_seq;
++        if (!ms_kernel_present_status(crtc,TRUE,&status))
++            FatalError("HDMI kernel presenter cancellation failed\n");
++        if (status.state == HDMI_PRESENT_SUBMITTED || status.state == HDMI_PRESENT_COMPLETE) {
++            trf->flip_seq=seq;
++            ms_tearfree_copy_clear(crtc,FALSE);
++            return;
++        }
++        trf->kernel_seq=0;
++        ms_drm_abort_seq(crtc->scrn,seq);
++    }
+     ms_tearfree_copy_clear(crtc, TRUE);
+ }
+ 
+@@ -792,8 +893,13 @@ ms_tearfree_start_copy(ScreenPtr screen, xf86CrtcPtr crtc)
+     boxes = RegionRects(&trf->copy_damage);
+     for (i = 0; i < RegionNumRects(&trf->copy_damage); ++i)
+         trf->pixels += (uint64_t)(boxes[i].x2 - boxes[i].x1) * (boxes[i].y2 - boxes[i].y1);
++    if (getenv("HDMI_LOS_PRESENTER") && !strcmp(getenv("HDMI_LOS_PRESENTER"),"kernel")) {
++        if (!ms_kernel_present_start(crtc))
++            FatalError("HDMI kernel presenter could not accept deferred flip\n");
++    } else {
+     if (!SetNotifyFd(trf->copy_fd, ms_tearfree_copy_ready, X_NOTIFY_READ, crtc))
+         FatalError("HDMI asynchronous TearFree could not register native-fence readiness\n");
++    }
+     trf->copy_timer = TimerSet(trf->copy_timer, 0, 2000, ms_tearfree_copy_timeout, crtc);
+     if (!trf->copy_timer)
+         FatalError("HDMI asynchronous TearFree could not arm recovery timeout\n");

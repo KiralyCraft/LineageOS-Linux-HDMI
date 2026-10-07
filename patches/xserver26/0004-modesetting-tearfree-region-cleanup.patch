@@ -1,0 +1,29 @@
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+index acb248b..9e64c58 100644
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -695,6 +695,7 @@ ms_tearfree_update_damages(ScreenPtr pScreen)
+                              pScreen->GetScreenPixmap(pScreen),
+                              NULL, ms->drmmode.fb_id, 0, 0);
+         }
++        RegionUninit(&region);
+     }
+     DamageEmpty(ms->damage);
+ }
+diff --git a/hw/xfree86/drivers/modesetting/pageflip.c b/hw/xfree86/drivers/modesetting/pageflip.c
+index dc9bc5d..5e1f3c4 100644
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -350,8 +350,11 @@ ms_tearfree_dri_flip(modesettingPtr ms, xf86CrtcPtr crtc, void *event,
+      * didn't change this CRTC's contents at all with its presentation, possibly
+      * because its window is fully occluded by another window on this CRTC.
+      */
+-    if (RegionNil(&region))
++    if (RegionNil(&region)) {
++        RegionUninit(&region);
+         return FALSE;
++    }
++    RegionUninit(&region);
+ 
+     flip = calloc(1, sizeof(*flip));
+     if (!flip)

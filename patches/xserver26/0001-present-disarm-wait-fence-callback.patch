@@ -1,0 +1,19 @@
+diff --git a/present/present_execute.c b/present/present_execute.c
+index 449ea5c..5ec3738 100644
+--- a/present/present_execute.c
++++ b/present/present_execute.c
+@@ -39,6 +39,14 @@ present_wait_fence_triggered(void *param)
+     ScreenPtr               screen = vblank->screen;
+     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+ 
++    /*
++     * miSyncTriggerFence() restarts its trigger-list scan after every fired
++     * callback because the callback may modify that list.  Disarm this
++     * callback before re-executing: re_execute() may queue the request for a
++     * future MSC and leave the Present fence alive, which would otherwise
++     * make this same trigger fire repeatedly in the restarted scan.
++     */
++    present_fence_set_callback(vblank->wait_fence, NULL, NULL);
+     screen_priv->re_execute(vblank);
+ }
+ 

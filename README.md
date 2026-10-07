@@ -1,5 +1,10 @@
 # LineageOS Linux HDMI
 
+This branch prepares the separate [Xorg 26 migration candidate](docs/experiments/XORG26-REBASE-20261007.md).
+Its active server patches are in `patches/xserver26/series`; the original
+`third_party/xserver` pin and `patches/xserver` remain for the 21.1 comparison
+builds. HDMI acceptance of the new server is pending.
+
 Run a Linux/Xorg desktop on the external USB-C/HDMI display of a Sony Xperia
 1 V while Android continues to use the phone's internal display.
 
