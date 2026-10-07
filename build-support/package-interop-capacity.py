@@ -159,7 +159,7 @@ phone currently runs 0.4.3. A same-agent connected restart avoids that version's
 paused-registration defect. Preserve the previous Downloads folder for rollback.
 """)
     (out / 'README.md').write_text((out / 'INTEROP-CAPACITY.md').read_text())
-    files = sorted(p for p in out.rglob('*') if p.is_file() and p.name != 'SHA256SUMS')
+    files = sorted(p for p in out.rglob('*') if p.is_file() and p != out / 'SHA256SUMS')
     (out / 'SHA256SUMS').write_text(''.join(sha(p) + '  ' + str(p.relative_to(out)) + '\n' for p in files))
     verify_bundle(out)
     print(json.dumps(dict(output=str(out), mesa_commit=commit, hdmi_commit=repository_commit,
