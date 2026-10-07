@@ -104,7 +104,9 @@ all four performance cores became active. The X3 was sampled active at
 3187.2 MHz. A separate placement test observed inherited-affinity workers on
 CPUs 0 through 7 while Android remained Dozing. Version 0.1.4 retains the
 working display-policy selection and removes the unreliable forced minimums.
-Its package must still pass live acceptance after manual installation.
+The user subsequently installed 0.1.4: awake and dozing workloads both ran
+on all eight CPUs with the same sampled peak frequencies, and unplug while
+still dozing restored the original cap/core limits without a wake event.
 
 Installation and every boot check exact ROM properties and hashes of PowerHAL,
 both performance libraries, and the three CPU resource profiles. Before
@@ -157,9 +159,9 @@ the original service. Disabling it during a lease stops monitor renewal and
 restores policy through expiry; reboot removes the boot-time launcher mount.
 
 See [live October 7 results](experiments/CPU-POWER-20261007.md) for versioned
-evidence. Screen-off frequency preservation and unplug restoration were
-observed with 0.1.1; all-CPU placement during Doze was observed with 0.1.3.
-Version 0.1.4 remains pending manual installation and live workload/unplug
-checks. Recovery across service crashes, thermal stress and suspend/resume
-has not been established by these live tests. No Maps or display-cadence
+evidence. Installed 0.1.4 passed awake and dozing inherited-affinity workloads
+on all CPUs including the X3, followed by unplug restoration while Android
+remained Dozing. The recorder was stopped and the agent left waiting.
+Standalone Termux:X11 GUI workloads and recovery across service crashes,
+thermal stress and suspend/resume remain untested. No Maps or display-cadence
 improvement is claimed.

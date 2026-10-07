@@ -1,0 +1,249 @@
+{
+  "module_version": "0.1.4-98f97e06dee7",
+  "native_guard_sha256": "ce3c59ff70fd827e5366ae75602135332058fe6fced617424c946639c5d6c935",
+  "zip_sha256": "790b2ae064d84eb700a8536c4a8b1ff34827273a2da023231676c705ea4dda50",
+  "output_mode": "3840x2160@30",
+  "workloads": [
+    {
+      "wake_before": "mWakefulness=Awake",
+      "workers": 8,
+      "nice": 10,
+      "affinity_policy": "inherited, never changed",
+      "before": {
+        "boot_s": 420.454345619,
+        "cpu3_min_cpus": "3",
+        "cpu3_max_cpus": "4",
+        "cpu3_active_cpus": "3",
+        "cpu3_scaling_max_freq": "2803200",
+        "cpu3_scaling_cur_freq": "1651200",
+        "cpu7_min_cpus": "0",
+        "cpu7_max_cpus": "1",
+        "cpu7_active_cpus": "0",
+        "cpu7_scaling_max_freq": "3187200",
+        "cpu7_scaling_cur_freq": "864000"
+      },
+      "hash_counts": [
+        7336,
+        7379,
+        7312,
+        4726,
+        7583,
+        7501,
+        7677,
+        4710
+      ],
+      "wake_after": "mWakefulness=Awake",
+      "after": {
+        "boot_s": 425.685730201,
+        "cpu3_min_cpus": "3",
+        "cpu3_max_cpus": "4",
+        "cpu3_active_cpus": "3",
+        "cpu3_scaling_max_freq": "2803200",
+        "cpu3_scaling_cur_freq": "2592000",
+        "cpu7_min_cpus": "0",
+        "cpu7_max_cpus": "1",
+        "cpu7_active_cpus": "0",
+        "cpu7_scaling_max_freq": "3187200",
+        "cpu7_scaling_cur_freq": "864000"
+      },
+      "observed_cpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "peak_sampled_khz": {
+        "3": 2803200,
+        "7": 3187200
+      },
+      "active_combinations": [
+        [
+          "4",
+          "0"
+        ],
+        [
+          "4",
+          "1"
+        ]
+      ]
+    },
+    {
+      "wake_before": "mWakefulness=Dozing",
+      "workers": 8,
+      "nice": 10,
+      "affinity_policy": "inherited, never changed",
+      "before": {
+        "boot_s": 475.137825546,
+        "cpu3_min_cpus": "3",
+        "cpu3_max_cpus": "4",
+        "cpu3_active_cpus": "3",
+        "cpu3_scaling_max_freq": "2803200",
+        "cpu3_scaling_cur_freq": "1785600",
+        "cpu7_min_cpus": "0",
+        "cpu7_max_cpus": "1",
+        "cpu7_active_cpus": "1",
+        "cpu7_scaling_max_freq": "3187200",
+        "cpu7_scaling_cur_freq": "3187200"
+      },
+      "hash_counts": [
+        7284,
+        7295,
+        7272,
+        7266,
+        7235,
+        7274,
+        7260,
+        7277
+      ],
+      "wake_after": "mWakefulness=Dozing",
+      "after": {
+        "boot_s": 480.359415753,
+        "cpu3_min_cpus": "3",
+        "cpu3_max_cpus": "4",
+        "cpu3_active_cpus": "3",
+        "cpu3_scaling_max_freq": "2803200",
+        "cpu3_scaling_cur_freq": "614400",
+        "cpu7_min_cpus": "0",
+        "cpu7_max_cpus": "1",
+        "cpu7_active_cpus": "0",
+        "cpu7_scaling_max_freq": "3187200",
+        "cpu7_scaling_cur_freq": "864000"
+      },
+      "observed_cpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "peak_sampled_khz": {
+        "3": 2803200,
+        "7": 3187200
+      },
+      "active_combinations": [
+        [
+          "4",
+          "0"
+        ],
+        [
+          "4",
+          "1"
+        ]
+      ]
+    }
+  ],
+  "restoration": {
+    "last_normal_sample": {
+      "boottime_s": 581.904261652,
+      "wall_s": 1791388054.2557533,
+      "max_khz": {
+        "0": "2016000",
+        "3": "2803200",
+        "7": "3187200"
+      },
+      "cur_khz": {
+        "0": "2016000",
+        "3": "1651200",
+        "7": "864000"
+      },
+      "core_ctl": {
+        "0": {
+          "min_cpus": "1",
+          "max_cpus": "3",
+          "active_cpus": "3"
+        },
+        "3": {
+          "min_cpus": "3",
+          "max_cpus": "4",
+          "active_cpus": "4"
+        },
+        "7": {
+          "min_cpus": "0",
+          "max_cpus": "1",
+          "active_cpus": "1"
+        }
+      }
+    },
+    "first_screen_off_policy_sample": {
+      "boottime_s": 582.107229516,
+      "wall_s": 1791388054.4587255,
+      "max_khz": {
+        "0": "2016000",
+        "3": "940800",
+        "7": "3187200"
+      },
+      "cur_khz": {
+        "0": "556800",
+        "3": "614400",
+        "7": "864000"
+      },
+      "core_ctl": {
+        "0": {
+          "min_cpus": "1",
+          "max_cpus": "3",
+          "active_cpus": "3"
+        },
+        "3": {
+          "min_cpus": "2",
+          "max_cpus": "2",
+          "active_cpus": "3"
+        },
+        "7": {
+          "min_cpus": "0",
+          "max_cpus": "0",
+          "active_cpus": "0"
+        }
+      }
+    },
+    "settled_sample": {
+      "boottime_s": 667.452285623,
+      "wall_s": 1791388139.8037796,
+      "max_khz": {
+        "0": "2016000",
+        "3": "940800",
+        "7": "3187200"
+      },
+      "cur_khz": {
+        "0": "1785600",
+        "3": "940800",
+        "7": "864000"
+      },
+      "core_ctl": {
+        "0": {
+          "min_cpus": "1",
+          "max_cpus": "3",
+          "active_cpus": "3"
+        },
+        "3": {
+          "min_cpus": "2",
+          "max_cpus": "2",
+          "active_cpus": "2"
+        },
+        "7": {
+          "min_cpus": "0",
+          "max_cpus": "0",
+          "active_cpus": "0"
+        }
+      }
+    },
+    "final_framework_state": "Dozing",
+    "cpu_lease_deadline": 0,
+    "active_lease": false,
+    "guard_android_on": false,
+    "guard_applied_on": false,
+    "companion_refcount": 0
+  },
+  "limitations": [
+    "CPU placement is sampled via worker /proc/PID/stat last-CPU; no migration latency claim.",
+    "Current-frequency snapshots are separate from worker CPU-placement samples.",
+    "Unplug physical timestamp was not measured.",
+    "No standalone Termux:X11 GUI workload, browser benchmark, thermal stress or service-crash test."
+  ]
+}
