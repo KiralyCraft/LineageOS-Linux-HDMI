@@ -212,6 +212,17 @@ def main():
                 resize(d, window, *requested)
                 sync(d, 0)
                 width, height, events = drain_and_size()
+                # Map/configure requests are mediated by the window manager.
+                # XSync on this connection alone can return before the WM has
+                # applied the requested size. Compare both controls at the
+                # same actual geometry instead of drawing an older extent.
+                deadline = time.monotonic()+2
+                while [width, height] != requested and time.monotonic() < deadline:
+                    time.sleep(.005)
+                    sync(d, 0)
+                    width, height, new_events = drain_and_size()
+                    events += new_events
+                assert [width, height] == requested, 'WM did not apply benchmark geometry'
                 configure_ms = (time.monotonic_ns()-before_resize)/1e6
                 before_draw = time.monotonic_ns()
                 rgb, swap_ms = draw(serial, width, height)
