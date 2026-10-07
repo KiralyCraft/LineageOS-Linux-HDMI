@@ -251,3 +251,13 @@ the C/D bridge path and F presenter, and no E diagnostic wait. The broker
 acknowledges a continuous agent. No automatic test observer or pattern workload
 is running. This is a manual-test selection, not promotion of E to the ordinary
 launcher default. No launcher, runtime library or Magisk module was changed.
+
+## Subsequent manual acceptance
+
+The user could not reproduce the titlebar issue in manual 4K30 use and accepts
+E for continued testing. Firefox corruption during circular corner resizing and
+Maps panning stutter remain separate unresolved observations; Konsole resizing
+was clean. Preserve the automated titlebar failures above alongside this manual
+result. The next live audit found a different controls bundle at 4K60 with older
+Mesa and E ABI 1, so it cannot establish an E ABI 2 fix or 60 Hz acceptance.
+See [the Firefox/Maps investigation](FIREFOX-MAPS-20261007.md).
