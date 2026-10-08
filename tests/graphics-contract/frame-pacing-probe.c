@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT
- * Diagnostic only: fixed memory records; output is written at process exit.
+ * Diagnostic only: fixed memory records; output is written at process exit or
+ * an optional HDMI_FRAME_TRACE_SECONDS checkpoint (1 through 300 seconds).
+ * Preload the actual application ELF, not its shell wrapper: exec keeps the
+ * PID, so the wrapper's O_EXCL trace file would prevent tracing the application.
  * No application/Present options, fences or frame scheduling are changed.
  */
 #define _GNU_SOURCE
@@ -50,6 +53,11 @@ static void dump(void){
  close(fd);
 }
 static void stop(int signal){dump();_exit(128+signal);}
+static void *timed_dump(void *seconds){
+ struct timespec delay={.tv_sec=(time_t)(uintptr_t)seconds};
+ while(nanosleep(&delay,&delay)<0 && errno==EINTR){}
+ dump();return NULL;
+}
 __attribute__((constructor)) static void init(void){
  owner=getpid();char name[PATH_MAX];const char *dir=getenv("HDMI_FRAME_TRACE_DIR");
  const char *path=getenv("HDMI_FRAME_TRACE");
@@ -57,6 +65,9 @@ __attribute__((constructor)) static void init(void){
  if(!path)return;
  int fd=open(path,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC,0600);if(fd<0)return;atomic_store(&output,fd);
  struct sigaction sa={.sa_handler=stop};sigemptyset(&sa.sa_mask);sigaction(SIGTERM,&sa,NULL);
+ const char *seconds=getenv("HDMI_FRAME_TRACE_SECONDS");
+ if(seconds){char *end;unsigned long n=strtoul(seconds,&end,10);if(*seconds && !*end && n && n<=300){pthread_t thread;if(!pthread_create(&thread,NULL,timed_dump,(void *)(uintptr_t)n))pthread_detach(thread);}}
+
 }
 __attribute__((destructor)) static void fini(void){dump();}
 static void *resolve_symbol(const char *name){

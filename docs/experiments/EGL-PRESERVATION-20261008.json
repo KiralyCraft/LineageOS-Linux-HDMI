@@ -1,0 +1,320 @@
+{
+  "mesa_commit": "08a3ec46412f3a2dbb708cecd07bb82ca85384d9",
+  "mode": [
+    3840,
+    2160,
+    30
+  ],
+  "physical_optical_capture": false,
+  "magisk_changed": false,
+  "cases": [
+    {
+      "case": "age-baseline",
+      "preserved": false,
+      "swap_count": 24,
+      "images_checked": 24,
+      "passed": 24,
+      "buffer_ages": {
+        "0": 1,
+        "1": 23
+      },
+      "failed_tiles": [],
+      "result_sha256": "fa544d39cc8f7a7356560bf174d546e85207be386ff62fcd186a0e1eb8227727",
+      "log_sha256": "dba277094c7cd6e86acddb8ae4c58258ca38d5e51311447078dc950ab156f49c"
+    },
+    {
+      "case": "preserved-baseline",
+      "preserved": true,
+      "swap_count": 24,
+      "images_checked": 24,
+      "passed": 24,
+      "buffer_ages": {
+        "0": 1,
+        "1": 23
+      },
+      "failed_tiles": [],
+      "result_sha256": "a5af7972606010e785a835838416426d88d57d22344b445946a469167ff4a8c9",
+      "log_sha256": "c6bf00f3508f6b7b13b3a6eca775795f01680ce03badb58ae1414282809b84df"
+    },
+    {
+      "case": "age-burst",
+      "preserved": false,
+      "swap_count": 240,
+      "images_checked": 8,
+      "passed": 8,
+      "buffer_ages": {
+        "0": 2,
+        "1": 228,
+        "26": 1,
+        "2": 5,
+        "30": 2,
+        "31": 1,
+        "29": 1
+      },
+      "failed_tiles": [],
+      "result_sha256": "188d3261e4cab63e336878631406ece6575cbf464b332d8040ff4666e5494a64",
+      "log_sha256": "f434616b747b49086602626145d1b975c598eae2f6c292725373872f0bf67c4f"
+    },
+    {
+      "case": "preserved-burst-fast",
+      "preserved": true,
+      "swap_count": 240,
+      "images_checked": 8,
+      "passed": 0,
+      "buffer_ages": {
+        "0": 3,
+        "2": 29,
+        "1": 1,
+        "3": 207
+      },
+      "failed_tiles": [
+        {
+          "serial": 30,
+          "bad_tiles": [
+            1,
+            3,
+            5,
+            7,
+            9,
+            11,
+            13,
+            15
+          ]
+        },
+        {
+          "serial": 60,
+          "bad_tiles": [
+            0,
+            1,
+            2,
+            4,
+            5,
+            10,
+            11,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "serial": 90,
+          "bad_tiles": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            12,
+            15
+          ]
+        },
+        {
+          "serial": 120,
+          "bad_tiles": [
+            0,
+            1,
+            6,
+            7,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ]
+        },
+        {
+          "serial": 150,
+          "bad_tiles": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            8,
+            11,
+            14,
+            15
+          ]
+        },
+        {
+          "serial": 180,
+          "bad_tiles": [
+            2,
+            3,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12,
+            13
+          ]
+        },
+        {
+          "serial": 210,
+          "bad_tiles": [
+            0,
+            1,
+            4,
+            7,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "serial": 240,
+          "bad_tiles": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8,
+            9,
+            14,
+            15
+          ]
+        }
+      ],
+      "result_sha256": "b01b67695c47219f3c6ddfda7b2f673214b6148a208ed84c5f82d633ec6838c5",
+      "log_sha256": "ab335740dba63c901b5fe1f572f0fe1e4ed0055445706165925f3eed518e486a"
+    },
+    {
+      "case": "preserved-burst-fixed",
+      "preserved": true,
+      "swap_count": 240,
+      "images_checked": 8,
+      "passed": 8,
+      "buffer_ages": {
+        "0": 3,
+        "1": 237
+      },
+      "failed_tiles": [],
+      "result_sha256": "45e38936b60fe6cd76a6983f4feb49d6e26ca283b80e86c9b29171c6e36cbd96",
+      "log_sha256": "6915674fa03be3d9af5c2d62d54181de41b7a237c155057e0965f48d84fe0310"
+    },
+    {
+      "case": "ordinary-burst-fixed",
+      "preserved": false,
+      "swap_count": 240,
+      "images_checked": 8,
+      "passed": 8,
+      "buffer_ages": {
+        "0": 2,
+        "2": 219,
+        "1": 11,
+        "5": 1,
+        "3": 6,
+        "4": 1
+      },
+      "failed_tiles": [],
+      "result_sha256": "2e389ee6dd55ef32477503a8e8448d75da282694f06de577e7166f6e407d9acd",
+      "log_sha256": "2b2cde00e2eaf7a4e0eacb18b71e73d7acdfcefda7a1711275280c72061075b0"
+    },
+    {
+      "case": "preserved-no-query-fixed",
+      "preserved": true,
+      "swap_count": 240,
+      "images_checked": 8,
+      "passed": 8,
+      "buffer_ages": {
+        "1": 240
+      },
+      "failed_tiles": [],
+      "result_sha256": "0f84b404c7d1ab5575a778819739881cadbcf82870d634863ea0e1ce38e0f82c",
+      "log_sha256": "6483e7ca67bb047ff6e52991a0f19e1ef5862106b0dc825c22adcec7c45c151b"
+    }
+  ],
+  "firefox_correlation": {
+    "ordinary_async_requests": 2171,
+    "all_target_msc_zero": true,
+    "basic_resize_acknowledgements": 238,
+    "counter_to_next_request_ms": {
+      "mean": 1.2534164705882354,
+      "p95": 2.57526,
+      "maximum": 30.251719
+    },
+    "managed_window": 16777238,
+    "egl_child": 16777232,
+    "parent_child_geometry_mismatches": 19,
+    "request_batches": 299,
+    "clipping_cause": "unresolved; matching child/parent geometry alone does not eliminate clipped frames",
+    "trace_sha256": "40e6b544e2430af5358f2fff309ddb6e926ae23c19f80921ff4683db06d173ce",
+    "physical_optical_capture": false
+  },
+  "prior_captures_archived": {
+    "server": "root@192.168.104.201",
+    "archive": "/bigdata/mesa-sync-build/package-combined/hdmi-wm-resize-20261008/prior-browser-captures.tar.gz",
+    "sha256": "9b082981b817d2724effcc01d8c8cedfb3fe67a3fdf0427fac957a4a383ce0ea",
+    "bytes": 44917099,
+    "cases": [
+      "firefox-wm-1",
+      "firefox-wm-corrected",
+      "firefox-fixed-clean-wm",
+      "firefox-fixed-clean-direct"
+    ],
+    "source": "owned empty-browser tests only; no profile or Xauthority included"
+  },
+  "build": {
+    "commit": "08a3ec46412f3a2dbb708cecd07bb82ca85384d9",
+    "base": "cc190637b670f522f60a294caeb4412cee1ea477",
+    "seconds_this_run": 15.478430986404419,
+    "tests": {
+      "src/freedreno/drm/kgsl_bo_handle_test": "skipped: device unavailable",
+      "src/x11/kgsl_device_selection_test": "skipped: device unavailable"
+    },
+    "files": {
+      "usr/lib/libgbm.so.1.0.0": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+      "usr/lib/libgallium-26.2.0-devel.so": "5d29933a8bb0f7dada322b53b12b98d67fd30e27afcd13269ff635a59de51085",
+      "usr/lib/libGLX_mesa.so.0.0.0": "a525c302c9a92e5c263077aa82563ff38c94bcd8fb670a796849b07f6edef56f",
+      "usr/lib/libEGL_mesa.so.0.0.0": "c11ac86fcb8dfd89d08d56a425593accd6126e9ae64f4540479858d6cd730459",
+      "usr/lib/pkgconfig/dri.pc": "0ef0ad154b083686235bc2148b64f84e3cad3c02ab807179ea66c014c60e5b33",
+      "usr/lib/pkgconfig/gbm.pc": "dc758a99eedc7aae15ba56488d1aeec45beadfdc83421afaca17d852cc6927e6",
+      "usr/lib/dri/libdril_dri.so": "db3b5424b8bec640db4414ac9c620f02418489207476f869c658aae0b1def561",
+      "usr/lib/gbm/dri_gbm.so": "868e7656a0baff277ef4d2b31307dc0078f6de812e8f0ffc0244e700eb818fc7"
+    },
+    "note": "Matched R13 built on root@192.168.104.201; stage and source blob hashes verified. Production cache ASan/UBSan/LSan fixture passed. Device tests on builder skipped; isolated EGL and GLX regression tests passed on the phone. Not yet deployed to the continuous desktop."
+  },
+  "regressions": [
+    {
+      "name": "egl-damage-resize",
+      "frames": 24,
+      "passed": 24,
+      "renderer": "FD740",
+      "result_sha256": "52e464dd390662a758a285830fb4ba9f207a993ca9d26490e81f490263eaecbe"
+    },
+    {
+      "name": "glx-msaa-interval-transitions",
+      "frames": 24,
+      "passed": 24,
+      "renderer": "FD740",
+      "result_sha256": "e37998ec4062fd606fa9b9614f84d004f86948725151bd889250d6151720fb00"
+    }
+  ],
+  "resumed_committed_test": {
+    "swaps": 240,
+    "images_checked": 8,
+    "passed": 8,
+    "no_age_query": true,
+    "all_egl_gl_calls_succeeded": true,
+    "note": "Initial runner exit failed because a new summary compared integer GL_NO_ERROR to a string; recorded calls and all eight pixel checks passed. Summary fixed before post-deployment rerun."
+  },
+  "r13_browser_trace": {
+    "present_requests": 1799,
+    "options": "ASYNC",
+    "target_msc": 0,
+    "resize_correlation_valid": false,
+    "note": "45 second checkpoint ended before resize automation began. Do not use this trace as a resize synchronization result."
+  }
+}
