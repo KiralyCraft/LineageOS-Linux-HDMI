@@ -1508,5 +1508,107 @@
   },
   "worker_hint_promoted": false,
   "physical_scanout_tested": false,
-  "memory_evidence_archive": "root@192.168.104.201:/bigdata/mesa-sync-build/live-evidence/20261008-session-scheduling"
+  "memory_evidence_archive": "root@192.168.104.201:/bigdata/mesa-sync-build/live-evidence/20261008-session-scheduling",
+  "disable_inherited_hint_validation": {
+    "result": "PASS",
+    "inherited_agent_min": 512,
+    "explicit_child_min": 0,
+    "tasks": {
+      "hdmi-los-agent": {
+        "pid": 29389,
+        "attributes": [
+          "uclamp.min                                   :                  512",
+          "uclamp.max                                   :                 1024",
+          "effective uclamp.min                         :                  512",
+          "effective uclamp.max                         :                 1024"
+        ]
+      },
+      "Xorg": {
+        "pid": 29422,
+        "attributes": [
+          "uclamp.min                                   :                    0",
+          "uclamp.max                                   :                 1024",
+          "effective uclamp.min                         :                    0",
+          "effective uclamp.max                         :                 1024"
+        ]
+      },
+      "lxsession": {
+        "pid": 29445,
+        "attributes": [
+          "uclamp.min                                   :                    0",
+          "uclamp.max                                   :                 1024",
+          "effective uclamp.min                         :                    0",
+          "effective uclamp.max                         :                 1024"
+        ]
+      }
+    }
+  },
+  "final_runtime": {
+    "result": "PASS",
+    "final_tasks": {
+      "hdmi-los-agent": {
+        "pid": 30467,
+        "effective_util_min": 0
+      },
+      "Xorg": {
+        "pid": 30501,
+        "effective_util_min": 512
+      },
+      "lxsession": {
+        "pid": 30527,
+        "effective_util_min": 512
+      },
+      "lxpanel": {
+        "pid": 30555,
+        "effective_util_min": 512
+      },
+      "kgsl-events": {
+        "pid": 676,
+        "effective_util_min": 0
+      }
+    },
+    "agent_sha256": "70d906e0e5bff880c1f37f49530616885f886f6e6bb01164960df24c104f3c34",
+    "diagnostics_running": false
+  },
+  "diagnostic_probe_sha256": "207f35c9e5f78fdf65776ccf1d9908c8323cc18187f2e01bb93b4d1d77bfbf9b",
+  "installed_broker_version": "0.4.3-restart-6d19c959b8c4",
+  "replacement_registration": "idle registration plus root legacy takeover; paused-registration capability fix remains uninstalled",
+  "archive_verified_files": {
+    "cases/r15-1080p60-quake-fullscreen-vsync/trace.bin": "2378012e9bcb0a32941286d063f581f2ebbb69e4b408f73e89b84af93968582f",
+    "cases/r15-1080p60-quake-fullscreen-vsync/trace.summary.json": "dddf558b64e303b1a845126181ffc7d9edede8cb236eb35b2dd54137f78b5daa",
+    "cases/r15-1080p60-quake-fullscreen-vsync/result.json": "99562c6d112436c9f1e8783bdc4c30ff07bba07029b584bfb0d4e065b6650e94",
+    "cases/r15-1080p60-quake-fullscreen-vsync/stdout.log": "69bcd4fa1d7f1111469b7380734b7fac43be00110c84dcca25686409367bb485",
+    "cases/r15-1080p60-maximized512/trace.bin": "4eb4d999773abf83c1fa1d13eec37b2935e2c56aafceac90b6ee7456197e59db",
+    "cases/r15-1080p60-maximized512/trace.summary.json": "f4f5464169790f09d8be878a20dfac4ec36e8a34d8a4641d228adbdd665b0cd7",
+    "cases/r15-1080p60-maximized512/result.json": "d9bf439d1ad9830dc82fd0c388fe12da6aa21b044086cdfb6da989948a6f9051",
+    "cases/r15-1080p60-maximized512/stdout.log": "c079952dd6317a8330cc9145866d026126646077c0ed2e72f909d7056f9b6503",
+    "cases/r15_1080p60_kgsl_events_clamp/trace.bin": "5582b150d36cea6021e85a8b1f7de559688a493ae60c104b1e90c4638b07167f",
+    "cases/r15_1080p60_kgsl_events_clamp/trace.summary.json": "f70702f216fb14b33fd0cc3a47cd6dbc87522bbead63f9720de22b8119b52a56",
+    "cases/r15_1080p60_kgsl_events_clamp/result.json": "1ecd0f064952d3afc3cc6b82cfe74807553048b171022c61d335000d71cc372e",
+    "cases/r15_1080p60_kgsl_events_clamp/stdout.log": "93c5f103adbf8efbfb26233869290094f161421090951b17a9b1193c8acf4655",
+    "cases/r15-1080p60-maximized-worker512/trace.bin": "21379f3b509033794c648ff53995528a5fd9941db5970aa790df0e728c1c9c59",
+    "cases/r15-1080p60-maximized-worker512/trace.summary.json": "178f10e135c6e7b7ddf8cd4e602768b89e4cd96e9637a53436ccf2b1c50f7c80",
+    "cases/r15-1080p60-maximized-worker512/result.json": "15c5e609b1551d07f2a94c3eb2f5f755c1feac39d9ce95d328c644b6b2e6469f",
+    "cases/r15-1080p60-maximized-worker512/stdout.log": "02bf3ad445f5d54c68c500447e2f6a94bbca1886a6547675e2f034691e2bbdaf",
+    "cases/r15-1080p60-fullscreen-client512/trace.bin": "4874b1bd455e65972716132ded3504bc6b61ef42ff6cc32bb6bb762d454c2a84",
+    "cases/r15-1080p60-fullscreen-client512/trace.summary.json": "a85213e6f2e3aab3b4beae0137c82a9a1bf04d31dd5636ef4c88df61ffd65e6d",
+    "cases/r15-1080p60-fullscreen-client512/result.json": "7ba2173ff93dcbb8a203e5b33086fbfc99b3d3b728e877d4fd0e3d0dfc43c677",
+    "cases/r15-1080p60-fullscreen-client512/stdout.log": "6e82a271b971414b2ab1321832f3f16e98c2d6fdb4603cb2d03af51cf7b522cb",
+    "cases/r15-1080p60-fullscreen-client0/trace.bin": "23428f5e5936ca0ba5d1c5bc89bcc02dcba3c824425795e5e381cd50ae483dbc",
+    "cases/r15-1080p60-fullscreen-client0/trace.summary.json": "bd39d43db53a0aaa67dde11c3d7845af971df6385f3e89ac7dcf1c2703d7498c",
+    "cases/r15-1080p60-fullscreen-client0/result.json": "231e800abd130e08d4b2294d5ad7ac3601066ac3ebbfc652d7aefdd1ee8639fc",
+    "cases/r15-1080p60-fullscreen-client0/stdout.log": "11450f27c9ace78c4932821ba6f3cb601c21327c02e464e25d34852705e37bb0",
+    "cases/r15_1080p60_kgsl_events_trace/trace.bin": "01a071597061edbcd3370a1736784808923b715b21157750fb866b1c5f6df696",
+    "cases/r15_1080p60_kgsl_events_trace/trace.summary.json": "d7fc173114488b53f72f20e50aea2982e14cdebe005127146a5c95ebb04ca991",
+    "cases/r15_1080p60_kgsl_events_trace/result.json": "df7b54b69f2f98776277bfe2fb1c8a8d36b7af0ada47a044112107e33d840879",
+    "cases/r15_1080p60_kgsl_events_trace/stdout.log": "425dff275d194ec157a03ddadc593f237a0c4caf9afb501e1a86288345fba831",
+    "cases/r15_1080p60_maximized_trace/trace.bin": "3e6540a5ba007c763f6ecfd3a84d8a65d5e46d9a3ad36b2358c53e071d583b11",
+    "cases/r15_1080p60_maximized_trace/trace.summary.json": "5e99092dea0d1a97b36cfed5a754141ce97154d8e25820def80a317802223a12",
+    "cases/r15_1080p60_maximized_trace/result.json": "42b6cd1deba8d13e550b1f364ed1e8048a6e07dd35ae0ce7d376ff45ab6a5911",
+    "cases/r15_1080p60_maximized_trace/stdout.log": "c95695b243447e5ae71bdecbc66296979d10a3808cf9f4c6537d0ec3c47bc9fe",
+    "kernel-r15_1080p60_kgsl_events_clamp-trace.txt": "7e4106101e573066a7f32021ea130fd1c1ea36f67e0973015e27cbe4b227b757",
+    "kernel-r15_1080p60_kgsl_events_clamp-trace.json": "d4ba0c01b1b07a6c78eee13c6353cb55cb615231229693b3833c7e5a220aefcf",
+    "kernel-r15_1080p60_kgsl_events_trace-trace.json": "484229a22bffe0954eb84c0c1af8f8f20bf2a4144a603aa6688318a67f0cf124",
+    "kernel-r15_1080p60_kgsl_events_trace-trace.txt": "06ce5eef1113529ff25c7ab522d6872349e1e36198f963a9760c8840b13c0ad9"
+  }
 }

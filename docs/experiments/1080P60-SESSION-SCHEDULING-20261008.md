@@ -104,3 +104,22 @@ desktop remains active.
 Remaining work is to correlate untraced Copy-path misses with repaint timing,
 GPU readiness and kernel-presenter submission without the broad scheduler-trace
 overhead. No physical 4K60 claim is made for this adapter.
+
+## Final deployment checks
+
+The final ARM64 agent hash is
+`70d906e0e5bff880c1f37f49530616885f886f6e6bb01164960df24c104f3c34`.
+It was rebuilt on the build server and loaded from the self-contained Downloads
+bundle named above. An inherited-hint control launched the agent itself at 512
+with `--session-uclamp-min 0`; both Xorg and LXDE then had an effective minimum
+of zero. The final ordinary launch restored 512 for Xorg/LXDE, with the agent
+and `kgsl-events` still at zero. The disable control therefore clears inherited
+settings as documented.
+
+The installed broker is `0.4.3-restart-6d19c959b8c4`. Its paused-registration
+reply still omits continuous capability, so replacement agents were registered
+after disarming, then started through the existing root diagnostic takeover.
+The external timing was checked at 1080p60 before takeover. The repository's
+0.4.4 registration fix remains separate from this agent update; the installed
+module was not replaced. The final Xorg, LXDE and panel are running, owned test
+applications have exited, and no owned ftrace instance remains enabled.
