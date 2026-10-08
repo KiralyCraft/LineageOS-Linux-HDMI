@@ -86,6 +86,10 @@ static void *resolve_symbol(const char *name){
  else if(!strncmp(name,"XSync",5))library="libXext.so.6";
  else if(name[0]=='X')library="libX11.so.6";
  if(library){void *handle=dlopen(library,RTLD_LAZY|RTLD_NOLOAD);if(handle){symbol=dlsym(handle,name);dlclose(handle);}}
+ if(!symbol && !strncmp(name,"eglSwapBuffersWithDamage",24)){
+  __eglMustCastToProperFunctionPointerType(*getproc)(const char*)=resolve_symbol("eglGetProcAddress");
+  if(getproc)symbol=(void*)getproc(name);
+ }
  if(!symbol && !strcmp(name,"glViewport")){void *handle=dlopen("libGLESv2.so.2",RTLD_LAZY|RTLD_NOLOAD);if(handle){symbol=dlsym(handle,name);dlclose(handle);}}
  if(!symbol)fprintf(stderr,"HDMI diagnostic cannot resolve %s in its loaded library scope\n",name);
  return symbol;
@@ -129,6 +133,23 @@ xcb_generic_event_t*xcb_wait_for_special_event(xcb_connection_t*c,xcb_special_ev
 
 DECLARE(eglSwapBuffers,EGLBoolean,(EGLDisplay,EGLSurface))
 EGLBoolean eglSwapBuffers(EGLDisplay d,EGLSurface surface){RESOLVE(eglSwapBuffers);uint64_t b=stamp();EGLBoolean r=real_eglSwapBuffers(d,surface);note(10,b,stamp(),(intptr_t)d,(intptr_t)surface,viewport_w,viewport_h,r);return r;}
+DECLARE(eglSwapBuffersWithDamageKHR,EGLBoolean,(EGLDisplay,EGLSurface,const EGLint*,EGLint))
+EGLBoolean eglSwapBuffersWithDamageKHR(EGLDisplay d,EGLSurface surface,const EGLint*rects,EGLint n){RESOLVE(eglSwapBuffersWithDamageKHR);uint64_t b=stamp();EGLBoolean r=real_eglSwapBuffersWithDamageKHR(d,surface,rects,n);note(14,b,stamp(),(intptr_t)surface,viewport_w,viewport_h,n,r);return r;}
+DECLARE(eglSwapBuffersWithDamageEXT,EGLBoolean,(EGLDisplay,EGLSurface,const EGLint*,EGLint))
+EGLBoolean eglSwapBuffersWithDamageEXT(EGLDisplay d,EGLSurface surface,const EGLint*rects,EGLint n){RESOLVE(eglSwapBuffersWithDamageEXT);uint64_t b=stamp();EGLBoolean r=real_eglSwapBuffersWithDamageEXT(d,surface,rects,n);note(14,b,stamp(),(intptr_t)surface,viewport_w,viewport_h,n,r);return r;}
+/* Firefox can obtain these entry points through EGL rather than ELF symbol
+ * lookup. Return the wrappers only when the real implementation supports the
+ * function, retaining its capability and context-dispatch behavior. */
+DECLARE(eglGetProcAddress,__eglMustCastToProperFunctionPointerType,(const char*))
+__eglMustCastToProperFunctionPointerType eglGetProcAddress(const char*name){
+ RESOLVE(eglGetProcAddress);__eglMustCastToProperFunctionPointerType r=real_eglGetProcAddress(name);
+ if(!r || !name)return r;
+ if(!strcmp(name,"eglSwapBuffers"))return (__eglMustCastToProperFunctionPointerType)eglSwapBuffers;
+ if(!strcmp(name,"eglSwapBuffersWithDamageKHR"))return (__eglMustCastToProperFunctionPointerType)eglSwapBuffersWithDamageKHR;
+ if(!strcmp(name,"eglSwapBuffersWithDamageEXT"))return (__eglMustCastToProperFunctionPointerType)eglSwapBuffersWithDamageEXT;
+ if(!strcmp(name,"glViewport"))return (__eglMustCastToProperFunctionPointerType)glViewport;
+ return r;
+}
 DECLARE(XSyncSetCounter,Status,(Display*,XSyncCounter,XSyncValue))
 Status XSyncSetCounter(Display*d,XSyncCounter counter,XSyncValue value){RESOLVE(XSyncSetCounter);uint64_t b=stamp();Status r=real_XSyncSetCounter(d,counter,value);note(11,b,stamp(),counter,value.hi,value.lo,(intptr_t)d,r);return r;}
 DECLARE(xcb_sync_set_counter,xcb_void_cookie_t,(xcb_connection_t*,xcb_sync_counter_t,xcb_sync_int64_t))

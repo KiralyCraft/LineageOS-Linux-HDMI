@@ -14,9 +14,10 @@ from xroot_capture import RootCapture
 from committed_framebuffer import Scanout
 from wm_resize import WMResize
 from marionette_client import Marionette
-ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('output',type=pathlib.Path);ap.add_argument('--browser-pid',type=int,required=True);ap.add_argument('--method',choices=['wm','direct'],default='wm');ap.add_argument('--seconds',type=float,default=15);ap.add_argument('--circle',action='store_true');ap.add_argument('--port',type=int,default=2829);args=ap.parse_args()
+ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('output',type=pathlib.Path);ap.add_argument('--browser-pid',type=int,required=True);ap.add_argument('--method',choices=['wm','direct'],default='wm');ap.add_argument('--seconds',type=float,default=15);shape=ap.add_mutually_exclusive_group();shape.add_argument('--circle',action='store_true');shape.add_argument('--vertical',action='store_true');ap.add_argument('--capture-interval',type=float,default=.2);ap.add_argument('--paired-root',action='store_true',help='Read X root before each scanout sample; correctness/location test, not performance');ap.add_argument('--port',type=int,default=2829);args=ap.parse_args()
 out=args.output.resolve();assert any(out.is_relative_to(pathlib.Path(p)) for p in ['/tmp','/dev/shm']),'Use RAM for output'
 assert 0<args.seconds<=60 and os.geteuid()==0
+assert .05<=args.capture_interval<=1
 command=pathlib.Path('/proc/'+str(args.browser_pid)+'/cmdline').read_bytes().split(b'\0');assert b'--no-remote' in command and b'--profile' in command
 profile=pathlib.Path(command[command.index(b'--profile')+1].decode()).resolve();assert profile.is_relative_to(pathlib.Path('/tmp')),'Only an isolated RAM browser profile is allowed'
 out.mkdir();uid=pathlib.Path('/proc/'+str(args.browser_pid)).stat().st_uid;os.chown(out,uid,uid)
@@ -31,19 +32,24 @@ props=subprocess.check_output(['xprop','-id',hex(window),'WM_PROTOCOLS','_NET_WM
 cap=RootCapture(d,X,root,sw,sh);
 rr,pp,kids,n=L(),L(),C.POINTER(L)(),U();assert cap.query(d,window,C.byref(rr),C.byref(pp),C.byref(kids),C.byref(n));children=[kids[i] for i in range(n.value)];cap.free(C.cast(kids,V));child=max(children,key=lambda c:cap.bounds(c)[2]*cap.bounds(c)[3]);
 scanout=Scanout();m=Marionette(args.port);m.call('WebDriver:NewSession',{'capabilities':{'alwaysMatch':{}}})
-wm=None;records=[]
+wm=None;records=[];before=None;after=None;initial_child_bounds=None;initial_client_bounds=None;complete=False
 try:
- resize(d,window,640,480);sync(d,0)
+ initial_size=[960,720] if args.vertical else [640,480]
+ resize(d,window,*initial_size);sync(d,0)
  deadline=time.monotonic()+3
- while cap.bounds(window)[2:]!=[640,480] and time.monotonic()<deadline:time.sleep(.01)
- assert cap.bounds(window)[2:]==[640,480],cap.bounds(window)
+ while cap.bounds(window)[2:]!=initial_size and time.monotonic()<deadline:time.sleep(.01)
+ assert cap.bounds(window)[2:]==initial_size,cap.bounds(window)
  time.sleep(.4)
  before=m.call('WebDriver:ExecuteScript',{'script':'window.framesLog=[];return {time:performance.now(),inner:[innerWidth,innerHeight],frame:frameNumber};','args':[],'newSandbox':False,'sandbox':None})['value']
+ initial_child_bounds=cap.bounds(child)
+ initial_client_bounds=cap.bounds(window)
  if args.method=='wm':wm=WMResize(d,X,root,screen,window,cap.bounds);wm.start()
  start=time.monotonic();next_capture=start;last=None;drag_finished=False
  while time.monotonic()-start<args.seconds:
   now=time.monotonic();age=now-start
-  if args.circle and age<12:
+  if args.vertical and age<12:
+   size=[960,720+int(240*math.sin(age*math.pi/2))]
+  elif args.circle and age<12:
    size=[960+int(320*math.cos(age*math.pi/2)),720+int(240*math.sin(age*math.pi/2))]
   elif age<4:size=[640+int(age/4*640),480+int(age/4*480)]
   elif age<8:size=[1280-int((age-4)/4*640),960-int((age-4)/4*480)]
@@ -58,12 +64,18 @@ try:
   if wm and age>=12 and not drag_finished:wm.finish();drag_finished=True
   row=dict(age=age,ns=time.monotonic_ns(),requested=size,actual=cap.bounds(window),child_actual=cap.bounds(child),request=request)
   if now>=next_capture:
-   scanout.align();frame=cap.frame(window);bounds=cap.bounds(frame);client=cap.bounds(window);x,y,w,h=bounds;x1,y1=max(x,0),max(y,0);x2,y2=min(x+w,sw),min(y+h,sh)
-   row['capture']=scanout.read(x1,y1,x2-x1,y2-y1,dict(age=age,requested=size,frame_bounds=bounds,client_bounds=client,egl_child_bounds=cap.bounds(child)));row['capture']['geometry_stable']=bounds==cap.bounds(frame) and client==cap.bounds(window);next_capture=now+.2
+   scanout.align()
+   if args.paired_root:row['root_capture']=cap.capture(window,'paired',dict(age=age))
+   frame=cap.frame(window);bounds=cap.bounds(frame);client=cap.bounds(window);x,y,w,h=bounds;x1,y1=max(x,0),max(y,0);x2,y2=min(x+w,sw),min(y+h,sh)
+   row['capture']=scanout.read(x1,y1,x2-x1,y2-y1,dict(age=age,requested=size,frame_bounds=bounds,client_bounds=client,egl_child_bounds=cap.bounds(child)));row['capture']['geometry_stable']=bounds==cap.bounds(frame) and client==cap.bounds(window);next_capture=now+args.capture_interval
   records.append(row);time.sleep(max(0,.05-(time.monotonic()-now)))
  after=m.call('WebDriver:ExecuteScript',{'script':'return {time:performance.now(),inner:[innerWidth,innerHeight],frame:frameNumber,frames:framesLog};','args':[],'newSandbox':False,'sandbox':None})['value']
- (out/'result.json').write_text(json.dumps(dict(method=args.method,circle=args.circle,browser_pid=args.browser_pid,screen=[sw,sh],window=window,egl_child=child,properties=props,records=records,before=before,after=after,physical_optical_capture=False,capture_helper=os.environ.get('HDMI_FRAMEBUFFER_HELPER')),indent=2)+'\n')
+ complete=True
  print(json.dumps(dict(method=args.method,request_batches=len(records),captures=len(scanout.records),raf_frames=len(after['frames']))),flush=True)
 finally:
  if wm:wm.close()
- m.close();scanout.close();scanout.save(out/'scanout');bind('XCloseDisplay',I,[V])(d)
+ (out/'result.json').write_text(json.dumps(dict(complete=complete,method=args.method,circle=args.circle,vertical=args.vertical,capture_interval=args.capture_interval,browser_pid=args.browser_pid,screen=[sw,sh],window=window,egl_child=child,initial_client_bounds=initial_client_bounds,initial_child_bounds=initial_child_bounds,properties=props,records=records,before=before,after=after,physical_optical_capture=False,capture_helper=os.environ.get('HDMI_FRAMEBUFFER_HELPER')),indent=2)+'\n')
+ m.close();scanout.close();scanout.save(out/'scanout')
+ if args.paired_root:
+  cap.save(out/'root');(out/'root/captures.json').write_text(json.dumps(cap.records,indent=2)+'\n')
+ bind('XCloseDisplay',I,[V])(d)

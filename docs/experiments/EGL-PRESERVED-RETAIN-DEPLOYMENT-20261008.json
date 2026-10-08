@@ -1,0 +1,49 @@
+{
+  "previous_xorg_pid": 22454,
+  "agent_pid": 8827,
+  "agent_path": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-resolve-order-20261007",
+  "runtime_source": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-preserved-retain-20261008",
+  "rollback_runtime": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-preserved-20261008",
+  "magisk_changed": false,
+  "commands": [
+    {
+      "action": "pause",
+      "code": 0,
+      "output": "state=10 status=0 remaining=0 flags=0x1300 requested=3840x2160@30.000 active=3840x2160@30.000 detail=Linux paused; HDMI stays connected; use resume within five minutes\n"
+    },
+    {
+      "action": "resume",
+      "code": 0,
+      "output": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode\n"
+    }
+  ],
+  "new_xorg_pid": 22751,
+  "running": true,
+  "status": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode",
+  "xorg_sha256": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12",
+  "modesetting_sha256": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+  "loaded_artifact_hashes": {
+    "lib/mesa/libEGL_mesa.so.0": "c11ac86fcb8dfd89d08d56a425593accd6126e9ae64f4540479858d6cd730459",
+    "lib/mesa/libgallium-26.2.0-devel.so": "296b411e488e689fcf0dd593b13b25dca2c980c6ff22ccdd5585fc832c102c99",
+    "lib/mesa/libgbm.so.1": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+    "lib/xorg/modules/drivers/modesetting_drv.so": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+    "lib/xorg/modules/libglamoregl.so": "3d7a0cbc25544b164100bdcaa3d2caeee50ee22386bf440fb67e45e49df86e9e",
+    "libexec/Xorg": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12"
+  },
+  "authority_refreshed": true,
+  "mesa_commit": "eff5c22036c93e9b0c5fc9a7525c46f636e61937",
+  "checks": [
+    {
+      "case": "r14-live-defined",
+      "checked": 24,
+      "passed": 24,
+      "result_sha256": "8fb707fe91312421e4236f618e14f34b631aa1c5ca7c0d2dd1e1bf791a2bf1c3"
+    },
+    {
+      "case": "r14-live-fixed",
+      "checked": 240,
+      "passed": 240,
+      "result_sha256": "2b9855e21e730dd8a5d5b1e434881efaad2776176bb374079457abb732af22cc"
+    }
+  ]
+}
