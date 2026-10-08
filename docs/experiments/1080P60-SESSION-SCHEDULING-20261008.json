@@ -1,0 +1,1512 @@
+{
+  "date": "2026-10-08",
+  "mode": {
+    "width": 1920,
+    "height": 1080,
+    "android_refresh_hz": 60.000004,
+    "scanout_clock_khz": 148500
+  },
+  "runtime": "hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-preserved-retain-session-uclamp-20261008",
+  "mesa_commit": "eff5c22036c93e9b0c5fc9a7525c46f636e61937",
+  "phone_doze": true,
+  "session_uclamp_min": 512,
+  "cases": {
+    "r15-1080p60-fullscreen-client0": {
+      "results": {
+        "probe_records": 17055,
+        "requested_records": 17055,
+        "dropped": 0,
+        "seconds": 40.574458265,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 1,
+          "6": 2444,
+          "5": 6,
+          "1": 2435,
+          "7": 2435,
+          "9": 4866,
+          "8": 4868
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 2134,
+              "mean_ms": 16.039850581068418,
+              "p50_ms": 16.201458,
+              "p95_ms": 17.978281,
+              "p99_ms": 19.351302,
+              "max_ms": 24.679427
+            },
+            "end_interval": {
+              "count": 2133,
+              "mean_ms": 16.666551187998127,
+              "p50_ms": 16.696302,
+              "p95_ms": 18.432135,
+              "p99_ms": 19.662187,
+              "max_ms": 25.110886
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 33.631398112,
+                "ms": 25.110886
+              },
+              {
+                "relative_seconds": 28.594531291,
+                "ms": 22.231823
+              },
+              {
+                "relative_seconds": 21.961408481,
+                "ms": 22.199063
+              },
+              {
+                "relative_seconds": 7.044186768,
+                "ms": 21.321406
+              },
+              {
+                "relative_seconds": 25.943966188,
+                "ms": 21.243907
+              },
+              {
+                "relative_seconds": 7.342341507,
+                "ms": 21.104739
+              },
+              {
+                "relative_seconds": 36.07738009,
+                "ms": 21.036562
+              },
+              {
+                "relative_seconds": 11.644393537,
+                "ms": 20.9525
+              },
+              {
+                "relative_seconds": 17.29168791,
+                "ms": 20.750261
+              },
+              {
+                "relative_seconds": 13.876397703,
+                "ms": 20.380781
+              },
+              {
+                "relative_seconds": 8.493078278,
+                "ms": 20.212761
+              },
+              {
+                "relative_seconds": 19.676444732,
+                "ms": 20.155052
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 2135,
+          "request_thread_ids": [
+            10017
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "1": 2135
+          },
+          "msc_delta": {
+            "1": 2134
+          },
+          "ust_delta": {
+            "count": 2134,
+            "mean_ms": 16.666666822867853,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 16.668
+          },
+          "request_to_event": {
+            "count": 2135,
+            "mean_ms": 12.887572810772832,
+            "p50_ms": 13.014323,
+            "p95_ms": 13.888646,
+            "p99_ms": 14.362344,
+            "max_ms": 15.26849
+          },
+          "request_options": {
+            "0": 2135
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "23428f5e5936ca0ba5d1c5bc89bcc02dcba3c824425795e5e381cd50ae483dbc",
+        "trace.summary.json": "bd39d43db53a0aaa67dde11c3d7845af971df6385f3e89ac7dcf1c2703d7498c",
+        "result.json": "231e800abd130e08d4b2294d5ad7ac3601066ac3ebbfc652d7aefdd1ee8639fc",
+        "stdout.log": "11450f27c9ace78c4932821ba6f3cb601c21327c02e464e25d34852705e37bb0"
+      },
+      "trace_enabled": false,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15-1080p60-fullscreen-client512": {
+      "results": {
+        "probe_records": 17062,
+        "requested_records": 17062,
+        "dropped": 0,
+        "seconds": 40.598283735,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 1,
+          "6": 2445,
+          "5": 6,
+          "1": 2436,
+          "7": 2436,
+          "9": 4868,
+          "8": 4870
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 2135,
+              "mean_ms": 16.523133220140515,
+              "p50_ms": 16.511303,
+              "p95_ms": 17.088698,
+              "p99_ms": 17.591458,
+              "max_ms": 23.590469
+            },
+            "end_interval": {
+              "count": 2134,
+              "mean_ms": 16.666735340206188,
+              "p50_ms": 16.653958,
+              "p95_ms": 17.219531,
+              "p99_ms": 17.723125,
+              "max_ms": 23.747188
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 15.220080307,
+                "ms": 23.747188
+              },
+              {
+                "relative_seconds": 11.967107704,
+                "ms": 20.719375
+              },
+              {
+                "relative_seconds": 23.965329574,
+                "ms": 19.047291
+              },
+              {
+                "relative_seconds": 34.664843268,
+                "ms": 18.617812
+              },
+              {
+                "relative_seconds": 13.564345672,
+                "ms": 18.177864
+              },
+              {
+                "relative_seconds": 32.497994519,
+                "ms": 18.120833
+              },
+              {
+                "relative_seconds": 7.964400674,
+                "ms": 18.098229
+              },
+              {
+                "relative_seconds": 40.414562381,
+                "ms": 18.073698
+              },
+              {
+                "relative_seconds": 37.514453267,
+                "ms": 18.043802
+              },
+              {
+                "relative_seconds": 30.714252905,
+                "ms": 18.042031
+              },
+              {
+                "relative_seconds": 18.06428041,
+                "ms": 18.015
+              },
+              {
+                "relative_seconds": 31.797431342,
+                "ms": 17.965781
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 2136,
+          "request_thread_ids": [
+            10700
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "1": 2136
+          },
+          "msc_delta": {
+            "1": 2135
+          },
+          "ust_delta": {
+            "count": 2135,
+            "mean_ms": 16.666666510538644,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 16.668
+          },
+          "request_to_event": {
+            "count": 2136,
+            "mean_ms": 13.899039422284643,
+            "p50_ms": 13.969947,
+            "p95_ms": 14.402292,
+            "p99_ms": 14.816718,
+            "max_ms": 16.315469
+          },
+          "request_options": {
+            "0": 2136
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "4874b1bd455e65972716132ded3504bc6b61ef42ff6cc32bb6bb762d454c2a84",
+        "trace.summary.json": "a85213e6f2e3aab3b4beae0137c82a9a1bf04d31dd5636ef4c88df61ffd65e6d",
+        "result.json": "7ba2173ff93dcbb8a203e5b33086fbfc99b3d3b728e877d4fd0e3d0dfc43c677",
+        "stdout.log": "6e82a271b971414b2ab1321832f3f16e98c2d6fdb4603cb2d03af51cf7b522cb"
+      },
+      "trace_enabled": false,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15-1080p60-maximized512": {
+      "results": {
+        "probe_records": 14915,
+        "requested_records": 14915,
+        "dropped": 0,
+        "seconds": 35.544274621,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 2139,
+          "4": 4,
+          "5": 4,
+          "1": 2128,
+          "7": 2127,
+          "9": 4254,
+          "8": 4254
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 1828,
+              "mean_ms": 16.565162060175055,
+              "p50_ms": 16.545989,
+              "p95_ms": 17.494844,
+              "p99_ms": 17.97,
+              "max_ms": 33.653073
+            },
+            "end_interval": {
+              "count": 1827,
+              "mean_ms": 16.703891648056924,
+              "p50_ms": 16.681927,
+              "p95_ms": 17.634167,
+              "p99_ms": 18.052344,
+              "max_ms": 33.816562
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 16.127277389,
+                "ms": 33.816562
+              },
+              {
+                "relative_seconds": 7.426839007,
+                "ms": 33.321406
+              },
+              {
+                "relative_seconds": 18.909838951,
+                "ms": 33.268125
+              },
+              {
+                "relative_seconds": 18.827255149,
+                "ms": 32.815521
+              },
+              {
+                "relative_seconds": 30.279862436,
+                "ms": 19.805
+              },
+              {
+                "relative_seconds": 28.628653218,
+                "ms": 19.225729
+              },
+              {
+                "relative_seconds": 22.328336814,
+                "ms": 18.887812
+              },
+              {
+                "relative_seconds": 7.094193643,
+                "ms": 18.428594
+              },
+              {
+                "relative_seconds": 7.12750083,
+                "ms": 18.372604
+              },
+              {
+                "relative_seconds": 6.661095466,
+                "ms": 18.342709
+              },
+              {
+                "relative_seconds": 8.677750882,
+                "ms": 18.316771
+              },
+              {
+                "relative_seconds": 29.311084155,
+                "ms": 18.310469
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 1829,
+          "request_thread_ids": [
+            11415
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 1829
+          },
+          "msc_delta": {
+            "1": 1824,
+            "2": 4
+          },
+          "ust_delta": {
+            "count": 1828,
+            "mean_ms": 16.703136761487965,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 33.333
+          },
+          "request_to_event": {
+            "count": 1829,
+            "mean_ms": 13.648224715144888,
+            "p50_ms": 13.675625,
+            "p95_ms": 14.326458,
+            "p99_ms": 14.597708,
+            "max_ms": 30.876615
+          },
+          "request_options": {
+            "0": 1828
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "4eb4d999773abf83c1fa1d13eec37b2935e2c56aafceac90b6ee7456197e59db",
+        "trace.summary.json": "f4f5464169790f09d8be878a20dfac4ec36e8a34d8a4641d228adbdd665b0cd7",
+        "result.json": "d9bf439d1ad9830dc82fd0c388fe12da6aa21b044086cdfb6da989948a6f9051",
+        "stdout.log": "c079952dd6317a8330cc9145866d026126646077c0ed2e72f909d7056f9b6503"
+      },
+      "trace_enabled": false,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15-1080p60-quake-fullscreen-vsync": {
+      "results": {
+        "probe_records": 17718,
+        "requested_records": 17718,
+        "dropped": 0,
+        "seconds": 50.554510658,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "2": 2954,
+          "7": 2954,
+          "9": 5904,
+          "8": 5906
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          },
+          "2": {
+            "call": {
+              "count": 2732,
+              "mean_ms": 10.36135927635432,
+              "p50_ms": 10.839531,
+              "p95_ms": 14.386198,
+              "p99_ms": 15.405521,
+              "max_ms": 16.663698
+            },
+            "end_interval": {
+              "count": 2731,
+              "mean_ms": 16.66645647711461,
+              "p50_ms": 16.65849,
+              "p95_ms": 18.115365,
+              "p99_ms": 18.809271,
+              "max_ms": 19.72349
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 10.720773121,
+                "ms": 19.72349
+              },
+              {
+                "relative_seconds": 35.737143684,
+                "ms": 19.495989
+              },
+              {
+                "relative_seconds": 29.770310926,
+                "ms": 19.4925
+              },
+              {
+                "relative_seconds": 36.25401832,
+                "ms": 19.387813
+              },
+              {
+                "relative_seconds": 35.136760612,
+                "ms": 19.325261
+              },
+              {
+                "relative_seconds": 26.970723531,
+                "ms": 19.282447
+              },
+              {
+                "relative_seconds": 29.570165041,
+                "ms": 19.219636
+              },
+              {
+                "relative_seconds": 47.22028467,
+                "ms": 19.210573
+              },
+              {
+                "relative_seconds": 30.370203009,
+                "ms": 19.195104
+              },
+              {
+                "relative_seconds": 6.171134164,
+                "ms": 19.164062
+              },
+              {
+                "relative_seconds": 23.570102022,
+                "ms": 19.15526
+              },
+              {
+                "relative_seconds": 47.553532378,
+                "ms": 19.135261
+              }
+            ]
+          }
+        },
+        "present": {
+          "completed": 2734,
+          "request_thread_ids": [
+            12083
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "1": 2734
+          },
+          "msc_delta": {
+            "1": 2733
+          },
+          "ust_delta": {
+            "count": 2733,
+            "mean_ms": 16.666666666666668,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 16.667
+          },
+          "request_to_event": {
+            "count": 2734,
+            "mean_ms": 10.658121917337235,
+            "p50_ms": 11.373125,
+            "p95_ms": 12.311198,
+            "p99_ms": 12.668333,
+            "max_ms": 15.183854
+          },
+          "request_options": {
+            "0": 2733
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "2378012e9bcb0a32941286d063f581f2ebbb69e4b408f73e89b84af93968582f",
+        "trace.summary.json": "dddf558b64e303b1a845126181ffc7d9edede8cb236eb35b2dd54137f78b5daa",
+        "result.json": "99562c6d112436c9f1e8783bdc4c30ff07bba07029b584bfb0d4e065b6650e94",
+        "stdout.log": "69bcd4fa1d7f1111469b7380734b7fac43be00110c84dcca25686409367bb485"
+      },
+      "trace_enabled": false,
+      "workload": "ioQuake3 opengl2"
+    },
+    "r15_1080p60_maximized_trace": {
+      "results": {
+        "probe_records": 16940,
+        "requested_records": 16940,
+        "dropped": 0,
+        "seconds": 40.562506651,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 2428,
+          "4": 4,
+          "5": 4,
+          "1": 2417,
+          "7": 2417,
+          "9": 4833,
+          "8": 4832
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 2121,
+              "mean_ms": 16.61913952098067,
+              "p50_ms": 16.529219,
+              "p95_ms": 17.507344,
+              "p99_ms": 18.24448,
+              "max_ms": 34.579323
+            },
+            "end_interval": {
+              "count": 2120,
+              "mean_ms": 16.761379268396226,
+              "p50_ms": 16.667969,
+              "p95_ms": 17.640521,
+              "p99_ms": 18.415208,
+              "max_ms": 34.79151
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 23.923756918,
+                "ms": 34.79151
+              },
+              {
+                "relative_seconds": 29.705827333,
+                "ms": 34.198698
+              },
+              {
+                "relative_seconds": 39.923898422,
+                "ms": 34.095312
+              },
+              {
+                "relative_seconds": 6.973494581,
+                "ms": 33.944688
+              },
+              {
+                "relative_seconds": 34.306474466,
+                "ms": 33.924479
+              },
+              {
+                "relative_seconds": 23.089884471,
+                "ms": 33.908178
+              },
+              {
+                "relative_seconds": 5.823500363,
+                "ms": 33.861511
+              },
+              {
+                "relative_seconds": 11.439646142,
+                "ms": 33.795365
+              },
+              {
+                "relative_seconds": 13.939598224,
+                "ms": 33.713437
+              },
+              {
+                "relative_seconds": 29.539329728,
+                "ms": 33.209739
+              },
+              {
+                "relative_seconds": 14.488869161,
+                "ms": 32.839323
+              },
+              {
+                "relative_seconds": 35.139087226,
+                "ms": 32.497448
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 2122,
+          "request_thread_ids": [
+            13222
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 2122
+          },
+          "msc_delta": {
+            "1": 2109,
+            "2": 12
+          },
+          "ust_delta": {
+            "count": 2121,
+            "mean_ms": 16.76096181046676,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 33.334
+          },
+          "request_to_event": {
+            "count": 2122,
+            "mean_ms": 13.54320104005655,
+            "p50_ms": 13.568489,
+            "p95_ms": 14.181042,
+            "p99_ms": 14.575208,
+            "max_ms": 31.208385
+          },
+          "request_options": {
+            "0": 2122
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "3e6540a5ba007c763f6ecfd3a84d8a65d5e46d9a3ad36b2358c53e071d583b11",
+        "trace.summary.json": "5e99092dea0d1a97b36cfed5a754141ce97154d8e25820def80a317802223a12",
+        "result.json": "42b6cd1deba8d13e550b1f364ed1e8048a6e07dd35ae0ce7d376ff45ab6a5911",
+        "stdout.log": "c95695b243447e5ae71bdecbc66296979d10a3808cf9f4c6537d0ec3c47bc9fe"
+      },
+      "trace_enabled": true,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15_1080p60_kgsl_events_trace": {
+      "results": {
+        "probe_records": 7672,
+        "requested_records": 7672,
+        "dropped": 0,
+        "seconds": 18.550821451,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 1104,
+          "4": 4,
+          "5": 4,
+          "1": 1093,
+          "7": 1093,
+          "9": 2185,
+          "8": 2184
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 794,
+              "mean_ms": 16.896887802267003,
+              "p50_ms": 16.525313,
+              "p95_ms": 17.766614,
+              "p99_ms": 33.634062,
+              "max_ms": 34.73099
+            },
+            "end_interval": {
+              "count": 793,
+              "mean_ms": 17.045685287515763,
+              "p50_ms": 16.676042,
+              "p95_ms": 17.879687,
+              "p99_ms": 33.740104,
+              "max_ms": 34.80625
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 6.627919841,
+                "ms": 34.80625
+              },
+              {
+                "relative_seconds": 7.461182289,
+                "ms": 34.712865
+              },
+              {
+                "relative_seconds": 14.594224682,
+                "ms": 34.692917
+              },
+              {
+                "relative_seconds": 18.061139159,
+                "ms": 34.14776
+              },
+              {
+                "relative_seconds": 7.044083382,
+                "ms": 33.978125
+              },
+              {
+                "relative_seconds": 14.89415864,
+                "ms": 33.913958
+              },
+              {
+                "relative_seconds": 10.577566089,
+                "ms": 33.825416
+              },
+              {
+                "relative_seconds": 14.760843692,
+                "ms": 33.740104
+              },
+              {
+                "relative_seconds": 14.927884577,
+                "ms": 33.725937
+              },
+              {
+                "relative_seconds": 15.977300619,
+                "ms": 33.649584
+              },
+              {
+                "relative_seconds": 14.860244682,
+                "ms": 33.519323
+              },
+              {
+                "relative_seconds": 14.961329577,
+                "ms": 33.445
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 795,
+          "request_thread_ids": [
+            18244
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 795
+          },
+          "msc_delta": {
+            "1": 776,
+            "2": 18
+          },
+          "ust_delta": {
+            "count": 794,
+            "mean_ms": 17.0445,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 33.333,
+            "max_ms": 33.334
+          },
+          "request_to_event": {
+            "count": 795,
+            "mean_ms": 13.665850491823898,
+            "p50_ms": 13.405209,
+            "p95_ms": 14.418958,
+            "p99_ms": 29.832604,
+            "max_ms": 31.158021
+          },
+          "request_options": {
+            "0": 795
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "01a071597061edbcd3370a1736784808923b715b21157750fb866b1c5f6df696",
+        "trace.summary.json": "d7fc173114488b53f72f20e50aea2982e14cdebe005127146a5c95ebb04ca991",
+        "result.json": "df7b54b69f2f98776277bfe2fb1c8a8d36b7af0ada47a044112107e33d840879",
+        "stdout.log": "425dff275d194ec157a03ddadc593f237a0c4caf9afb501e1a86288345fba831"
+      },
+      "trace_enabled": true,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15_1080p60_kgsl_events_clamp": {
+      "results": {
+        "probe_records": 7798,
+        "requested_records": 7798,
+        "dropped": 0,
+        "seconds": 18.550968378,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 1122,
+          "4": 4,
+          "5": 4,
+          "1": 1111,
+          "7": 1111,
+          "9": 2221,
+          "8": 2220
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 812,
+              "mean_ms": 16.521944779556648,
+              "p50_ms": 16.514375,
+              "p95_ms": 17.29349,
+              "p99_ms": 17.671979,
+              "max_ms": 18.172239
+            },
+            "end_interval": {
+              "count": 811,
+              "mean_ms": 16.66659177805179,
+              "p50_ms": 16.65276,
+              "p95_ms": 17.400208,
+              "p99_ms": 17.780937,
+              "max_ms": 18.263229
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 15.382054212,
+                "ms": 18.263229
+              },
+              {
+                "relative_seconds": 7.365516195,
+                "ms": 18.237084
+              },
+              {
+                "relative_seconds": 6.765296768,
+                "ms": 18.009323
+              },
+              {
+                "relative_seconds": 11.098714579,
+                "ms": 17.874011
+              },
+              {
+                "relative_seconds": 12.348548432,
+                "ms": 17.86677
+              },
+              {
+                "relative_seconds": 15.115697285,
+                "ms": 17.833229
+              },
+              {
+                "relative_seconds": 8.448517444,
+                "ms": 17.817864
+              },
+              {
+                "relative_seconds": 11.56549286,
+                "ms": 17.795938
+              },
+              {
+                "relative_seconds": 14.814945254,
+                "ms": 17.780937
+              },
+              {
+                "relative_seconds": 11.281674943,
+                "ms": 17.76151
+              },
+              {
+                "relative_seconds": 16.16497817,
+                "ms": 17.7525
+              },
+              {
+                "relative_seconds": 6.864968434,
+                "ms": 17.744479
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 813,
+          "request_thread_ids": [
+            20244
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 813
+          },
+          "msc_delta": {
+            "1": 812
+          },
+          "ust_delta": {
+            "count": 812,
+            "mean_ms": 16.666666256157637,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 16.668
+          },
+          "request_to_event": {
+            "count": 813,
+            "mean_ms": 14.005118191881918,
+            "p50_ms": 14.029167,
+            "p95_ms": 14.495,
+            "p99_ms": 14.639792,
+            "max_ms": 14.947969
+          },
+          "request_options": {
+            "0": 814
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "5582b150d36cea6021e85a8b1f7de559688a493ae60c104b1e90c4638b07167f",
+        "trace.summary.json": "f70702f216fb14b33fd0cc3a47cd6dbc87522bbead63f9720de22b8119b52a56",
+        "result.json": "1ecd0f064952d3afc3cc6b82cfe74807553048b171022c61d335000d71cc372e",
+        "stdout.log": "93c5f103adbf8efbfb26233869290094f161421090951b17a9b1193c8acf4655"
+      },
+      "trace_enabled": true,
+      "workload": "/usr/local/bin/glxgears"
+    },
+    "r15-1080p60-maximized-worker512": {
+      "results": {
+        "probe_records": 16967,
+        "requested_records": 16967,
+        "dropped": 0,
+        "seconds": 40.57636061,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 2432,
+          "4": 4,
+          "5": 4,
+          "1": 2421,
+          "7": 2421,
+          "9": 4840,
+          "8": 4840
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 2124,
+              "mean_ms": 16.592663737758944,
+              "p50_ms": 16.523594,
+              "p95_ms": 17.39625,
+              "p99_ms": 18.041197,
+              "max_ms": 34.871093
+            },
+            "end_interval": {
+              "count": 2123,
+              "mean_ms": 16.73721492133773,
+              "p50_ms": 16.67125,
+              "p95_ms": 17.55323,
+              "p99_ms": 18.140105,
+              "max_ms": 34.947968
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 37.808639152,
+                "ms": 34.947968
+              },
+              {
+                "relative_seconds": 31.291316655,
+                "ms": 34.238646
+              },
+              {
+                "relative_seconds": 40.14164311,
+                "ms": 34.179011
+              },
+              {
+                "relative_seconds": 20.191716815,
+                "ms": 34.115781
+              },
+              {
+                "relative_seconds": 38.274749204,
+                "ms": 33.866198
+              },
+              {
+                "relative_seconds": 17.908445879,
+                "ms": 33.734896
+              },
+              {
+                "relative_seconds": 34.324381237,
+                "ms": 33.406667
+              },
+              {
+                "relative_seconds": 38.89081186,
+                "ms": 33.168177
+              },
+              {
+                "relative_seconds": 28.707499208,
+                "ms": 32.644844
+              },
+              {
+                "relative_seconds": 11.292094475,
+                "ms": 18.720521
+              },
+              {
+                "relative_seconds": 15.359581349,
+                "ms": 18.629584
+              },
+              {
+                "relative_seconds": 36.292832174,
+                "ms": 18.479479
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 2125,
+          "request_thread_ids": [
+            21489
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 2125
+          },
+          "msc_delta": {
+            "1": 2115,
+            "2": 9
+          },
+          "ust_delta": {
+            "count": 2124,
+            "mean_ms": 16.73728813559322,
+            "p50_ms": 16.667,
+            "p95_ms": 16.667,
+            "p99_ms": 16.667,
+            "max_ms": 33.334
+          },
+          "request_to_event": {
+            "count": 2125,
+            "mean_ms": 13.682759241411766,
+            "p50_ms": 13.70677,
+            "p95_ms": 14.268125,
+            "p99_ms": 14.730312,
+            "max_ms": 31.36125
+          },
+          "request_options": {
+            "0": 2125
+          }
+        }
+      },
+      "source_files": {
+        "trace.bin": "21379f3b509033794c648ff53995528a5fd9941db5970aa790df0e728c1c9c59",
+        "trace.summary.json": "178f10e135c6e7b7ddf8cd4e602768b89e4cd96e9637a53436ccf2b1c50f7c80",
+        "result.json": "15c5e609b1551d07f2a94c3eb2f5f755c1feac39d9ce95d328c644b6b2e6469f",
+        "stdout.log": "02bf3ad445f5d54c68c500447e2f6a94bbca1886a6547675e2f034691e2bbdaf"
+      },
+      "trace_enabled": false,
+      "workload": "/usr/local/bin/glxgears"
+    }
+  },
+  "kernel_event_analysis": {
+    "baseline": {
+      "trace": "/tmp/hdmi-app-pacing-20261008/kernel-r15_1080p60_kgsl_events_trace-trace.txt",
+      "overruns": {
+        "cpu7": 0,
+        "cpu6": 0,
+        "cpu5": 0,
+        "cpu4": 0,
+        "cpu3": 0,
+        "cpu2": 0,
+        "cpu1": 0,
+        "cpu0": 0
+      },
+      "complete_trace": true,
+      "native_fence_notification": {
+        "count": 4423,
+        "p50_ms": 0.24899999698391184,
+        "p95_ms": 0.7489999989047647,
+        "p99_ms": 1.702000001387205,
+        "max_ms": 6.833999999798834
+      },
+      "worker_wake_to_run": {
+        "count": 4445,
+        "p50_ms": 0.08900000102585182,
+        "p95_ms": 0.5029999956605025,
+        "p99_ms": 1.4430000010179356,
+        "max_ms": 6.652000003668945
+      },
+      "worker_cpus": {
+        "0": 4121,
+        "1": 240,
+        "2": 283,
+        "5": 3
+      },
+      "longest_notifications": [
+        {
+          "ctx": 28,
+          "ts": 10856,
+          "retirement": 49085.53641,
+          "registration": 49085.53439,
+          "callback": 49085.543244,
+          "notification_ms": 6.833999999798834
+        },
+        {
+          "ctx": 31,
+          "ts": 397,
+          "retirement": 49082.246637,
+          "registration": 49082.244137,
+          "callback": 49082.252977,
+          "notification_ms": 6.339999999909196
+        },
+        {
+          "ctx": 28,
+          "ts": 10904,
+          "retirement": 49085.95239,
+          "registration": 49085.950257,
+          "callback": 49085.958118,
+          "notification_ms": 5.728000003728084
+        },
+        {
+          "ctx": 31,
+          "ts": 812,
+          "retirement": 49085.74448,
+          "registration": 49085.743355,
+          "callback": 49085.748964,
+          "notification_ms": 4.483999997319188
+        },
+        {
+          "ctx": 31,
+          "ts": 1761,
+          "retirement": 49093.830246,
+          "registration": 49093.827455,
+          "callback": 49093.834534,
+          "notification_ms": 4.288000003725756
+        },
+        {
+          "ctx": 28,
+          "ts": 12070,
+          "retirement": 49095.932292,
+          "registration": 49095.930976,
+          "callback": 49095.936469,
+          "notification_ms": 4.177000002528075
+        },
+        {
+          "ctx": 31,
+          "ts": 20,
+          "retirement": 49079.096267,
+          "registration": 49079.094433,
+          "callback": 49079.100238,
+          "notification_ms": 3.970999998273328
+        },
+        {
+          "ctx": 31,
+          "ts": 813,
+          "retirement": 49085.745034,
+          "registration": 49085.743511,
+          "callback": 49085.748981,
+          "notification_ms": 3.9469999974244274
+        },
+        {
+          "ctx": 31,
+          "ts": 952,
+          "retirement": 49086.944716,
+          "registration": 49086.943389,
+          "callback": 49086.948641,
+          "notification_ms": 3.925000004528556
+        },
+        {
+          "ctx": 31,
+          "ts": 369,
+          "retirement": 49082.012561,
+          "registration": 49082.010085,
+          "callback": 49082.016435,
+          "notification_ms": 3.87399999453919
+        },
+        {
+          "ctx": 28,
+          "ts": 10607,
+          "retirement": 49083.464682,
+          "registration": 49083.462723,
+          "callback": 49083.46848,
+          "notification_ms": 3.7980000051902607
+        },
+        {
+          "ctx": 31,
+          "ts": 1599,
+          "retirement": 49092.345386,
+          "registration": 49092.343492,
+          "callback": 49092.349045,
+          "notification_ms": 3.6590000017895363
+        },
+        {
+          "ctx": 28,
+          "ts": 11817,
+          "retirement": 49093.665266,
+          "registration": 49093.663786,
+          "callback": 49093.668589,
+          "notification_ms": 3.3229999971808866
+        },
+        {
+          "ctx": 28,
+          "ts": 11823,
+          "retirement": 49093.766732,
+          "registration": 49093.763998,
+          "callback": 49093.769993,
+          "notification_ms": 3.2610000052955
+        },
+        {
+          "ctx": 31,
+          "ts": 260,
+          "retirement": 49081.111507,
+          "registration": 49081.109881,
+          "callback": 49081.114759,
+          "notification_ms": 3.2519999949727207
+        },
+        {
+          "ctx": 31,
+          "ts": 1744,
+          "retirement": 49093.594367,
+          "registration": 49093.593072,
+          "callback": 49093.597556,
+          "notification_ms": 3.1890000027487986
+        },
+        {
+          "ctx": 31,
+          "ts": 21,
+          "retirement": 49079.0971,
+          "registration": 49079.094685,
+          "callback": 49079.10026,
+          "notification_ms": 3.1600000002072193
+        },
+        {
+          "ctx": 31,
+          "ts": 953,
+          "retirement": 49086.945521,
+          "registration": 49086.943546,
+          "callback": 49086.948657,
+          "notification_ms": 3.1359999993583187
+        },
+        {
+          "ctx": 28,
+          "ts": 11819,
+          "retirement": 49093.699786,
+          "registration": 49093.697705,
+          "callback": 49093.70287,
+          "notification_ms": 3.0840000035823323
+        },
+        {
+          "ctx": 28,
+          "ts": 11821,
+          "retirement": 49093.732302,
+          "registration": 49093.730198,
+          "callback": 49093.735369,
+          "notification_ms": 3.067000005103182
+        }
+      ],
+      "physical_scanout_tested": false
+    },
+    "temporary_worker_clamp": {
+      "trace": "/tmp/hdmi-app-pacing-20261008/kernel-r15_1080p60_kgsl_events_clamp-trace.txt",
+      "overruns": {
+        "cpu7": 0,
+        "cpu6": 0,
+        "cpu5": 0,
+        "cpu4": 0,
+        "cpu3": 0,
+        "cpu2": 0,
+        "cpu1": 0,
+        "cpu0": 0
+      },
+      "complete_trace": true,
+      "native_fence_notification": {
+        "count": 4432,
+        "p50_ms": 0.18799999816110358,
+        "p95_ms": 0.25800000003073364,
+        "p99_ms": 0.4709999993792735,
+        "max_ms": 2.355000004172325
+      },
+      "worker_wake_to_run": {
+        "count": 4564,
+        "p50_ms": 0.01700000575510785,
+        "p95_ms": 0.030000002880115062,
+        "p99_ms": 0.1230000052601099,
+        "max_ms": 1.9029999966733158
+      },
+      "worker_cpus": {
+        "6": 171,
+        "3": 4308,
+        "4": 88
+      },
+      "longest_notifications": [
+        {
+          "ctx": 31,
+          "ts": 1552,
+          "retirement": 49248.02798,
+          "registration": 49248.026823,
+          "callback": 49248.030335,
+          "notification_ms": 2.355000004172325
+        },
+        {
+          "ctx": 31,
+          "ts": 353,
+          "retirement": 49238.02845,
+          "registration": 49238.026887,
+          "callback": 49238.03044,
+          "notification_ms": 1.9900000042980537
+        },
+        {
+          "ctx": 31,
+          "ts": 832,
+          "retirement": 49242.028371,
+          "registration": 49242.026944,
+          "callback": 49242.030359,
+          "notification_ms": 1.9879999963450246
+        },
+        {
+          "ctx": 31,
+          "ts": 1433,
+          "retirement": 49247.028501,
+          "registration": 49247.027354,
+          "callback": 49247.03048,
+          "notification_ms": 1.9790000005741604
+        },
+        {
+          "ctx": 31,
+          "ts": 1072,
+          "retirement": 49244.028548,
+          "registration": 49244.027399,
+          "callback": 49244.030514,
+          "notification_ms": 1.9659999961731955
+        },
+        {
+          "ctx": 31,
+          "ts": 2153,
+          "retirement": 49253.028527,
+          "registration": 49253.026996,
+          "callback": 49253.030461,
+          "notification_ms": 1.9339999998919666
+        },
+        {
+          "ctx": 31,
+          "ts": 1193,
+          "retirement": 49245.028398,
+          "registration": 49245.026903,
+          "callback": 49245.030282,
+          "notification_ms": 1.883999997517094
+        },
+        {
+          "ctx": 31,
+          "ts": 1553,
+          "retirement": 49248.028576,
+          "registration": 49248.02698,
+          "callback": 49248.030346,
+          "notification_ms": 1.7700000025797635
+        },
+        {
+          "ctx": 31,
+          "ts": 232,
+          "retirement": 49237.027981,
+          "registration": 49237.026855,
+          "callback": 49237.029671,
+          "notification_ms": 1.689999997324776
+        },
+        {
+          "ctx": 31,
+          "ts": 833,
+          "retirement": 49242.028718,
+          "registration": 49242.027101,
+          "callback": 49242.030369,
+          "notification_ms": 1.6509999986737967
+        },
+        {
+          "ctx": 31,
+          "ts": 1312,
+          "retirement": 49246.027994,
+          "registration": 49246.026842,
+          "callback": 49246.029563,
+          "notification_ms": 1.5690000000176951
+        },
+        {
+          "ctx": 31,
+          "ts": 1073,
+          "retirement": 49244.029121,
+          "registration": 49244.02764,
+          "callback": 49244.030527,
+          "notification_ms": 1.4060000030440278
+        },
+        {
+          "ctx": 31,
+          "ts": 713,
+          "retirement": 49241.028511,
+          "registration": 49241.026781,
+          "callback": 49241.029758,
+          "notification_ms": 1.247000000148546
+        },
+        {
+          "ctx": 31,
+          "ts": 473,
+          "retirement": 49239.0285,
+          "registration": 49239.026893,
+          "callback": 49239.029701,
+          "notification_ms": 1.2009999991278164
+        },
+        {
+          "ctx": 31,
+          "ts": 1672,
+          "retirement": 49249.028328,
+          "registration": 49249.026974,
+          "callback": 49249.029519,
+          "notification_ms": 1.1910000030184165
+        },
+        {
+          "ctx": 31,
+          "ts": 592,
+          "retirement": 49240.028365,
+          "registration": 49240.026875,
+          "callback": 49240.029525,
+          "notification_ms": 1.1599999997997656
+        },
+        {
+          "ctx": 31,
+          "ts": 233,
+          "retirement": 49237.028554,
+          "registration": 49237.027054,
+          "callback": 49237.029682,
+          "notification_ms": 1.1280000035185367
+        },
+        {
+          "ctx": 31,
+          "ts": 1709,
+          "retirement": 49249.328434,
+          "registration": 49249.326869,
+          "callback": 49249.329437,
+          "notification_ms": 1.0029999975813553
+        },
+        {
+          "ctx": 31,
+          "ts": 593,
+          "retirement": 49240.028608,
+          "registration": 49240.027026,
+          "callback": 49240.029537,
+          "notification_ms": 0.9290000016335398
+        },
+        {
+          "ctx": 31,
+          "ts": 1313,
+          "retirement": 49246.028678,
+          "registration": 49246.026991,
+          "callback": 49246.029571,
+          "notification_ms": 0.8929999967222102
+        }
+      ],
+      "physical_scanout_tested": false
+    }
+  },
+  "worker_hint_control": {
+    "pid": 676,
+    "starttime": "162",
+    "previous_util_min": 0,
+    "diagnostic_util_min": 512,
+    "production_change": false,
+    "effective": [
+      "uclamp.min                                   :                  512",
+      "uclamp.max                                   :                 1024",
+      "effective uclamp.min                         :                  512",
+      "effective uclamp.max                         :                 1024"
+    ],
+    "workload_result": 0,
+    "restored_util_min": 0,
+    "restored_effective": [
+      "uclamp.min                                   :                    0",
+      "uclamp.max                                   :                 1024",
+      "effective uclamp.min                         :                    0",
+      "effective uclamp.max                         :                 1024"
+    ]
+  },
+  "worker_hint_promoted": false,
+  "physical_scanout_tested": false,
+  "memory_evidence_archive": "root@192.168.104.201:/bigdata/mesa-sync-build/live-evidence/20261008-session-scheduling"
+}

@@ -61,6 +61,7 @@ bool g_start_lxde = true;
 bool g_no_timeout = false;
 bool g_trace_startup_only = true;
 uint32_t g_session_uclamp_min = 0;
+bool g_session_uclamp_configured = false;
 std::string g_mouse;
 std::string g_keyboard;
 drm_mode_modeinfo g_android_mode = {};
@@ -278,7 +279,7 @@ bool process_alive(pid_t pid) {
 }
 
 bool apply_session_uclamp() {
-  if (!g_session_uclamp_min) return true;
+  if (!g_session_uclamp_configured) return true;
   sched_attr attributes = {};
   attributes.size = sizeof(attributes);
   attributes.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS |
@@ -1211,6 +1212,7 @@ int main(int argc, char **argv) {
         return 2;
       }
       g_session_uclamp_min = static_cast<uint32_t>(value);
+      g_session_uclamp_configured = true;
     } else if (strcmp(argv[i], "--drm-trace") == 0 && i + 1 < argc) {
       const char *value = argv[++i];
       if (strcmp(value, "startup") == 0)

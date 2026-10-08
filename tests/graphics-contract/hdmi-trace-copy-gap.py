@@ -44,10 +44,12 @@ try:
         "sched/sched_switch": (
             'prev_comm ~ "Xorg*" || next_comm ~ "Xorg*" || '
             'prev_comm ~ "glxgears*" || next_comm ~ "glxgears*" || '
-            'prev_comm ~ "lxpanel*" || next_comm ~ "lxpanel*"'
+            'prev_comm ~ "lxpanel*" || next_comm ~ "lxpanel*" || '
+            'prev_comm == "kgsl-events" || next_comm == "kgsl-events"'
         ),
         "sched/sched_wakeup": (
-            'comm ~ "Xorg*" || comm ~ "glxgears*" || comm ~ "lxpanel*"'
+            'comm ~ "Xorg*" || comm ~ "glxgears*" || comm ~ "lxpanel*" || '
+            'comm == "kgsl-events"'
         ),
         "drm/drm_vblank_event": "",
         "drm/drm_vblank_event_delivered": "",
