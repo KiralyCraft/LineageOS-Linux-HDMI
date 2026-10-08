@@ -1,5 +1,5 @@
 import argparse,os,pathlib,shutil,subprocess
-ap=argparse.ArgumentParser();ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('name');ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--drm-captures',action='store_true');ap.add_argument('--seconds',default='25');ap.add_argument('--mesa-build');ap.add_argument('--integrated');ap.add_argument('--binding-diagnostic',action='store_true');ap.add_argument('--lazy-slots');ap.add_argument('--framebuffer-helper');ap.add_argument('--framebuffer-period-ns',type=int);ap.add_argument('--wm-resize',action='store_true');ap.add_argument('--background-pixel');ap.add_argument('--paced-queue');ap.add_argument('--paced-lead');a=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--pacer-stats',action='store_true');ap.add_argument('--present-mode',choices=['unpaced','paced']);ap.add_argument('--vblank-mode',choices=['0','1','2','3']);ap.add_argument('--paced-margin-us');ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('name');ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--drm-captures',action='store_true');ap.add_argument('--seconds',default='25');ap.add_argument('--mesa-build');ap.add_argument('--integrated');ap.add_argument('--binding-diagnostic',action='store_true');ap.add_argument('--lazy-slots');ap.add_argument('--framebuffer-helper');ap.add_argument('--framebuffer-period-ns',type=int);ap.add_argument('--wm-resize',action='store_true');ap.add_argument('--background-pixel');ap.add_argument('--paced-queue');ap.add_argument('--paced-lead');a=ap.parse_args()
 base=pathlib.Path('/tmp/hdmi-app-pacing-20261008');pids=[r.split(None,1)[0] for r in subprocess.check_output(['ps','-eo','pid=,args='],text=True).splitlines() if len(r.split(None,1))==2 and r.split(None,1)[1].startswith('/usr/bin/lxsession -s LXDE')];assert len(pids)==1
 env=dict(s.decode().split('=',1) for s in pathlib.Path('/proc/'+pids[0]+'/environ').read_bytes().split(b'\0') if b'=' in s)
 auth=base/'Xauthority';shutil.copyfile(env['XAUTHORITY'],auth);os.chown(auth,4000,4000);auth.chmod(0o600)
@@ -9,6 +9,10 @@ if a.mesa_build:
 if a.integrated is not None:env['MESA_KGSL_X11_INTEGRATED_RESOLVE']=a.integrated
 if a.binding_diagnostic:env['MESA_KGSL_HDMI_BINDING_DIAGNOSTIC']='1'
 if a.lazy_slots is not None:env['MESA_KGSL_HDMI_LAZY_SLOTS']=a.lazy_slots
+if a.pacer_stats:env['MESA_KGSL_HDMI_PACER_STATS']='1'
+if a.present_mode is not None:env['MESA_DRI3_PRESENT_MODE']=a.present_mode
+if a.vblank_mode is not None:env['vblank_mode']=a.vblank_mode
+if a.paced_margin_us is not None:env['MESA_KGSL_HDMI_PACED_MARGIN_US']=a.paced_margin_us
 if a.paced_queue is not None:env['MESA_KGSL_HDMI_PACED_QUEUE']=a.paced_queue
 if a.paced_lead is not None:env['MESA_KGSL_HDMI_PACED_LEAD']=a.paced_lead
 args=['python3',str(pathlib.Path(__file__).with_name('hdmi-gears-workload.py')),str(base/a.name),'--binary',a.binary,'--seconds',a.seconds]

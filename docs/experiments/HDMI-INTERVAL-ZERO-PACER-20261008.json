@@ -1,0 +1,1379 @@
+{
+  "date": "2026-10-08",
+  "output": "1920x1080 at nominal 60 Hz",
+  "mesa_commit": "107af1757ecac4ce7087e2671c58b5916c2fb146",
+  "tested_logic_patch": "21f5b0101d5659d16a574337e90cd12b176a646ee3c14f731259490dd3374248",
+  "final_build_difference": "identification log and Mesa Git SHA only, no functional change from corrected overlap prototype",
+  "base_mesa": "eff5c22036c93e9b0c5fc9a7525c46f636e61937",
+  "runtime": "hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-preserved-retain-session-uclamp-20261008",
+  "workload_uclamp_min": 512,
+  "kernel_kgsl_events_uclamp_min": 0,
+  "Termux_source_changed": false,
+  "quake_profile_changed": false,
+  "physical_scanout_capture": false,
+  "raw_evidence": "/bigdata/mesa-sync-build/live-evidence/20261008-hdmi-pacer",
+  "results": {
+    "interval_one_control": {
+      "probe_records": 17720,
+      "requested_records": 17720,
+      "dropped": 0,
+      "seconds": 52.2980405,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "2": 2954,
+        "7": 2954,
+        "9": 5906,
+        "8": 5906
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2656,
+            "mean_ms": 9.1260753125,
+            "p50_ms": 9.230833,
+            "p95_ms": 11.986927,
+            "p99_ms": 12.955833,
+            "max_ms": 18.83875
+          },
+          "end_interval": {
+            "count": 2655,
+            "mean_ms": 16.673028360075328,
+            "p50_ms": 16.66,
+            "p95_ms": 17.802761,
+            "p99_ms": 18.390677,
+            "max_ms": 26.182084
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 51.340382897,
+              "ms": 26.182084
+            },
+            {
+              "relative_seconds": 51.381246751,
+              "ms": 25.506198
+            },
+            {
+              "relative_seconds": 51.50296498,
+              "ms": 22.173021
+            },
+            {
+              "relative_seconds": 20.234313221,
+              "ms": 19.57625
+            },
+            {
+              "relative_seconds": 24.267004417,
+              "ms": 19.564427
+            },
+            {
+              "relative_seconds": 39.682951495,
+              "ms": 19.186094
+            },
+            {
+              "relative_seconds": 30.19933978,
+              "ms": 19.107032
+            },
+            {
+              "relative_seconds": 15.4664489,
+              "ms": 18.85125
+            },
+            {
+              "relative_seconds": 39.63320238,
+              "ms": 18.847083
+            },
+            {
+              "relative_seconds": 9.382772913,
+              "ms": 18.835052
+            },
+            {
+              "relative_seconds": 46.532708211,
+              "ms": 18.792448
+            },
+            {
+              "relative_seconds": 44.466080764,
+              "ms": 18.682396
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2657,
+        "request_thread_ids": [
+          14390
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 2657
+        },
+        "msc_delta": {
+          "1": 2655,
+          "2": 1
+        },
+        "ust_delta": {
+          "count": 2656,
+          "mean_ms": 16.67294164156627,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 16.667,
+          "max_ms": 33.333
+        },
+        "request_to_event": {
+          "count": 2657,
+          "mean_ms": 10.78252060632292,
+          "p50_ms": 11.557969,
+          "p95_ms": 12.179219,
+          "p99_ms": 12.545364,
+          "max_ms": 20.724011
+        },
+        "request_options": {
+          "0": 2657
+        },
+        "target_error_msc": {
+          "0": 2656,
+          "1": 1
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "14390@0x1000033": {
+            "thread": 14390,
+            "window": 16777267,
+            "completed": 2657,
+            "first_monotonic_ns": 53007274576393,
+            "last_monotonic_ns": 53059559437884,
+            "msc_delta": {
+              "1": 2655,
+              "2": 1
+            },
+            "request_to_event": {
+              "count": 2657,
+              "mean_ms": 10.78252060632292,
+              "p50_ms": 11.557969,
+              "p95_ms": 12.179219,
+              "p99_ms": 12.545364,
+              "max_ms": 20.724011
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_uncapped_maximized": {
+      "probe_records": 17720,
+      "requested_records": 17720,
+      "dropped": 0,
+      "seconds": 54.332347219,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "2": 2954,
+        "7": 2954,
+        "9": 5906,
+        "8": 5906
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2779,
+            "mean_ms": 9.492052179560993,
+            "p50_ms": 9.579896,
+            "p95_ms": 11.975833,
+            "p99_ms": 12.693698,
+            "max_ms": 15.814844
+          },
+          "end_interval": {
+            "count": 2778,
+            "mean_ms": 16.66583833261339,
+            "p50_ms": 16.666094,
+            "p95_ms": 16.877396,
+            "p99_ms": 17.299791,
+            "max_ms": 22.325834
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 48.641485086,
+              "ms": 22.325834
+            },
+            {
+              "relative_seconds": 11.167753225,
+              "ms": 18.967969
+            },
+            {
+              "relative_seconds": 48.437952898,
+              "ms": 18.267917
+            },
+            {
+              "relative_seconds": 30.206409207,
+              "ms": 18.26526
+            },
+            {
+              "relative_seconds": 12.218793693,
+              "ms": 18.256771
+            },
+            {
+              "relative_seconds": 41.670317849,
+              "ms": 17.689375
+            },
+            {
+              "relative_seconds": 17.320690202,
+              "ms": 17.540573
+            },
+            {
+              "relative_seconds": 38.136942433,
+              "ms": 17.533281
+            },
+            {
+              "relative_seconds": 39.738272276,
+              "ms": 17.514531
+            },
+            {
+              "relative_seconds": 40.271059412,
+              "ms": 17.51224
+            },
+            {
+              "relative_seconds": 46.719821909,
+              "ms": 17.496302
+            },
+            {
+              "relative_seconds": 17.487478691,
+              "ms": 17.495364
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2780,
+        "request_thread_ids": [
+          17971
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 2780
+        },
+        "msc_delta": {
+          "1": 2779
+        },
+        "ust_delta": {
+          "count": 2779,
+          "mean_ms": 16.66666678661389,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 16.667,
+          "max_ms": 16.669
+        },
+        "request_to_event": {
+          "count": 2780,
+          "mean_ms": 11.072266922302157,
+          "p50_ms": 11.095885,
+          "p95_ms": 13.868437,
+          "p99_ms": 16.375156,
+          "max_ms": 22.067135
+        },
+        "request_options": {
+          "0": 2780
+        },
+        "target_error_msc": {
+          "0": 2780
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "17971@0x1000033": {
+            "thread": 17971,
+            "window": 16777267,
+            "completed": 2780,
+            "first_monotonic_ns": 53284790853891,
+            "last_monotonic_ns": 53339109136839,
+            "msc_delta": {
+              "1": 2779
+            },
+            "request_to_event": {
+              "count": 2780,
+              "mean_ms": 11.072266922302157,
+              "p50_ms": 11.095885,
+              "p95_ms": 13.868437,
+              "p99_ms": 16.375156,
+              "max_ms": 22.067135
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_cap65_maximized": {
+      "probe_records": 17708,
+      "requested_records": 17708,
+      "dropped": 0,
+      "seconds": 52.258787063,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "2": 2952,
+        "7": 2952,
+        "9": 5902,
+        "8": 5902
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2653,
+            "mean_ms": 9.370315671315492,
+            "p50_ms": 9.531614,
+            "p95_ms": 11.763125,
+            "p99_ms": 12.392031,
+            "max_ms": 20.556667
+          },
+          "end_interval": {
+            "count": 2652,
+            "mean_ms": 16.67781001923077,
+            "p50_ms": 16.665469,
+            "p95_ms": 16.887917,
+            "p99_ms": 17.344011,
+            "max_ms": 29.099531
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 28.830939989,
+              "ms": 29.099531
+            },
+            {
+              "relative_seconds": 15.396151192,
+              "ms": 27.490417
+            },
+            {
+              "relative_seconds": 15.368660775,
+              "ms": 20.717395
+            },
+            {
+              "relative_seconds": 28.801840458,
+              "ms": 20.445
+            },
+            {
+              "relative_seconds": 17.384279681,
+              "ms": 19.513802
+            },
+            {
+              "relative_seconds": 10.164498902,
+              "ms": 18.566093
+            },
+            {
+              "relative_seconds": 38.198803058,
+              "ms": 18.347187
+            },
+            {
+              "relative_seconds": 49.814375502,
+              "ms": 18.237761
+            },
+            {
+              "relative_seconds": 17.09807291,
+              "ms": 17.947187
+            },
+            {
+              "relative_seconds": 20.633432284,
+              "ms": 17.906354
+            },
+            {
+              "relative_seconds": 20.751388742,
+              "ms": 17.811562
+            },
+            {
+              "relative_seconds": 44.379860921,
+              "ms": 17.702709
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2653,
+        "request_thread_ids": [
+          19058
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 2653
+        },
+        "msc_delta": {
+          "1": 2650,
+          "2": 2
+        },
+        "ust_delta": {
+          "count": 2652,
+          "mean_ms": 16.679236048265462,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 16.667,
+          "max_ms": 33.333
+        },
+        "request_to_event": {
+          "count": 2653,
+          "mean_ms": 11.03429436072371,
+          "p50_ms": 11.061718,
+          "p95_ms": 13.77224,
+          "p99_ms": 16.327552,
+          "max_ms": 17.14375
+        },
+        "request_options": {
+          "0": 2653
+        },
+        "target_error_msc": {
+          "0": 2651,
+          "1": 2
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "19058@0x1000033": {
+            "thread": 19058,
+            "window": 16777267,
+            "completed": 2653,
+            "first_monotonic_ns": 53367130716516,
+            "last_monotonic_ns": 53419376078580,
+            "msc_delta": {
+              "1": 2650,
+              "2": 2
+            },
+            "request_to_event": {
+              "count": 2653,
+              "mean_ms": 11.03429436072371,
+              "p50_ms": 11.061718,
+              "p95_ms": 13.77224,
+              "p99_ms": 16.327552,
+              "max_ms": 17.14375
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_uncapped_fullscreen": {
+      "probe_records": 17719,
+      "requested_records": 17719,
+      "dropped": 0,
+      "seconds": 54.374712687,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "2": 2954,
+        "7": 2954,
+        "9": 5905,
+        "8": 5906
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2781,
+            "mean_ms": 9.346664541891405,
+            "p50_ms": 9.454219,
+            "p95_ms": 11.868073,
+            "p99_ms": 12.544062,
+            "max_ms": 13.729063
+          },
+          "end_interval": {
+            "count": 2780,
+            "mean_ms": 16.666078549280574,
+            "p50_ms": 16.66677,
+            "p95_ms": 16.810625,
+            "p99_ms": 17.177813,
+            "max_ms": 17.853438
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 12.25978812,
+              "ms": 17.853438
+            },
+            {
+              "relative_seconds": 26.809557021,
+              "ms": 17.797396
+            },
+            {
+              "relative_seconds": 34.544482122,
+              "ms": 17.7675
+            },
+            {
+              "relative_seconds": 12.294236453,
+              "ms": 17.760781
+            },
+            {
+              "relative_seconds": 32.827551497,
+              "ms": 17.667916
+            },
+            {
+              "relative_seconds": 12.024209682,
+              "ms": 17.657447
+            },
+            {
+              "relative_seconds": 46.043359878,
+              "ms": 17.540417
+            },
+            {
+              "relative_seconds": 17.293286191,
+              "ms": 17.489792
+            },
+            {
+              "relative_seconds": 22.344317178,
+              "ms": 17.479947
+            },
+            {
+              "relative_seconds": 41.743452275,
+              "ms": 17.454791
+            },
+            {
+              "relative_seconds": 39.010554047,
+              "ms": 17.366927
+            },
+            {
+              "relative_seconds": 42.44579264,
+              "ms": 17.345782
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2781,
+        "request_thread_ids": [
+          20547
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "1": 2781
+        },
+        "msc_delta": {
+          "1": 2780
+        },
+        "ust_delta": {
+          "count": 2780,
+          "mean_ms": 16.66666690647482,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 16.667,
+          "max_ms": 16.668
+        },
+        "request_to_event": {
+          "count": 2781,
+          "mean_ms": 10.75847224811219,
+          "p50_ms": 10.778021,
+          "p95_ms": 13.445,
+          "p99_ms": 15.774219,
+          "max_ms": 16.99276
+        },
+        "request_options": {
+          "0": 2781
+        },
+        "target_error_msc": {
+          "0": 2781
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "20547@0x1000033": {
+            "thread": 20547,
+            "window": 16777267,
+            "completed": 2781,
+            "first_monotonic_ns": 53473433148611,
+            "last_monotonic_ns": 53527775916976,
+            "msc_delta": {
+              "1": 2780
+            },
+            "request_to_event": {
+              "count": 2781,
+              "mean_ms": 10.75847224811219,
+              "p50_ms": 10.778021,
+              "p95_ms": 13.445,
+              "p99_ms": 15.774219,
+              "max_ms": 16.99276
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_gears_maximized": {
+      "probe_records": 12316,
+      "requested_records": 12316,
+      "dropped": 0,
+      "seconds": 30.637172905,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "3": 5,
+        "6": 1767,
+        "4": 4,
+        "1": 1756,
+        "5": 4,
+        "7": 1756,
+        "9": 3512,
+        "8": 3512
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {
+            "count": 1285,
+            "mean_ms": 17.468167301945524,
+            "p50_ms": 16.522135,
+            "p95_ms": 16.603594,
+            "p99_ms": 33.132031,
+            "max_ms": 912.054219
+          },
+          "end_interval": {
+            "count": 1284,
+            "mean_ms": 17.614343961838006,
+            "p50_ms": 16.666406,
+            "p95_ms": 16.727656,
+            "p99_ms": 33.29927,
+            "max_ms": 912.243177
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 9.88664234,
+              "ms": 912.243177
+            },
+            {
+              "relative_seconds": 8.974399163,
+              "ms": 121.188281
+            },
+            {
+              "relative_seconds": 20.887019523,
+              "ms": 33.55349
+            },
+            {
+              "relative_seconds": 19.220156034,
+              "ms": 33.480104
+            },
+            {
+              "relative_seconds": 14.670301973,
+              "ms": 33.382916
+            },
+            {
+              "relative_seconds": 29.887400145,
+              "ms": 33.368907
+            },
+            {
+              "relative_seconds": 16.88681416,
+              "ms": 33.358542
+            },
+            {
+              "relative_seconds": 16.536790358,
+              "ms": 33.335521
+            },
+            {
+              "relative_seconds": 17.986736295,
+              "ms": 33.330365
+            },
+            {
+              "relative_seconds": 12.403356453,
+              "ms": 33.325885
+            },
+            {
+              "relative_seconds": 17.886729368,
+              "ms": 33.314011
+            },
+            {
+              "relative_seconds": 15.68679114,
+              "ms": 33.300573
+            }
+          ]
+        },
+        "2": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        }
+      },
+      "present": {
+        "completed": 1284,
+        "request_thread_ids": [
+          23056
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 1284
+        },
+        "msc_delta": {
+          "1": 1269,
+          "61": 1,
+          "2": 13
+        },
+        "ust_delta": {
+          "count": 1283,
+          "mean_ms": 17.614964925954794,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 33.333,
+          "max_ms": 1016.666
+        },
+        "request_to_event": {
+          "count": 1284,
+          "mean_ms": 9.996572492211838,
+          "p50_ms": 8.970885,
+          "p95_ms": 9.750885,
+          "p99_ms": 21.536094,
+          "max_ms": 1010.364219
+        },
+        "request_options": {
+          "0": 1285
+        },
+        "target_error_msc": {
+          "0": 1270,
+          "60": 1,
+          "1": 13
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "23056@0x1600002": {
+            "thread": 23056,
+            "window": 23068674,
+            "completed": 1284,
+            "first_monotonic_ns": 53673711042233,
+            "last_monotonic_ns": 53704325666804,
+            "msc_delta": {
+              "1": 1269,
+              "61": 1,
+              "2": 13
+            },
+            "request_to_event": {
+              "count": 1284,
+              "mean_ms": 9.996572492211838,
+              "p50_ms": 8.970885,
+              "p95_ms": 9.750885,
+              "p99_ms": 21.536094,
+              "max_ms": 1010.364219
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_gears_resize": {
+      "probe_records": 9766,
+      "requested_records": 9766,
+      "dropped": 0,
+      "seconds": 20.665848586,
+      "warmup_excluded_seconds": 3.0,
+      "events": {
+        "3": 244,
+        "6": 1880,
+        "4": 243,
+        "1": 1153,
+        "5": 481,
+        "7": 1153,
+        "9": 2306,
+        "8": 2306
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {
+            "count": 975,
+            "mean_ms": 17.86202899897436,
+            "p50_ms": 16.517344,
+            "p95_ms": 29.8625,
+            "p99_ms": 62.777344,
+            "max_ms": 67.119948
+          },
+          "end_interval": {
+            "count": 974,
+            "mean_ms": 18.109888607802873,
+            "p50_ms": 16.668594,
+            "p95_ms": 30.025469,
+            "p99_ms": 63.129427,
+            "max_ms": 67.211823
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 12.460671141,
+              "ms": 67.211823
+            },
+            {
+              "relative_seconds": 3.27696328,
+              "ms": 66.519948
+            },
+            {
+              "relative_seconds": 3.527126561,
+              "ms": 66.492812
+            },
+            {
+              "relative_seconds": 6.843761768,
+              "ms": 64.400989
+            },
+            {
+              "relative_seconds": 6.74367755,
+              "ms": 63.692709
+            },
+            {
+              "relative_seconds": 7.143751247,
+              "ms": 63.638541
+            },
+            {
+              "relative_seconds": 7.244067081,
+              "ms": 63.576875
+            },
+            {
+              "relative_seconds": 6.943936768,
+              "ms": 63.465104
+            },
+            {
+              "relative_seconds": 11.860360725,
+              "ms": 63.293386
+            },
+            {
+              "relative_seconds": 12.26065661,
+              "ms": 63.129427
+            },
+            {
+              "relative_seconds": 11.96053536,
+              "ms": 62.935104
+            },
+            {
+              "relative_seconds": 7.543547601,
+              "ms": 62.040208
+            }
+          ]
+        },
+        "2": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        }
+      },
+      "present": {
+        "completed": 977,
+        "request_thread_ids": [
+          24973
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 977
+        },
+        "msc_delta": {
+          "1": 922,
+          "4": 13,
+          "2": 38,
+          "3": 3
+        },
+        "ust_delta": {
+          "count": 976,
+          "mean_ms": 18.084016393442624,
+          "p50_ms": 16.667,
+          "p95_ms": 33.333,
+          "p99_ms": 66.666,
+          "max_ms": 66.667
+        },
+        "request_to_event": {
+          "count": 977,
+          "mean_ms": 14.595347020470829,
+          "p50_ms": 15.569584,
+          "p95_ms": 28.504167,
+          "p99_ms": 62.947031,
+          "max_ms": 66.768229
+        },
+        "request_options": {
+          "0": 976
+        },
+        "target_error_msc": {
+          "0": 923,
+          "3": 13,
+          "1": 38,
+          "2": 3
+        },
+        "stream_warmup_seconds": 0,
+        "streams": {
+          "24973@0x1600002": {
+            "thread": 24973,
+            "window": 23068674,
+            "completed": 977,
+            "first_monotonic_ns": 53827502198216,
+            "last_monotonic_ns": 53848142531437,
+            "msc_delta": {
+              "1": 922,
+              "4": 13,
+              "2": 38,
+              "3": 3
+            },
+            "request_to_event": {
+              "count": 977,
+              "mean_ms": 14.595347020470829,
+              "p50_ms": 15.569584,
+              "p95_ms": 28.504167,
+              "p99_ms": 62.947031,
+              "max_ms": 66.768229
+            }
+          }
+        }
+      }
+    },
+    "prototype_current_gpu_wait": {
+      "probe_records": 16760,
+      "requested_records": 16760,
+      "dropped": 0,
+      "seconds": 54.434220448,
+      "warmup_excluded_seconds": 5,
+      "events": {
+        "2": 2794,
+        "7": 2794,
+        "9": 5586,
+        "8": 5586
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2779,
+            "mean_ms": 10.290593736236056,
+            "p50_ms": 10.24276,
+            "p95_ms": 12.571927,
+            "p99_ms": 14.652604,
+            "max_ms": 120.740209
+          },
+          "end_interval": {
+            "count": 2778,
+            "mean_ms": 17.78312006227502,
+            "p50_ms": 16.851354,
+            "p95_ms": 20.770729,
+            "p99_ms": 22.676614,
+            "max_ms": 129.242604
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 39.42828186,
+              "ms": 129.242604
+            },
+            {
+              "relative_seconds": 5.297892914,
+              "ms": 128.711041
+            },
+            {
+              "relative_seconds": 5.422015987,
+              "ms": 124.123073
+            },
+            {
+              "relative_seconds": 5.528623852,
+              "ms": 106.607865
+            },
+            {
+              "relative_seconds": 5.601980154,
+              "ms": 73.356302
+            },
+            {
+              "relative_seconds": 5.150868227,
+              "ms": 49.17724
+            },
+            {
+              "relative_seconds": 5.639560466,
+              "ms": 37.580312
+            },
+            {
+              "relative_seconds": 26.40338775,
+              "ms": 32.684479
+            },
+            {
+              "relative_seconds": 5.05181354,
+              "ms": 30.842969
+            },
+            {
+              "relative_seconds": 39.455444933,
+              "ms": 27.163073
+            },
+            {
+              "relative_seconds": 39.299039256,
+              "ms": 26.938646
+            },
+            {
+              "relative_seconds": 5.666422446,
+              "ms": 26.86198
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2779,
+        "request_thread_ids": [
+          11111
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 2779
+        },
+        "msc_delta": {
+          "2": 152,
+          "1": 2619,
+          "3": 2,
+          "7": 1,
+          "8": 1,
+          "6": 1,
+          "5": 1,
+          "9": 1
+        },
+        "ust_delta": {
+          "count": 2778,
+          "mean_ms": 17.782577393808495,
+          "p50_ms": 16.667,
+          "p95_ms": 33.333,
+          "p99_ms": 33.334,
+          "max_ms": 150.0
+        },
+        "request_to_event": {
+          "count": 2779,
+          "mean_ms": 10.010951224541202,
+          "p50_ms": 10.593281,
+          "p95_ms": 16.321041,
+          "p99_ms": 16.889844,
+          "max_ms": 134.812448
+        },
+        "request_options": {
+          "0": 2779
+        },
+        "target_error_msc": {
+          "2": 3,
+          "1": 152,
+          "0": 2619,
+          "6": 1,
+          "7": 1,
+          "5": 1,
+          "4": 1,
+          "8": 1
+        },
+        "stream_warmup_seconds": 5.0,
+        "streams": {
+          "11111@0x1000033": {
+            "thread": 11111,
+            "window": 16777267,
+            "completed": 2779,
+            "first_monotonic_ns": 52752021414043,
+            "last_monotonic_ns": 52806442607876,
+            "msc_delta": {
+              "2": 152,
+              "1": 2619,
+              "3": 2,
+              "7": 1,
+              "8": 1,
+              "6": 1,
+              "5": 1,
+              "9": 1
+            },
+            "request_to_event": {
+              "count": 2779,
+              "mean_ms": 10.010951224541202,
+              "p50_ms": 10.593281,
+              "p95_ms": 16.321041,
+              "p99_ms": 16.889844,
+              "max_ms": 134.812448
+            }
+          }
+        }
+      }
+    },
+    "prototype_margin12": {
+      "probe_records": 17020,
+      "requested_records": 17020,
+      "dropped": 0,
+      "seconds": 52.294132845,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "2": 2837,
+        "7": 2837,
+        "9": 5673,
+        "8": 5673
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        },
+        "2": {
+          "call": {
+            "count": 2541,
+            "mean_ms": 9.938776897284534,
+            "p50_ms": 9.996771,
+            "p95_ms": 11.975364,
+            "p99_ms": 12.998645,
+            "max_ms": 14.573542
+          },
+          "end_interval": {
+            "count": 2540,
+            "mean_ms": 17.430954799606297,
+            "p50_ms": 16.909427,
+            "p95_ms": 19.990833,
+            "p99_ms": 21.483854,
+            "max_ms": 24.936666
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 47.745978211,
+              "ms": 24.936666
+            },
+            {
+              "relative_seconds": 8.512250674,
+              "ms": 24.216875
+            },
+            {
+              "relative_seconds": 8.814102653,
+              "ms": 23.464427
+            },
+            {
+              "relative_seconds": 44.193028629,
+              "ms": 23.412448
+            },
+            {
+              "relative_seconds": 23.145081814,
+              "ms": 22.956041
+            },
+            {
+              "relative_seconds": 38.77234759,
+              "ms": 22.829948
+            },
+            {
+              "relative_seconds": 9.115933903,
+              "ms": 22.657292
+            },
+            {
+              "relative_seconds": 14.037696766,
+              "ms": 22.626823
+            },
+            {
+              "relative_seconds": 48.408300451,
+              "ms": 22.611615
+            },
+            {
+              "relative_seconds": 47.941213263,
+              "ms": 22.598437
+            },
+            {
+              "relative_seconds": 49.494274669,
+              "ms": 22.53
+            },
+            {
+              "relative_seconds": 47.721041545,
+              "ms": 22.212344
+            }
+          ]
+        }
+      },
+      "present": {
+        "completed": 2541,
+        "request_thread_ids": [
+          13379
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 2541
+        },
+        "msc_delta": {
+          "1": 2424,
+          "2": 116
+        },
+        "ust_delta": {
+          "count": 2540,
+          "mean_ms": 17.427821653543308,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 33.334,
+          "max_ms": 33.335
+        },
+        "request_to_event": {
+          "count": 2541,
+          "mean_ms": 11.86585672215663,
+          "p50_ms": 13.148698,
+          "p95_ms": 16.635729,
+          "p99_ms": 17.078125,
+          "max_ms": 18.02323
+        },
+        "request_options": {
+          "0": 2541
+        },
+        "target_error_msc": {
+          "0": 2425,
+          "1": 116
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "13379@0x1000033": {
+            "thread": 13379,
+            "window": 16777267,
+            "completed": 2541,
+            "first_monotonic_ns": 52929093694183,
+            "last_monotonic_ns": 52981375910101,
+            "msc_delta": {
+              "1": 2424,
+              "2": 116
+            },
+            "request_to_event": {
+              "count": 2541,
+              "mean_ms": 11.86585672215663,
+              "p50_ms": 13.148698,
+              "p95_ms": 16.635729,
+              "p99_ms": 17.078125,
+              "max_ms": 18.02323
+            }
+          }
+        }
+      }
+    },
+    "paced_zero_gears_maximized_hidden": {
+      "probe_records": 12884,
+      "requested_records": 12884,
+      "dropped": 0,
+      "seconds": 30.660729989,
+      "warmup_excluded_seconds": 8.0,
+      "events": {
+        "3": 5,
+        "6": 1848,
+        "4": 4,
+        "1": 1837,
+        "5": 4,
+        "7": 1838,
+        "9": 3674,
+        "8": 3674
+      },
+      "physical_scanout_tested": false,
+      "swaps": {
+        "1": {
+          "call": {
+            "count": 1359,
+            "mean_ms": 16.527414292126565,
+            "p50_ms": 16.534063,
+            "p95_ms": 16.592031,
+            "p99_ms": 16.673646,
+            "max_ms": 17.045
+          },
+          "end_interval": {
+            "count": 1358,
+            "mean_ms": 16.66687123490427,
+            "p50_ms": 16.666511,
+            "p95_ms": 16.721041,
+            "p99_ms": 16.800156,
+            "max_ms": 17.153854
+          },
+          "longest_intervals": [
+            {
+              "relative_seconds": 25.757649261,
+              "ms": 17.153854
+            },
+            {
+              "relative_seconds": 25.357551866,
+              "ms": 17.042969
+            },
+            {
+              "relative_seconds": 21.757011971,
+              "ms": 16.948854
+            },
+            {
+              "relative_seconds": 22.674070252,
+              "ms": 16.943958
+            },
+            {
+              "relative_seconds": 21.257327648,
+              "ms": 16.918541
+            },
+            {
+              "relative_seconds": 22.707384471,
+              "ms": 16.907136
+            },
+            {
+              "relative_seconds": 24.957390095,
+              "ms": 16.880104
+            },
+            {
+              "relative_seconds": 29.557227697,
+              "ms": 16.873437
+            },
+            {
+              "relative_seconds": 8.27374781,
+              "ms": 16.860469
+            },
+            {
+              "relative_seconds": 11.307297965,
+              "ms": 16.846198
+            },
+            {
+              "relative_seconds": 16.457375306,
+              "ms": 16.831718
+            },
+            {
+              "relative_seconds": 30.040765666,
+              "ms": 16.805625
+            }
+          ]
+        },
+        "2": {
+          "call": {},
+          "end_interval": {},
+          "longest_intervals": []
+        }
+      },
+      "present": {
+        "completed": 1358,
+        "request_thread_ids": [
+          26358
+        ],
+        "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+        "modes": {
+          "0": 1358
+        },
+        "msc_delta": {
+          "1": 1357
+        },
+        "ust_delta": {
+          "count": 1357,
+          "mean_ms": 16.666666175386883,
+          "p50_ms": 16.667,
+          "p95_ms": 16.667,
+          "p99_ms": 16.667,
+          "max_ms": 16.668
+        },
+        "request_to_event": {
+          "count": 1358,
+          "mean_ms": 9.163835337997055,
+          "p50_ms": 9.168646,
+          "p95_ms": 9.742864,
+          "p99_ms": 10.182917,
+          "max_ms": 10.50625
+        },
+        "request_options": {
+          "0": 1360
+        },
+        "target_error_msc": {
+          "0": 1358
+        },
+        "stream_warmup_seconds": 8.0,
+        "streams": {
+          "26358@0x1600002": {
+            "thread": 26358,
+            "window": 23068674,
+            "completed": 1358,
+            "first_monotonic_ns": 53938159891298,
+            "last_monotonic_ns": 53968792481339,
+            "msc_delta": {
+              "1": 1357
+            },
+            "request_to_event": {
+              "count": 1358,
+              "mean_ms": 9.163835337997055,
+              "p50_ms": 9.168646,
+              "p95_ms": 9.742864,
+              "p99_ms": 10.182917,
+              "max_ms": 10.50625
+            }
+          }
+        }
+      }
+    }
+  }
+}
