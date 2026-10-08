@@ -25,6 +25,13 @@ scheduler can use the performance cores and Cortex-X3 as demand rises. Thermal
 controls remain authoritative. The unsuccessful minimum-core requests in
 0.1.1–0.1.3 have been removed; a positive perf handle did not prove they applied.
 
+The launcher separately gives the leased Xorg and LXDE process trees a default
+`uclamp.min` of 512/1024. This is a per-task latency hint, not part of the power
+guard and not a global Android cgroup change. It addresses measured desktop
+submission delays after the power guard has made the cores available. Use
+`--session-uclamp-min 0` or `HDMI_LOS_SESSION_UCLAMP_MIN=0` to disable it. See
+[the 4K30 pacing experiment](experiments/FULLSCREEN-PACING-UCLAMP-20261008.md).
+
 A root monitor checks the existing broker every 200 ms. Only a connected,
 leased external CRTC authorizes a 1.5-second CLOCK_BOOTTIME deadline in
 `vendor.hdmi_los.cpu_lease`. Bad replies, timeouts, broker death, unplugging,

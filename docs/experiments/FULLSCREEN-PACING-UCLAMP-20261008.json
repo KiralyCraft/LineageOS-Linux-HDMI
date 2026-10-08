@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-08",
+  "mode": "3840x2160@30",
+  "payload": "R14",
+  "workload": "fullscreen glxgears with hidden cursor",
+  "results": {
+    "baseline": {
+      "p95_ms": 35.506041,
+      "p99_ms": 38.71573,
+      "max_ms": 41.885781,
+      "present_completions": 1667,
+      "consecutive_msc_deltas": 1666
+    },
+    "panel_paused": {
+      "p95_ms": 35.335208,
+      "p99_ms": 36.864584,
+      "max_ms": 41.867448,
+      "present_completions": 1066,
+      "consecutive_msc_deltas": 1065,
+      "user_visual_result": "smooth at 30 Hz"
+    },
+    "top_app": {
+      "p95_ms": 36.1025,
+      "p99_ms": 39.678542,
+      "max_ms": 47.189843,
+      "present_completions": 1069,
+      "consecutive_msc_deltas": 1068
+    },
+    "uclamp_256": {
+      "p95_ms": 34.646615,
+      "p99_ms": 37.434167,
+      "max_ms": 40.062708,
+      "present_completions": 1067,
+      "consecutive_msc_deltas": 1066
+    },
+    "uclamp_512": {
+      "p95_ms": 34.330573,
+      "p99_ms": 36.196614,
+      "max_ms": 38.234739,
+      "present_completions": 1069,
+      "consecutive_msc_deltas": 1068
+    }
+  },
+  "correlated_frame": {
+    "submission_thread_wakeup": 46839.044776,
+    "submission_thread_scheduled": 46839.049742,
+    "runnable_delay_ms": 4.966,
+    "kgsl_submission": 46839.04984,
+    "kgsl_retirement": 46839.05323,
+    "kgsl_execution_ms": 3.39,
+    "kgsl_fence_event": 46839.053802
+  },
+  "implementation": {
+    "default_uclamp_min": 512,
+    "range": [0, 1024],
+    "scope": ["Xorg process tree", "LXDE process tree"],
+    "disable": "HDMI_LOS_SESSION_UCLAMP_MIN=0"
+  },
+  "limits": [
+    "no physical 4K60 validation",
+    "no user optical comparison of the packaged uclamp 512 session",
+    "no browser smoothness claim"
+  ]
+}

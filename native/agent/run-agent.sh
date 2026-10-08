@@ -16,12 +16,13 @@ TIMING_GUARD=required
 TEARFREE_COMPLETION=async
 PRESENT_RELEASE=fence
 MESA_QUEUE=low-latency
+SESSION_UCLAMP_MIN=${HDMI_LOS_SESSION_UCLAMP_MIN:-512}
 CANDIDATE=${HDMI_LOS_DEFAULT_CANDIDATE:-BCDF}
 PULSE_SERVER=${PULSE_SERVER:-unix:/hostMounts/chrootBind/pulseAudio.socket}
 export PULSE_SERVER
 
 usage() {
-    printf 'usage: %s [--candidate B|C|D|E|F|BCDF|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--present-release fence|finish|legacy] [--mesa-queue low-latency|fifo] [--no-timeout|--timeout]\n' "$0" >&2
+    printf 'usage: %s [--candidate B|C|D|E|F|BCDF|BCDEF] [--capture auto|none|/dev/videoN] [--xorg-accel safe|kgsl-glamor|kgsl-kms-bridge] [--client-present bridge|shadow|direct] [--session lxde|none] [--session-uclamp-min 0..1024] [--drm-trace startup|full] [--timing-guard required|off] [--tearfree-completion async|sync] [--present-release fence|finish|legacy] [--mesa-queue low-latency|fifo] [--no-timeout|--timeout]\n' "$0" >&2
 }
 
 while (($#)); do
@@ -71,6 +72,11 @@ while (($#)); do
             CLIENT_PRESENT=$2
             shift 2
             ;;
+        --session-uclamp-min)
+            (($# >= 2)) || { usage; exit 2; }
+            SESSION_UCLAMP_MIN=$2
+            shift 2
+            ;;
         --no-timeout)
             NO_TIMEOUT=1
             shift
@@ -115,6 +121,10 @@ if [[ $CANDIDATE != B && ($XORG_ACCEL != kgsl-kms-bridge || $CLIENT_PRESENT != b
 fi
 [[ $PRESENT_RELEASE == fence || $PRESENT_RELEASE == finish || $PRESENT_RELEASE == legacy ]] || { usage; exit 2; }
 [[ $MESA_QUEUE == low-latency || $MESA_QUEUE == fifo ]] || { usage; exit 2; }
+[[ $SESSION_UCLAMP_MIN =~ ^[0-9]+$ ]] && ((SESSION_UCLAMP_MIN <= 1024)) || {
+    printf 'Session utilization clamp must be an integer from 0 through 1024\n' >&2
+    exit 2
+}
 if [[ $PRESENT_RELEASE != legacy && $XORG_ACCEL != kgsl-kms-bridge ]]; then
     printf 'Consumer release fencing requires --xorg-accel kgsl-kms-bridge\n' >&2
     exit 2
@@ -123,7 +133,8 @@ if ((EUID != 0)); then
     args=(--candidate "$CANDIDATE" --capture "$CAPTURE" --xorg-accel "$XORG_ACCEL" \
           --client-present "$CLIENT_PRESENT" --session "$SESSION" \
           --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
-          --tearfree-completion "$TEARFREE_COMPLETION")
+          --tearfree-completion "$TEARFREE_COMPLETION" \
+          --session-uclamp-min "$SESSION_UCLAMP_MIN")
     args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE")
     if ((NO_TIMEOUT)); then
         args+=(--no-timeout)
@@ -147,6 +158,7 @@ if [[ $MESA_QUEUE == low-latency ]]; then
     }
 fi
 printf 'HDMI presentation: release=%s queue=%s\n' "$PRESENT_RELEASE" "$MESA_QUEUE" >&2
+printf 'HDMI session scheduling: utilization_min=%s/1024\n' "$SESSION_UCLAMP_MIN" >&2
 
 # Select experiments explicitly; inherited shell variables cannot mix profiles.
 unset MESA_KGSL_X11_PIPELINE MESA_KGSL_X11_INTEGRATED_RESOLVE HDMI_LOS_GLAMOR_COPY HDMI_LOS_PRESENTER MESA_KGSL_HDMI_BLIT_STATS
@@ -413,7 +425,8 @@ fi
 agent_args=(--bundle "$BUNDLE" --xorg-accel "$XORG_ACCEL" \
             --client-present "$CLIENT_PRESENT" --session "$SESSION" \
             --drm-trace "$DRM_TRACE" --timing-guard "$TIMING_GUARD" \
-            --tearfree-completion "$TEARFREE_COMPLETION")
+            --tearfree-completion "$TEARFREE_COMPLETION" \
+            --session-uclamp-min "$SESSION_UCLAMP_MIN")
 ((NO_TIMEOUT)) && agent_args+=(--no-timeout)
 "$BUNDLE/bin/hdmi-los-agent" "${agent_args[@]}" >>"$RUNTIME/agent.log" 2>&1 &
 AGENT_PID=$!

@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -21,6 +22,8 @@
 
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#include <linux/sched.h>
+#include <linux/sched/types.h>
 
 #include <algorithm>
 #include <atomic>
@@ -57,6 +60,7 @@ ClientPresentMode g_client_present = ClientPresentMode::kBridge;
 bool g_start_lxde = true;
 bool g_no_timeout = false;
 bool g_trace_startup_only = true;
+uint32_t g_session_uclamp_min = 0;
 std::string g_mouse;
 std::string g_keyboard;
 drm_mode_modeinfo g_android_mode = {};
@@ -271,6 +275,21 @@ bool relay_trace_record(int timeout_ms) {
 
 bool process_alive(pid_t pid) {
   return pid > 1 && kill(pid, 0) == 0;
+}
+
+bool apply_session_uclamp() {
+  if (!g_session_uclamp_min) return true;
+  sched_attr attributes = {};
+  attributes.size = sizeof(attributes);
+  attributes.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS |
+                           SCHED_FLAG_UTIL_CLAMP_MIN;
+  attributes.sched_util_min = g_session_uclamp_min;
+  if (syscall(SYS_sched_setattr, 0, &attributes, 0) == 0) return true;
+  int saved_errno = errno;
+  fprintf(stderr, "failed to apply session utilization clamp %u/1024: %s\n",
+          g_session_uclamp_min, strerror(saved_errno));
+  errno = saved_errno;
+  return false;
 }
 
 std::string xorg_binary() {
@@ -784,6 +803,7 @@ pid_t spawn_xorg(int lease_fd) {
   }
   close(sockets[0]);
   setpgid(0, 0);
+  if (!apply_session_uclamp()) _exit(126);
   int flags = fcntl(lease_fd, F_GETFD);
   if (flags < 0 || fcntl(lease_fd, F_SETFD, flags & ~FD_CLOEXEC) < 0) _exit(126);
   flags = fcntl(sockets[1], F_GETFD);
@@ -830,6 +850,7 @@ pid_t spawn_lxde() {
     return child;
   }
   setpgid(0, 0);
+  if (!apply_session_uclamp()) _exit(126);
   if (initgroups(user->pw_name, user->pw_gid) != 0 || setgid(user->pw_gid) != 0 ||
       setuid(user->pw_uid) != 0) {
     _exit(126);
@@ -1181,6 +1202,15 @@ int main(int argc, char **argv) {
       }
     } else if (strcmp(argv[i], "--no-timeout") == 0) {
       g_no_timeout = true;
+    } else if (strcmp(argv[i], "--session-uclamp-min") == 0 && i + 1 < argc) {
+      char *end = nullptr;
+      errno = 0;
+      unsigned long value = strtoul(argv[++i], &end, 10);
+      if (errno || !argv[i][0] || !end || *end || value > 1024) {
+        fprintf(stderr, "invalid session utilization clamp: %s\n", argv[i]);
+        return 2;
+      }
+      g_session_uclamp_min = static_cast<uint32_t>(value);
     } else if (strcmp(argv[i], "--drm-trace") == 0 && i + 1 < argc) {
       const char *value = argv[++i];
       if (strcmp(value, "startup") == 0)
@@ -1197,6 +1227,7 @@ int main(int argc, char **argv) {
                       "[--client-present bridge|shadow|direct] "
                       "[--session lxde|none] [--timing-guard required|off] "
                       "[--tearfree-completion async|sync] "
+                      "[--session-uclamp-min 0..1024] "
                       "[--drm-trace startup|full] "
                       "[--no-timeout]\n");
       return 2;
