@@ -75,25 +75,28 @@ fi
 export LD_LIBRARY_PATH="$BUNDLE/lib/mesa${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export LIBGL_DRIVERS_PATH="$BUNDLE/lib/mesa"
 export GBM_BACKENDS_PATH="$BUNDLE/lib/mesa/gbm"
-export MESA_DRI3_PRESENT_MODE=paced
 exec "$@"
 ''')
 (out / 'run-paced.sh').chmod(0o755)
+(out / 'run-client.sh').symlink_to('run-paced.sh')
 report = 'docs/experiments/HDMI-INTERVAL-ZERO-PACER-20261008.md'
 readme = f'''HDMI interval-zero pacing candidate, 2026-10-08
 
 Mesa: {commit}; HDMI source: {head}
 
-From an existing HDMI terminal, ./run-paced.sh command [arguments...] selects
+From an existing HDMI terminal, ./run-client.sh command [arguments...] selects
 this folder's matched Mesa without restarting Xorg or changing the desktop.
 For Quake, use r_swapInterval 0 and com_maxfps 0, or the 65 FPS control at 60 Hz.
 The wrapper inherits DISPLAY and XAUTHORITY and applies only to that application.
-Ordinary applications and interval-one swaps keep their previous policy.
+Interval-zero HDMI swaps are paced by default. To opt out for one application:
+MESA_DRI3_PRESENT_MODE=unpaced ./run-client.sh command [arguments...]
+The compatibility name run-paced.sh selects the same libraries and also respects
+the opt-out. Interval-one swaps keep their previous policy.
 
 ./run-agent.sh remains the complete continuous BCDEF launcher. It retains the
 USB/Bluetooth input bridge, CPU session hint, companion, private Xorg and broker.
-The launcher defaults do not enable interval-zero pacing globally. An HDMI
-application can select it with MESA_DRI3_PRESENT_MODE=paced.
+New HDMI applications use default-on interval-zero pacing with this Mesa build.
+Termux:X11's default and capability checks remain unchanged.
 
 The HDMI backend reuses the original Termux pacer with an independent clock and
 ledger. Termux's implementation, tests and capability checks are unchanged.
@@ -113,20 +116,21 @@ No Magisk installation is required. Raw measurements use tmpfs and server SSD.
 '''
 (out / 'README.md').write_text(readme)
 (out / 'HDMI-PACER-20261008.md').write_text(readme)
-(out / 'ACTIVE-SESSION.md').write_text('This is a complete alternative runtime. The current agent and Xorg remain on the prior bundle. run-paced.sh can test the matched client Mesa without restarting them.\n')
+(out / 'ACTIVE-SESSION.md').write_text('This is a complete alternative runtime. The current agent and Xorg remain on the prior bundle. run-client.sh selects the matched default-on client Mesa without restarting them. Existing processes keep their already-loaded libraries.\n')
 info = json.loads((out / 'build-info.json').read_text())
 info['source_commit'] = head
 info['candidate'] += '-interval-zero-pacer'
 info['components']['mesa'] = dict(commit=commit, base=result['base'],
                                 build='validation/hdmi-pacer-final-result.json')
-info['hdmi_interval_zero_pacer'] = dict(opt_in='MESA_DRI3_PRESENT_MODE=paced',
-    default=False, margin_us=8000, producer_frames=2, commitments=1,
+info['hdmi_interval_zero_pacer'] = dict(opt_out='MESA_DRI3_PRESENT_MODE=unpaced',
+    default=True, margin_us=8000, producer_frames=2, commitments=1,
     termux_code_changed=False, report='source/hdmi/' + report)
 for name, entry in info['artifacts'].items():
     path = out / name
     if path.is_file():
         entry.update(sha256=sha(path), size=path.stat().st_size)
 info['artifacts']['run-paced.sh'] = dict(sha256=sha(out / 'run-paced.sh'), size=(out / 'run-paced.sh').stat().st_size)
+info['artifacts']['run-client.sh'] = dict(sha256=sha(out / 'run-client.sh'), size=(out / 'run-client.sh').stat().st_size)
 (out / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
 for script in ['run-agent.sh', 'run-paced.sh']:
     subprocess.run(['bash', '-n', str(out / script)], check=True)

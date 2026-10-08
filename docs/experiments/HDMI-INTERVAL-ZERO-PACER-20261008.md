@@ -120,3 +120,53 @@ the preserved prior bundle.
 Raw evidence: `/bigdata/mesa-sync-build/live-evidence/20261008-hdmi-pacer`.
 The adjacent JSON records the detailed measurements, including rejected
 prototype results and separate software/physical validation flags.
+
+## Default-on follow-up
+
+At the user's request, Mesa `de72dbb1a145f24e80d4347076c83538de09fb03`
+defaults ordinary interval-zero HDMI swaps to paced operation. An explicit
+`MESA_DRI3_PRESENT_MODE=unpaced` opts out. Explicit queued/invalid selections
+retain their unpaced HDMI behavior. The generic Termux default and capability
+predicate are unchanged. The production-policy tests cover each selection.
+
+In the existing 1080p60 Xorg session, a short Quake control with no presentation
+mode environment setting produced 919 consecutive one-refresh completion
+intervals after startup, with swap-return p99 17.299 ms. A separate explicit
+unpaced glxgears control used ASYNC/target-zero requests and produced multiple
+Copy completions per MSC, confirming the opt-out. These are functional checks,
+not replacements for the longer matched measurements above.
+
+`run-client.sh` selects the matched default-on Mesa for a newly launched
+application inside the existing desktop. Its compatibility name `run-paced.sh`
+uses the same script. Both inherit DISPLAY/Xauthority and respect an explicit
+opt-out. Xorg, the agent, and already-running applications keep their current
+libraries; this test requires no lease restart or HDMI reconnect.
+
+## Where the HDMI frame clock comes from
+
+The checked Termux source registers `AChoreographer_postFrameCallback`; its
+callback queues a server redraw and wakes its event loop. Android's scheduling
+API supplies rendering callbacks and, in newer APIs, frame deadlines and
+expected presentation times. See the [Android NDK documentation](https://developer.android.com/ndk/reference/group/choreographer).
+
+The leased modesetting server gets its display clock directly through DRM.
+`ms_present_queue_vblank` schedules a refresh-count event, and its callback
+passes the kernel MSC/UST into Present. Actual flip completion is delivered
+through the DRM event queue. Our companion keeps vblank accounting active with
+`drm_crtc_vblank_get`; its status samples use `drm_crtc_vblank_count_and_time`.
+These are the existing driver's counters/timestamps. The [kernel DRM API](https://docs.kernel.org/gpu/drm-uapi.html#vblank-event-handling)
+provides the corresponding vblank and page-flip event interfaces.
+
+The TearFree repaint patch predicts the next refresh from its last real flip
+timestamp and the active mode period, with a copy reserve. Mesa learns its
+period from Present MSC/UST and uses measured production time to schedule
+admission. The kernel presenter waits for the producer dependency, then submits
+through the existing driver's page-flip path; it does not manufacture refresh
+ticks. KGSL producer fences and display-refresh events serve different purposes.
+
+The clock is already available. The next useful refinement is correlating the
+final TearFree scanout with windowed Present and delivering that output deadline
+to Mesa. Copy-mode completion can precede actual scanout of the new desktop,
+whereas a direct flip gives stronger physical completion feedback. This is a
+userspace timeline/scheduling investigation; the available kernel clock alone
+does not define the producer's ideal rendering start time.
