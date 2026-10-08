@@ -4,6 +4,11 @@
  */
 #define _GNU_SOURCE
 #include <GL/glx.h>
+#include <EGL/egl.h>
+#include <X11/extensions/sync.h>
+#include <stdio.h>
+#include <limits.h>
+#include <string.h>
 #include <X11/Xlib.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -23,12 +28,13 @@ struct record { uint64_t begin,end; int64_t data[5]; uint32_t event,tid; };
 static struct record records[LIMIT];
 static _Atomic unsigned committed[LIMIT],used;
 static _Atomic int output=-1;
+static pid_t owner;
 _Static_assert(sizeof(struct record)==64,"trace ABI");
 _Static_assert(ATOMIC_INT_LOCK_FREE==2,"signal-safe atomic counters required");
 static _Thread_local int viewport_w,viewport_h;
 static uint64_t stamp(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000000+t.tv_nsec;}
 static void note(unsigned event,uint64_t begin,uint64_t end,int64_t a,int64_t b,int64_t c,int64_t d,int64_t e){
- if(atomic_load_explicit(&output,memory_order_relaxed)<0)return;
+ if(getpid()!=owner || atomic_load_explicit(&output,memory_order_relaxed)<0)return;
  unsigned i=atomic_fetch_add_explicit(&used,1,memory_order_relaxed);if(i>=LIMIT)return;
  records[i]=(struct record){begin,end,{a,b,c,d,e},event,(uint32_t)syscall(SYS_gettid)};
  atomic_store_explicit(&committed[i],1,memory_order_release);
@@ -36,6 +42,7 @@ static void note(unsigned event,uint64_t begin,uint64_t end,int64_t a,int64_t b,
 static void write_all(int fd,const void *data,size_t size){const char *p=data;while(size){ssize_t n=write(fd,p,size);if(n<0&&errno==EINTR)continue;if(n<=0)break;p+=n;size-=n;}}
 static void dump(void){
  int fd=atomic_exchange_explicit(&output,-1,memory_order_relaxed);if(fd<0)return;
+ if(getpid()!=owner){close(fd);return;}
  unsigned count=atomic_load_explicit(&used,memory_order_relaxed),limit=count>LIMIT?LIMIT:count;
  uint64_t header[4]={UINT64_C(0x31305046494d4448),64,count,stamp()};
  write_all(fd,header,sizeof(header));
@@ -44,14 +51,33 @@ static void dump(void){
 }
 static void stop(int signal){dump();_exit(128+signal);}
 __attribute__((constructor)) static void init(void){
- const char *path=getenv("HDMI_FRAME_TRACE");if(!path)return;
+ owner=getpid();char name[PATH_MAX];const char *dir=getenv("HDMI_FRAME_TRACE_DIR");
+ const char *path=getenv("HDMI_FRAME_TRACE");
+ if(dir){int n=snprintf(name,sizeof(name),"%s/trace-%u.bin",dir,(unsigned)owner);if(n<0 || (size_t)n>=sizeof(name))return;path=name;}
+ if(!path)return;
  int fd=open(path,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC,0600);if(fd<0)return;atomic_store(&output,fd);
  struct sigaction sa={.sa_handler=stop};sigemptyset(&sa.sa_mask);sigaction(SIGTERM,&sa,NULL);
 }
 __attribute__((destructor)) static void fini(void){dump();}
+static void *resolve_symbol(const char *name){
+ void *symbol=dlsym(RTLD_NEXT,name);if(symbol)return symbol;
+ const char *library=NULL;
+ if(!strncmp(name,"xcb_present_",12))library="libxcb-present.so.0";
+ else if(!strncmp(name,"xcb_sync_",9))library="libxcb-sync.so.1";
+ else if(!strncmp(name,"xcb_",4))library="libxcb.so.1";
+ else if(!strncmp(name,"egl",3))library="libEGL.so.1";
+ else if(!strncmp(name,"glX",3))library="libGLX.so.0";
+ else if(!strcmp(name,"glViewport"))library="libGL.so.1";
+ else if(!strncmp(name,"XSync",5))library="libXext.so.6";
+ else if(name[0]=='X')library="libX11.so.6";
+ if(library){void *handle=dlopen(library,RTLD_LAZY|RTLD_NOLOAD);if(handle){symbol=dlsym(handle,name);dlclose(handle);}}
+ if(!symbol && !strcmp(name,"glViewport")){void *handle=dlopen("libGLESv2.so.2",RTLD_LAZY|RTLD_NOLOAD);if(handle){symbol=dlsym(handle,name);dlclose(handle);}}
+ if(!symbol)fprintf(stderr,"HDMI diagnostic cannot resolve %s in its loaded library scope\n",name);
+ return symbol;
+}
 #define DECLARE(symbol,ret,args) \
  static ret(*real_##symbol)args; static pthread_once_t once_##symbol=PTHREAD_ONCE_INIT; \
- static void resolve_##symbol(void){real_##symbol=dlsym(RTLD_NEXT,#symbol);if(!real_##symbol)_exit(126);}
+ static void resolve_##symbol(void){real_##symbol=resolve_symbol(#symbol);if(!real_##symbol)_exit(126);}
 #define RESOLVE(symbol) pthread_once(&once_##symbol,resolve_##symbol)
 DECLARE(glXSwapBuffers,void,(Display*,GLXDrawable))
 void glXSwapBuffers(Display*d,GLXDrawable drawable){RESOLVE(glXSwapBuffers);uint64_t b=stamp();real_glXSwapBuffers(d,drawable);note(1,b,stamp(),drawable,viewport_w,viewport_h,0,0);}
@@ -78,3 +104,15 @@ DECLARE(xcb_poll_for_special_event,xcb_generic_event_t*,(xcb_connection_t*,xcb_s
 xcb_generic_event_t*xcb_poll_for_special_event(xcb_connection_t*c,xcb_special_event_t*s){RESOLVE(xcb_poll_for_special_event);xcb_generic_event_t*e=real_xcb_poll_for_special_event(c,s);event(e,stamp());return e;}
 DECLARE(xcb_wait_for_special_event,xcb_generic_event_t*,(xcb_connection_t*,xcb_special_event_t*))
 xcb_generic_event_t*xcb_wait_for_special_event(xcb_connection_t*c,xcb_special_event_t*s){RESOLVE(xcb_wait_for_special_event);xcb_generic_event_t*e=real_xcb_wait_for_special_event(c,s);event(e,stamp());return e;}
+
+DECLARE(eglSwapBuffers,EGLBoolean,(EGLDisplay,EGLSurface))
+EGLBoolean eglSwapBuffers(EGLDisplay d,EGLSurface surface){RESOLVE(eglSwapBuffers);uint64_t b=stamp();EGLBoolean r=real_eglSwapBuffers(d,surface);note(10,b,stamp(),(intptr_t)d,(intptr_t)surface,viewport_w,viewport_h,r);return r;}
+DECLARE(XSyncSetCounter,Status,(Display*,XSyncCounter,XSyncValue))
+Status XSyncSetCounter(Display*d,XSyncCounter counter,XSyncValue value){RESOLVE(XSyncSetCounter);uint64_t b=stamp();Status r=real_XSyncSetCounter(d,counter,value);note(11,b,stamp(),counter,value.hi,value.lo,(intptr_t)d,r);return r;}
+DECLARE(xcb_sync_set_counter,xcb_void_cookie_t,(xcb_connection_t*,xcb_sync_counter_t,xcb_sync_int64_t))
+xcb_void_cookie_t xcb_sync_set_counter(xcb_connection_t*c,xcb_sync_counter_t counter,xcb_sync_int64_t value){RESOLVE(xcb_sync_set_counter);uint64_t b=stamp();xcb_void_cookie_t r=real_xcb_sync_set_counter(c,counter,value);note(12,b,stamp(),counter,value.hi,value.lo,(intptr_t)c,0);return r;}
+
+DECLARE(_exit,void,(int))
+void _exit(int status){dump();RESOLVE(_exit);real__exit(status);__builtin_unreachable();}
+DECLARE(_Exit,void,(int))
+void _Exit(int status){dump();RESOLVE(_Exit);real__Exit(status);__builtin_unreachable();}

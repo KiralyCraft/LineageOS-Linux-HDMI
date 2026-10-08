@@ -94,6 +94,7 @@ if lazy_default not in launcher:
     anchor='export MESA_KGSL_HDMI_RESIZE_CAPACITY="$RESIZE_CAPACITY"'
     assert launcher.count(anchor)==1
     launcher=launcher.replace(anchor,anchor+'\nexport MESA_KGSL_HDMI_LAZY_SLOTS="$LAZY_SLOTS"')
+assert b'HDMI_LOS_MESA_FRONTEND_FLUSH_ABI=1' in (out/'lib/mesa/libgallium-26.2.0-devel.so').read_bytes()
 assert b'HDMI_LOS_MESA_SLOT_ABI=1' in (out/'lib/mesa/libgallium-26.2.0-devel.so').read_bytes()
 (out/'run-agent.sh').write_text(launcher)
 for name in ['result.json','source-verification.json','cache-test.log']:
@@ -105,9 +106,10 @@ shutil.rmtree(out/'source/hdmi');(out/'source/hdmi').mkdir()
 with subprocess.Popen(['git','-C',str(repo),'archive',head],stdout=subprocess.PIPE) as p:
     subprocess.run(['tar','xf','-','-C',str(out/'source/hdmi')],stdin=p.stdout,check=True);assert p.wait()==0
 info=json.loads((out/'build-info.json').read_text())
-info.update(source_commit=head,candidate='BCDEF-Xorg26-shallow-pacing-demand-shared-images')
+info.update(source_commit=head,candidate='BCDEF-Xorg26-frontend-flush-shallow-pacing-demand-images')
 info['components']['mesa']=dict(commit=commit,base=manifest['base'],build='validation/pacing-mesa-result.json')
 info['components']['xorg']=dict(version=xr['sources']['xserver']['version'],source_commit=head,build='validation/pacing-xorg-result.json',compiled_units=xr['compiled_units'],evdev=xr['sources']['evdev']['version'])
+info['frontend_flush']=dict(api=1,egl='normalized drawable and ancillary flags',glx='caller flags preserved',resolve='frontend callback after drawable preparation; one native fence',rejected_swap='negative result; error reported once')
 info['demand_allocation']=dict(default=True,control='--lazy-slots 0',initial_images=1,maximum_images_per_generation=3,maximum_generations=3,actual_backing_limit_bytes=512*1024*1024,retirement='native completion plus Present COMPLETE and IDLE')
 info['pacing']=dict(repaint_reserve_us=8000,synchronized_pending_default=1,reprime_msc_lead=1,storage_retirement='complete plus idle',legacy_control='--paced-queue 0 --paced-lead 2',special_events='queued-only general drain; single socket reader',physical_4k60_tested=False)
 for name,entry in info['artifacts'].items():
@@ -125,7 +127,7 @@ collects desktop damage until a frame-timed repaint deadline with an 8 ms reserv
 It uses real flip timestamps and the current mode period; native GPU fences and
 DRM completion still control image readiness and ownership. --repaint-us 0 disables
 that scheduling policy for comparison; --repaint-us accepts 0 through 20000.
-Shared destinations now begin with one image. Additional images are initialized only\nwhen every existing image is still owned. Existing complete-plus-idle retirement\nand the 512 MiB actual backing limit remain enforced. --lazy-slots 0 selects\nthe three-image eager control. This value survives sudo escalation. This change\nreduces allocation cost; it does not claim seamless active resizing.\n\nThe complete Mesa and private Xorg stacks were rebuilt together on root@192.168.104.201.
+EGL and GLX now normalize the integrated resolve through their own frontend\nflush adapter. EGL's zero loader flags become drawable/ancillary flags; GLX\nretains caller flags. The final native fence still covers rendering and resolve.\nRejected HDMI swaps return failure to EGL instead of reporting successful paint.\n\nShared destinations now begin with one image. Additional images are initialized only\nwhen every existing image is still owned. Existing complete-plus-idle retirement\nand the 512 MiB actual backing limit remain enforced. --lazy-slots 0 selects\nthe three-image eager control. This value survives sudo escalation. This change\nreduces allocation cost; it does not claim seamless active resizing.\n\nThe complete Mesa and private Xorg stacks were rebuilt together on root@192.168.104.201.
 
 The low-latency profile now permits one pending synchronized frame. Displayed
 scanout remains pinned until IDLE but does not block producing its replacement.

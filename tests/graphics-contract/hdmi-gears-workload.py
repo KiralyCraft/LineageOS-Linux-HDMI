@@ -1,6 +1,6 @@
 import argparse,ctypes as C,json,pathlib,subprocess,time,os,sys
 from xroot_capture import RootCapture
-ap=argparse.ArgumentParser();ap.add_argument('output',type=pathlib.Path);ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--drm-captures',action='store_true');ap.add_argument('--background-pixel',type=lambda s:int(s,0));ap.add_argument('--seconds',type=float,default=30);a=ap.parse_args();a.output.mkdir();
+ap=argparse.ArgumentParser();ap.add_argument('output',type=pathlib.Path);ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--drm-captures',action='store_true');ap.add_argument('--wm-resize',action='store_true');ap.add_argument('--background-pixel',type=lambda s:int(s,0));ap.add_argument('--seconds',type=float,default=30);a=ap.parse_args();a.output.mkdir();
 V,I,U,L=C.c_void_p,C.c_int,C.c_uint,C.c_ulong;X=C.CDLL('libX11.so.6')
 def bind(n,r,types):
  f=getattr(X,n);f.restype=r;f.argtypes=types;return f
@@ -21,7 +21,7 @@ def windows():
 before=windows();env=os.environ.copy();env['HDMI_FRAME_TRACE']=str(a.output/'trace.bin')
 if a.drm_captures:os.chown(a.output,4000,4000)
 log=(a.output/'stdout.log').open('w');child=subprocess.Popen([a.binary,'-geometry','640x480']+(['-fullscreen'] if a.fullscreen else []),env=env,stdout=log,stderr=subprocess.STDOUT,**({'user':4000,'group':4000,'extra_groups':[]} if a.drm_captures else {}))
-cap=RootCapture(d,X,root,sw,sh);record=[];keys=[];hidden=False;scanout=None
+cap=RootCapture(d,X,root,sw,sh);record=[];keys=[];hidden=False;scanout=None;wm=None;wm_cleanup=None
 if a.drm_captures:
  assert os.geteuid()==0
  from committed_framebuffer import Scanout
@@ -55,6 +55,10 @@ try:
   F=C.CDLL('libXfixes.so.3');major,minor=I(5),I(0);F.XFixesQueryVersion.argtypes=[V,C.POINTER(I),C.POINTER(I)];assert F.XFixesQueryVersion(d,C.byref(major),C.byref(minor))
   F.XFixesHideCursor.argtypes=[V,L];F.XFixesShowCursor.argtypes=[V,L];F.XFixesHideCursor(d,root);sync(d,0);hidden=True
  time.sleep(.5)
+ if a.wm_resize:
+  assert not (a.static or a.maximize or a.fullscreen or a.pause_check)
+  from wm_resize import WMResize
+  wm=WMResize(d,X,root,screen,window,cap.bounds);wm_cleanup=wm;wm.start()
  start=time.monotonic();last=None;next_capture=start
  stop_time=None
  while time.monotonic()-start<a.seconds:
@@ -68,7 +72,10 @@ try:
   elif age<12:size=(640,480) if int((age-8)*20)%2==0 else (1280,960)
   else:size=(1000,750) if a.pause_check and 14.5<=age<17 else (960,720)
   if size!=last:
-   resize(d,window,*size);sync(d,0);last=size
+   if wm:wm.move(*size)
+   else:resize(d,window,*size);sync(d,0)
+   last=size
+   if wm and age>=12:wm.finish();wm=None
    if age>=12 and stop_time is None:stop_time=t
   row={'relative_seconds':age,'ns':time.monotonic_ns(),'requested':size}
   if (a.captures or a.drm_captures) and t>=next_capture:
@@ -81,6 +88,7 @@ try:
    next_capture=t+.2
   record.append(row);time.sleep(max(0,.05-(time.monotonic()-t)))
 finally:
+ if wm_cleanup:wm_cleanup.close()
  if hidden:F.XFixesShowCursor(d,root);sync(d,0)
  child.terminate()
  try:code=child.wait(timeout=10)
@@ -89,6 +97,6 @@ finally:
  if cap.images:cap.save(a.output/'frames')
  if scanout:
   scanout.close();scanout.save(a.output/'scanout')
- (a.output/'result.json').write_text(json.dumps({'code':code,'binary':a.binary,'background_pixel':a.background_pixel,'screen':[sw,sh],'static':a.static,'maximize':a.maximize,'fullscreen':a.fullscreen,'cursor_hidden':a.hide_cursor,'pause_key_ns':keys,'resize_stopped_ns':int(stop_time*1e9) if stop_time else None,'records':record,'physical_scanout_tested':False},indent=2)+'\n')
+ (a.output/'result.json').write_text(json.dumps({'code':code,'binary':a.binary,'wm_resize':a.wm_resize,'background_pixel':a.background_pixel,'screen':[sw,sh],'static':a.static,'maximize':a.maximize,'fullscreen':a.fullscreen,'cursor_hidden':a.hide_cursor,'pause_key_ns':keys,'resize_stopped_ns':int(stop_time*1e9) if stop_time else None,'records':record,'physical_scanout_tested':False},indent=2)+'\n')
  bind('XCloseDisplay',I,[V])(d)
 print(json.dumps({'records':len(record),'captured':len(scanout.records) if scanout else len(cap.records),'code':code}),flush=True)

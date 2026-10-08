@@ -39,12 +39,14 @@ int hdmi_scanout_read(int fd,uint32_t crtc_id,uint32_t x,uint32_t y,uint32_t w,u
  struct stat st;if(fstat(dma,&st) || st.st_size<=0) {ret=result();goto done;}
  uint64_t start=(uint64_t)fb->offsets[0]+(uint64_t)y*fb->pitches[0]+x*4;
  uint64_t end=start+(uint64_t)(h-1)*fb->pitches[0]+w*4;
- long page=sysconf(_SC_PAGESIZE);if(page<=0 || end>(uint64_t)st.st_size) {ret=-EINVAL;goto done;}
- uint64_t page_start=start&~((uint64_t)page-1);map_len=(size_t)(end-page_start);
- map=mmap(NULL,map_len,PROT_READ,MAP_SHARED,dma,(off_t)page_start);if(map==MAP_FAILED) {ret=result();goto done;}
+ if(end>(uint64_t)st.st_size || end>SIZE_MAX) {ret=-EINVAL;goto done;}
+ /* The MSM GEM PRIME mmap callback resets vm_pgoff. Map from zero instead
+  * of relying on nonzero DMA-BUF offsets; copy only the requested crop. */
+ map_len=(size_t)end;
+ map=mmap(NULL,map_len,PROT_READ,MAP_SHARED,dma,0);if(map==MAP_FAILED) {ret=result();goto done;}
  struct dma_buf_sync sync={.flags=DMA_BUF_SYNC_START|DMA_BUF_SYNC_READ};
  if(ioctl(dma,DMA_BUF_IOCTL_SYNC,&sync)) {ret=result();goto done;}
- for(uint32_t row=0;row<h;row++) memcpy((char*)out+(size_t)row*w*4,(const char*)map+(start-page_start)+(size_t)row*fb->pitches[0],(size_t)w*4);
+ for(uint32_t row=0;row<h;row++) memcpy((char*)out+(size_t)row*w*4,(const char*)map+start+(size_t)row*fb->pitches[0],(size_t)w*4);
  sync.flags=DMA_BUF_SYNC_END|DMA_BUF_SYNC_READ;
  if(ioctl(dma,DMA_BUF_IOCTL_SYNC,&sync)) {ret=result();goto done;}
  if(drmCrtcGetSequence(fd,crtc_id,&meta->sequence_after,&meta->vblank_after_ns)) {ret=result();goto done;}

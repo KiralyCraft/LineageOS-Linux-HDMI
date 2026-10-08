@@ -1,0 +1,6051 @@
+{
+  "mesa_commit": "a426a484523b6d8440adb3bbd1de8a4bd0e27502",
+  "mode": [
+    3840,
+    2160,
+    30
+  ],
+  "magisk_changed": false,
+  "physical_optical_capture": false,
+  "tests": [
+    {
+      "case": "egl-before-flags",
+      "frames": 24,
+      "passed": 0,
+      "swaps_reported_success": 24,
+      "with_damage": false,
+      "renderer": "FD740",
+      "visual_depth": 24,
+      "result_sha256": "d14d817de2cf51a1159bad9f0a2d947d61f1f23027a6f8fc276f9cf50dc82fa7",
+      "log_sha256": "1afec1984297813413e8cd318e5c624183af183cc2dc7ad7502c940144b7f0e2"
+    },
+    {
+      "case": "egl-after-flags",
+      "frames": 24,
+      "passed": 24,
+      "swaps_reported_success": 24,
+      "with_damage": false,
+      "renderer": "FD740",
+      "visual_depth": 24,
+      "result_sha256": "f5bac8d8aa3fbb787bdbe58e7259062a27754e45ea64267b149ef0c91bde3304",
+      "log_sha256": "6bca1a851a296fb03395a87f9fe888d6e34cd0e74b7b55ea40a6c1049452aeb5"
+    },
+    {
+      "case": "egl-after-damage",
+      "frames": 24,
+      "passed": 24,
+      "swaps_reported_success": 24,
+      "with_damage": true,
+      "renderer": "FD740",
+      "visual_depth": 24,
+      "result_sha256": "9a041ca2c473da723a1bd079193bee1e6d79b55ed9666bb70dac3f2a834ee8ef",
+      "log_sha256": "6eef87219cc2b9c1185fd62ed30432abf7293f0717148a2795cc09fdab69f9e6"
+    },
+    {
+      "case": "egl-after-local-probe",
+      "frames": 24,
+      "passed": 24,
+      "swaps_reported_success": 24,
+      "with_damage": false,
+      "renderer": "FD740",
+      "visual_depth": 24,
+      "result_sha256": "fbcc7ab06fe67300ab7ac25e062e500e176d181cd7644534b9aab95b322c027d",
+      "log_sha256": "dbddc420207bf2222270693f3a7b219992be8d1bda310f287d3f26b418aa1080"
+    },
+    {
+      "case": "frontend-glx-msaa",
+      "frames": 24,
+      "passed": 24,
+      "samples": 4,
+      "interval_transitions": true,
+      "result_sha256": "08b9242f027475a762f5a5c2901e2cf691e9487f6b0f4668b395f18c375b71e5"
+    }
+  ],
+  "source_verified_build": {
+    "commit": "a426a484523b6d8440adb3bbd1de8a4bd0e27502",
+    "base": "cc190637b670f522f60a294caeb4412cee1ea477",
+    "seconds_this_run": 15.380831718444824,
+    "tests": {
+      "src/freedreno/drm/kgsl_bo_handle_test": "skipped: device unavailable",
+      "src/x11/kgsl_device_selection_test": "skipped: device unavailable"
+    },
+    "files": {
+      "usr/lib/libgbm.so.1.0.0": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+      "usr/lib/libgallium-26.2.0-devel.so": "9c211a097a2941967f5902518153f9b665e85dee5ece132582660c396f3bb77c",
+      "usr/lib/libGLX_mesa.so.0.0.0": "a525c302c9a92e5c263077aa82563ff38c94bcd8fb670a796849b07f6edef56f",
+      "usr/lib/libEGL_mesa.so.0.0.0": "c11ac86fcb8dfd89d08d56a425593accd6126e9ae64f4540479858d6cd730459",
+      "usr/lib/pkgconfig/dri.pc": "0ef0ad154b083686235bc2148b64f84e3cad3c02ab807179ea66c014c60e5b33",
+      "usr/lib/pkgconfig/gbm.pc": "dc758a99eedc7aae15ba56488d1aeec45beadfdc83421afaca17d852cc6927e6",
+      "usr/lib/dri/libdril_dri.so": "db3b5424b8bec640db4414ac9c620f02418489207476f869c658aae0b1def561",
+      "usr/lib/gbm/dri_gbm.so": "868e7656a0baff277ef4d2b31307dc0078f6de812e8f0ffc0244e700eb818fc7"
+    },
+    "note": "Not installed. Hardware allocation regression and live presentation still require validation."
+  },
+  "capture_correction": {
+    "old_helper": "0a76776a4c4c05972df116ee80446eb7ceda78f7fa41453c1d0d371d7768a722",
+    "new_helper": "68020e58ca6dbd4f8c6c8f36611be37f3ec79f32df9f523cf08410faeaebd6fe",
+    "reason": "MSM GEM ignores nonzero mapping page offsets. Map from zero and copy only crop. Prior gears cases all had crop [0,0] and are unaffected."
+  },
+  "firefox-fixed-clean-wm": {
+    "request_batches": 299,
+    "raf_frames": 836,
+    "raf_interval_ms": {
+      "mean": 18.146562874251497,
+      "p95": 33.419999999998254,
+      "max": 50.70000000000073
+    },
+    "capture_summary": {
+      "case": "firefox-fixed-clean-wm",
+      "captures": 75,
+      "physical_optical_capture": false,
+      "pattern_frames": [
+        {
+          "file": "000.png",
+          "age": 3.3229000109713525e-05,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.774741,
+          "pixel_error": 0,
+          "frame_mod192": 141,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              147,
+              141,
+              171
+            ],
+            [
+              188,
+              182,
+              212
+            ],
+            [
+              65,
+              59,
+              89
+            ],
+            [
+              106,
+              100,
+              130
+            ]
+          ]
+        },
+        {
+          "file": "001.png",
+          "age": 0.20076692700240528,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.242083,
+          "pixel_error": 0,
+          "frame_mod192": 153,
+          "client_bounds": [
+            1275,
+            597,
+            672,
+            504
+          ],
+          "pixels": [
+            [
+              207,
+              33,
+              135
+            ],
+            [
+              56,
+              74,
+              176
+            ],
+            [
+              125,
+              143,
+              53
+            ],
+            [
+              166,
+              184,
+              94
+            ]
+          ]
+        },
+        {
+          "file": "002.png",
+          "age": 0.40143755200188025,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.707501,
+          "pixel_error": 0,
+          "frame_mod192": 165,
+          "client_bounds": [
+            1275,
+            597,
+            704,
+            528
+          ],
+          "pixels": [
+            [
+              75,
+              117,
+              99
+            ],
+            [
+              116,
+              158,
+              140
+            ],
+            [
+              185,
+              35,
+              209
+            ],
+            [
+              34,
+              76,
+              58
+            ]
+          ]
+        },
+        {
+          "file": "003.png",
+          "age": 0.6022720309993019,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.852761,
+          "pixel_error": 0,
+          "frame_mod192": 175,
+          "client_bounds": [
+            1275,
+            597,
+            736,
+            552
+          ],
+          "pixels": [
+            [
+              61,
+              59,
+              197
+            ],
+            [
+              102,
+              100,
+              46
+            ],
+            [
+              171,
+              169,
+              115
+            ],
+            [
+              212,
+              210,
+              156
+            ]
+          ]
+        },
+        {
+          "file": "004.png",
+          "age": 0.8030904690021998,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.496615,
+          "pixel_error": 0,
+          "frame_mod192": 185,
+          "client_bounds": [
+            1275,
+            597,
+            768,
+            576
+          ],
+          "pixels": [
+            [
+              47,
+              193,
+              103
+            ],
+            [
+              88,
+              42,
+              144
+            ],
+            [
+              157,
+              111,
+              213
+            ],
+            [
+              198,
+              152,
+              62
+            ]
+          ]
+        },
+        {
+          "file": "005.png",
+          "age": 1.0038467710000987,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.775001,
+          "pixel_error": 0,
+          "frame_mod192": 5,
+          "client_bounds": [
+            1275,
+            597,
+            800,
+            600
+          ],
+          "pixels": [
+            [
+              107,
+              85,
+              67
+            ],
+            [
+              148,
+              126,
+              108
+            ],
+            [
+              217,
+              195,
+              177
+            ],
+            [
+              66,
+              44,
+              218
+            ]
+          ]
+        },
+        {
+          "file": "006.png",
+          "age": 1.2056530730005761,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.475261,
+          "pixel_error": 0,
+          "frame_mod192": 16,
+          "client_bounds": [
+            1275,
+            597,
+            832,
+            624
+          ],
+          "pixels": [
+            [
+              130,
+              98,
+              194
+            ],
+            [
+              171,
+              139,
+              43
+            ],
+            [
+              48,
+              208,
+              112
+            ],
+            [
+              89,
+              57,
+              153
+            ]
+          ]
+        },
+        {
+          "file": "007.png",
+          "age": 1.4097653640019416,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.354063,
+          "pixel_error": 0,
+          "frame_mod192": 27,
+          "client_bounds": [
+            1275,
+            597,
+            865,
+            649
+          ],
+          "pixels": [
+            [
+              153,
+              111,
+              129
+            ],
+            [
+              194,
+              152,
+              170
+            ],
+            [
+              71,
+              221,
+              47
+            ],
+            [
+              112,
+              70,
+              88
+            ]
+          ]
+        },
+        {
+          "file": "008.png",
+          "age": 1.6106194269996195,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 11.704844,
+          "pixel_error": 0,
+          "frame_mod192": 37,
+          "client_bounds": [
+            1275,
+            597,
+            897,
+            673
+          ],
+          "pixels": [
+            [
+              139,
+              53,
+              35
+            ],
+            [
+              180,
+              94,
+              76
+            ],
+            [
+              57,
+              163,
+              145
+            ],
+            [
+              98,
+              204,
+              186
+            ]
+          ]
+        },
+        {
+          "file": "009.png",
+          "age": 1.8113155720020586,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.180938,
+          "pixel_error": 0,
+          "frame_mod192": 48,
+          "client_bounds": [
+            1275,
+            597,
+            929,
+            697
+          ],
+          "pixels": [
+            [
+              162,
+              66,
+              162
+            ],
+            [
+              203,
+              107,
+              203
+            ],
+            [
+              80,
+              176,
+              80
+            ],
+            [
+              121,
+              217,
+              121
+            ]
+          ]
+        },
+        {
+          "file": "010.png",
+          "age": 2.01198010400185,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.762604,
+          "pixel_error": 0,
+          "frame_mod192": 59,
+          "client_bounds": [
+            1275,
+            597,
+            961,
+            721
+          ],
+          "pixels": [
+            [
+              185,
+              79,
+              97
+            ],
+            [
+              34,
+              120,
+              138
+            ],
+            [
+              103,
+              189,
+              207
+            ],
+            [
+              144,
+              38,
+              56
+            ]
+          ]
+        },
+        {
+          "file": "011.png",
+          "age": 2.21269739499985,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.516927,
+          "pixel_error": 0,
+          "frame_mod192": 71,
+          "client_bounds": [
+            1275,
+            597,
+            969,
+            727
+          ],
+          "pixels": [
+            [
+              53,
+              163,
+              61
+            ],
+            [
+              94,
+              204,
+              102
+            ],
+            [
+              163,
+              81,
+              171
+            ],
+            [
+              204,
+              122,
+              212
+            ]
+          ]
+        },
+        {
+          "file": "012.png",
+          "age": 2.4135126040018804,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.213751,
+          "pixel_error": 0,
+          "frame_mod192": 79,
+          "client_bounds": [
+            1275,
+            597,
+            1026,
+            769
+          ],
+          "pixels": [
+            [
+              157,
+              155,
+              101
+            ],
+            [
+              198,
+              196,
+              142
+            ],
+            [
+              75,
+              73,
+              211
+            ],
+            [
+              116,
+              114,
+              60
+            ]
+          ]
+        },
+        {
+          "file": "013.png",
+          "age": 2.614297656000417,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.812708,
+          "pixel_error": 0,
+          "frame_mod192": 91,
+          "client_bounds": [
+            1275,
+            597,
+            1058,
+            793
+          ],
+          "pixels": [
+            [
+              217,
+              47,
+              65
+            ],
+            [
+              66,
+              88,
+              106
+            ],
+            [
+              135,
+              157,
+              175
+            ],
+            [
+              176,
+              198,
+              216
+            ]
+          ]
+        },
+        {
+          "file": "014.png",
+          "age": 2.815160936999746,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.693646,
+          "pixel_error": 0,
+          "frame_mod192": 106,
+          "client_bounds": [
+            1275,
+            597,
+            1090,
+            817
+          ],
+          "pixels": [
+            [
+              196,
+              152,
+              116
+            ],
+            [
+              45,
+              193,
+              157
+            ],
+            [
+              114,
+              70,
+              34
+            ],
+            [
+              155,
+              111,
+              75
+            ]
+          ]
+        },
+        {
+          "file": "015.png",
+          "age": 3.0221282800011977,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.810781,
+          "pixel_error": 0,
+          "frame_mod192": 118,
+          "client_bounds": [
+            1275,
+            597,
+            1123,
+            842
+          ],
+          "pixels": [
+            [
+              64,
+              44,
+              80
+            ],
+            [
+              105,
+              85,
+              121
+            ],
+            [
+              174,
+              154,
+              190
+            ],
+            [
+              215,
+              195,
+              39
+            ]
+          ]
+        },
+        {
+          "file": "016.png",
+          "age": 3.224981301002117,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 11.284896,
+          "pixel_error": 0,
+          "frame_mod192": 130,
+          "client_bounds": [
+            1275,
+            597,
+            1155,
+            866
+          ],
+          "pixels": [
+            [
+              124,
+              128,
+              44
+            ],
+            [
+              165,
+              169,
+              85
+            ],
+            [
+              42,
+              46,
+              154
+            ],
+            [
+              83,
+              87,
+              195
+            ]
+          ]
+        },
+        {
+          "file": "017.png",
+          "age": 3.4325187489994278,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.878386,
+          "pixel_error": 0,
+          "frame_mod192": 141,
+          "client_bounds": [
+            1275,
+            597,
+            1189,
+            891
+          ],
+          "pixels": [
+            [
+              147,
+              141,
+              171
+            ],
+            [
+              188,
+              182,
+              212
+            ],
+            [
+              65,
+              59,
+              89
+            ],
+            [
+              106,
+              100,
+              130
+            ]
+          ]
+        },
+        {
+          "file": "018.png",
+          "age": 3.6332589049998205,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.753282,
+          "pixel_error": 0,
+          "frame_mod192": 152,
+          "client_bounds": [
+            1275,
+            597,
+            1221,
+            915
+          ],
+          "pixels": [
+            [
+              170,
+              154,
+              106
+            ],
+            [
+              211,
+              195,
+              147
+            ],
+            [
+              88,
+              72,
+              216
+            ],
+            [
+              129,
+              113,
+              65
+            ]
+          ]
+        },
+        {
+          "file": "019.png",
+          "age": 3.8339480720023857,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.098854,
+          "pixel_error": 0,
+          "frame_mod192": 164,
+          "client_bounds": [
+            1275,
+            597,
+            1253,
+            940
+          ],
+          "pixels": [
+            [
+              38,
+              46,
+              70
+            ],
+            [
+              79,
+              87,
+              111
+            ],
+            [
+              148,
+              156,
+              180
+            ],
+            [
+              189,
+              197,
+              221
+            ]
+          ]
+        },
+        {
+          "file": "020.png",
+          "age": 4.034833436002373,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.180417,
+          "pixel_error": 0,
+          "frame_mod192": 176,
+          "client_bounds": [
+            1275,
+            597,
+            1275,
+            956
+          ],
+          "pixels": [
+            [
+              98,
+              130,
+              34
+            ],
+            [
+              139,
+              171,
+              75
+            ],
+            [
+              208,
+              48,
+              144
+            ],
+            [
+              57,
+              89,
+              185
+            ]
+          ]
+        },
+        {
+          "file": "021.png",
+          "age": 4.235460259002139,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 9.268282,
+          "pixel_error": 0,
+          "frame_mod192": 187,
+          "client_bounds": [
+            1275,
+            597,
+            1243,
+            932
+          ],
+          "pixels": [
+            [
+              121,
+              143,
+              161
+            ],
+            [
+              162,
+              184,
+              202
+            ],
+            [
+              39,
+              61,
+              79
+            ],
+            [
+              80,
+              102,
+              120
+            ]
+          ]
+        },
+        {
+          "file": "022.png",
+          "age": 4.436127134002163,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.151094,
+          "pixel_error": 0,
+          "frame_mod192": 7,
+          "client_bounds": [
+            1275,
+            597,
+            1211,
+            908
+          ],
+          "pixels": [
+            [
+              181,
+              35,
+              125
+            ],
+            [
+              222,
+              76,
+              166
+            ],
+            [
+              99,
+              145,
+              43
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ]
+        },
+        {
+          "file": "023.png",
+          "age": 4.636879426001542,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.788126,
+          "pixel_error": 0,
+          "frame_mod192": 19,
+          "client_bounds": [
+            1275,
+            597,
+            1179,
+            884
+          ],
+          "pixels": [
+            [
+              49,
+              119,
+              89
+            ],
+            [
+              90,
+              160,
+              130
+            ],
+            [
+              159,
+              37,
+              199
+            ],
+            [
+              200,
+              78,
+              48
+            ]
+          ]
+        },
+        {
+          "file": "024.png",
+          "age": 4.8375573420016735,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.576355,
+          "pixel_error": 0,
+          "frame_mod192": 30,
+          "client_bounds": [
+            1275,
+            597,
+            1146,
+            860
+          ],
+          "pixels": [
+            [
+              72,
+              132,
+              216
+            ],
+            [
+              113,
+              173,
+              65
+            ],
+            [
+              182,
+              50,
+              134
+            ],
+            [
+              223,
+              91,
+              175
+            ]
+          ]
+        },
+        {
+          "file": "025.png",
+          "age": 5.0385623420006596,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.509948,
+          "pixel_error": 0,
+          "frame_mod192": 43,
+          "client_bounds": [
+            1275,
+            597,
+            1114,
+            836
+          ],
+          "pixels": [
+            [
+              169,
+              95,
+              209
+            ],
+            [
+              210,
+              136,
+              58
+            ],
+            [
+              87,
+              205,
+              127
+            ],
+            [
+              128,
+              54,
+              168
+            ]
+          ]
+        },
+        {
+          "file": "026.png",
+          "age": 5.23924697700204,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.810625,
+          "pixel_error": 0,
+          "frame_mod192": 57,
+          "client_bounds": [
+            1275,
+            597,
+            1082,
+            812
+          ],
+          "pixels": [
+            [
+              111,
+              129,
+              39
+            ],
+            [
+              152,
+              170,
+              80
+            ],
+            [
+              221,
+              47,
+              149
+            ],
+            [
+              70,
+              88,
+              190
+            ]
+          ]
+        },
+        {
+          "file": "027.png",
+          "age": 5.451575622999371,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.548751,
+          "pixel_error": 0,
+          "frame_mod192": 68,
+          "client_bounds": [
+            1275,
+            597,
+            1048,
+            786
+          ],
+          "pixels": [
+            [
+              134,
+              142,
+              166
+            ],
+            [
+              175,
+              183,
+              207
+            ],
+            [
+              52,
+              60,
+              84
+            ],
+            [
+              93,
+              101,
+              125
+            ]
+          ]
+        },
+        {
+          "file": "028.png",
+          "age": 5.652358851999452,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 10.251199,
+          "pixel_error": 0,
+          "frame_mod192": 76,
+          "client_bounds": [
+            1275,
+            597,
+            1016,
+            762
+          ],
+          "pixels": [
+            [
+              46,
+              134,
+              206
+            ],
+            [
+              87,
+              175,
+              55
+            ],
+            [
+              156,
+              52,
+              124
+            ],
+            [
+              197,
+              93,
+              165
+            ]
+          ]
+        },
+        {
+          "file": "029.png",
+          "age": 5.853137915000843,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.799428,
+          "pixel_error": 0,
+          "frame_mod192": 91,
+          "client_bounds": [
+            1275,
+            597,
+            984,
+            738
+          ],
+          "pixels": [
+            [
+              217,
+              47,
+              65
+            ],
+            [
+              66,
+              88,
+              106
+            ],
+            [
+              135,
+              157,
+              175
+            ],
+            [
+              176,
+              198,
+              216
+            ]
+          ]
+        },
+        {
+          "file": "030.png",
+          "age": 6.053903382999124,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.466198,
+          "pixel_error": 0,
+          "frame_mod192": 100,
+          "client_bounds": [
+            1275,
+            597,
+            952,
+            714
+          ],
+          "pixels": [
+            [
+              166,
+              110,
+              134
+            ],
+            [
+              207,
+              151,
+              175
+            ],
+            [
+              84,
+              220,
+              52
+            ],
+            [
+              125,
+              69,
+              93
+            ]
+          ]
+        },
+        {
+          "file": "031.png",
+          "age": 6.254611196000042,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 9.219793,
+          "pixel_error": 0,
+          "frame_mod192": 109,
+          "client_bounds": [
+            1275,
+            597,
+            920,
+            690
+          ],
+          "pixels": [
+            [
+              115,
+              173,
+              203
+            ],
+            [
+              156,
+              214,
+              52
+            ],
+            [
+              33,
+              91,
+              121
+            ],
+            [
+              74,
+              132,
+              162
+            ]
+          ]
+        },
+        {
+          "file": "032.png",
+          "age": 6.455418644000019,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.628229,
+          "pixel_error": 0,
+          "frame_mod192": 122,
+          "client_bounds": [
+            1275,
+            597,
+            888,
+            666
+          ],
+          "pixels": [
+            [
+              212,
+              136,
+              196
+            ],
+            [
+              61,
+              177,
+              45
+            ],
+            [
+              130,
+              54,
+              114
+            ],
+            [
+              171,
+              95,
+              155
+            ]
+          ]
+        },
+        {
+          "file": "033.png",
+          "age": 6.6567253100001835,
+          "stable": 1,
+          "geometry_stable": false,
+          "phase_ms": 5.8975,
+          "pixel_error": 0,
+          "frame_mod192": 132,
+          "client_bounds": [
+            1275,
+            597,
+            864,
+            648
+          ],
+          "pixels": [
+            [
+              198,
+              78,
+              102
+            ],
+            [
+              47,
+              119,
+              143
+            ],
+            [
+              116,
+              188,
+              212
+            ],
+            [
+              157,
+              37,
+              61
+            ]
+          ]
+        },
+        {
+          "file": "034.png",
+          "age": 6.857439060000615,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.585,
+          "pixel_error": 0,
+          "frame_mod192": 145,
+          "client_bounds": [
+            1275,
+            597,
+            823,
+            618
+          ],
+          "pixels": [
+            [
+              103,
+              41,
+              95
+            ],
+            [
+              144,
+              82,
+              136
+            ],
+            [
+              213,
+              151,
+              205
+            ],
+            [
+              62,
+              192,
+              54
+            ]
+          ]
+        },
+        {
+          "file": "035.png",
+          "age": 7.058146351999312,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.081406,
+          "pixel_error": 0,
+          "frame_mod192": 153,
+          "client_bounds": [
+            1275,
+            597,
+            791,
+            594
+          ],
+          "pixels": [
+            [
+              207,
+              33,
+              135
+            ],
+            [
+              56,
+              74,
+              176
+            ],
+            [
+              125,
+              143,
+              53
+            ],
+            [
+              166,
+              184,
+              94
+            ]
+          ]
+        },
+        {
+          "file": "036.png",
+          "age": 7.259181715999148,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.014844,
+          "pixel_error": 0,
+          "frame_mod192": 163,
+          "client_bounds": [
+            1275,
+            597,
+            759,
+            569
+          ],
+          "pixels": [
+            [
+              193,
+              167,
+              41
+            ],
+            [
+              42,
+              208,
+              82
+            ],
+            [
+              111,
+              85,
+              151
+            ],
+            [
+              152,
+              126,
+              192
+            ]
+          ]
+        },
+        {
+          "file": "037.png",
+          "age": 7.459833435001201,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.548647,
+          "pixel_error": 0,
+          "frame_mod192": 173,
+          "client_bounds": [
+            1275,
+            597,
+            727,
+            545
+          ],
+          "pixels": [
+            [
+              179,
+              109,
+              139
+            ],
+            [
+              220,
+              150,
+              180
+            ],
+            [
+              97,
+              219,
+              57
+            ],
+            [
+              138,
+              68,
+              98
+            ]
+          ]
+        },
+        {
+          "file": "038.png",
+          "age": 7.66047978899951,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.271198,
+          "pixel_error": 0,
+          "frame_mod192": 185,
+          "client_bounds": [
+            1275,
+            597,
+            695,
+            521
+          ],
+          "pixels": [
+            [
+              47,
+              193,
+              103
+            ],
+            [
+              88,
+              42,
+              144
+            ],
+            [
+              157,
+              111,
+              213
+            ],
+            [
+              198,
+              152,
+              62
+            ]
+          ]
+        },
+        {
+          "file": "039.png",
+          "age": 7.861133383001288,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.507917,
+          "pixel_error": 0,
+          "frame_mod192": 4,
+          "client_bounds": [
+            1275,
+            597,
+            663,
+            497
+          ],
+          "pixels": [
+            [
+              70,
+              206,
+              38
+            ],
+            [
+              111,
+              55,
+              79
+            ],
+            [
+              180,
+              124,
+              148
+            ],
+            [
+              221,
+              165,
+              189
+            ]
+          ]
+        },
+        {
+          "file": "060.png",
+          "age": 12.076497131001815,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.896198,
+          "pixel_error": 0,
+          "frame_mod192": 36,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              102,
+              174,
+              198
+            ],
+            [
+              143,
+              215,
+              47
+            ],
+            [
+              212,
+              92,
+              116
+            ],
+            [
+              61,
+              133,
+              157
+            ]
+          ]
+        },
+        {
+          "file": "061.png",
+          "age": 12.277139682999405,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.174532,
+          "pixel_error": 0,
+          "frame_mod192": 46,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              88,
+              116,
+              104
+            ],
+            [
+              129,
+              157,
+              145
+            ],
+            [
+              198,
+              34,
+              214
+            ],
+            [
+              47,
+              75,
+              63
+            ]
+          ]
+        },
+        {
+          "file": "062.png",
+          "age": 12.47786129800079,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.752709,
+          "pixel_error": 0,
+          "frame_mod192": 59,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              185,
+              79,
+              97
+            ],
+            [
+              34,
+              120,
+              138
+            ],
+            [
+              103,
+              189,
+              207
+            ],
+            [
+              144,
+              38,
+              56
+            ]
+          ]
+        },
+        {
+          "file": "063.png",
+          "age": 12.678499265999562,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.312031,
+          "pixel_error": 0,
+          "frame_mod192": 70,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              208,
+              92,
+              32
+            ],
+            [
+              57,
+              133,
+              73
+            ],
+            [
+              126,
+              202,
+              142
+            ],
+            [
+              167,
+              51,
+              183
+            ]
+          ]
+        },
+        {
+          "file": "064.png",
+          "age": 12.879139943001064,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.416355,
+          "pixel_error": 0,
+          "frame_mod192": 81,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              39,
+              105,
+              159
+            ],
+            [
+              80,
+              146,
+              200
+            ],
+            [
+              149,
+              215,
+              77
+            ],
+            [
+              190,
+              64,
+              118
+            ]
+          ]
+        },
+        {
+          "file": "065.png",
+          "age": 13.07990317200165,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.205521,
+          "pixel_error": 0,
+          "frame_mod192": 93,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              99,
+              189,
+              123
+            ],
+            [
+              140,
+              38,
+              164
+            ],
+            [
+              209,
+              107,
+              41
+            ],
+            [
+              58,
+              148,
+              82
+            ]
+          ]
+        },
+        {
+          "file": "066.png",
+          "age": 13.280675984999107,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.65776,
+          "pixel_error": 0,
+          "frame_mod192": 103,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              85,
+              131,
+              221
+            ],
+            [
+              126,
+              172,
+              70
+            ],
+            [
+              195,
+              49,
+              139
+            ],
+            [
+              44,
+              90,
+              180
+            ]
+          ]
+        },
+        {
+          "file": "067.png",
+          "age": 13.481449318001978,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.226979,
+          "pixel_error": 0,
+          "frame_mod192": 113,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              71,
+              73,
+              127
+            ],
+            [
+              112,
+              114,
+              168
+            ],
+            [
+              181,
+              183,
+              45
+            ],
+            [
+              222,
+              32,
+              86
+            ]
+          ]
+        },
+        {
+          "file": "068.png",
+          "age": 13.682249577999755,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.60099,
+          "pixel_error": 0,
+          "frame_mod192": 125,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              131,
+              157,
+              91
+            ],
+            [
+              172,
+              198,
+              132
+            ],
+            [
+              49,
+              75,
+              201
+            ],
+            [
+              90,
+              116,
+              50
+            ]
+          ]
+        },
+        {
+          "file": "069.png",
+          "age": 13.882951922001666,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.312448,
+          "pixel_error": 0,
+          "frame_mod192": 136,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              154,
+              170,
+              218
+            ],
+            [
+              195,
+              211,
+              67
+            ],
+            [
+              72,
+              88,
+              136
+            ],
+            [
+              113,
+              129,
+              177
+            ]
+          ]
+        },
+        {
+          "file": "070.png",
+          "age": 14.083694109001954,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.477761,
+          "pixel_error": 0,
+          "frame_mod192": 148,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              214,
+              62,
+              182
+            ],
+            [
+              63,
+              103,
+              223
+            ],
+            [
+              132,
+              172,
+              100
+            ],
+            [
+              173,
+              213,
+              141
+            ]
+          ]
+        },
+        {
+          "file": "071.png",
+          "age": 14.28442723400076,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.607709,
+          "pixel_error": 0,
+          "frame_mod192": 159,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              45,
+              75,
+              117
+            ],
+            [
+              86,
+              116,
+              158
+            ],
+            [
+              155,
+              185,
+              35
+            ],
+            [
+              196,
+              34,
+              76
+            ]
+          ]
+        },
+        {
+          "file": "072.png",
+          "age": 14.485135307000746,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.122656,
+          "pixel_error": 0,
+          "frame_mod192": 170,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              68,
+              88,
+              52
+            ],
+            [
+              109,
+              129,
+              93
+            ],
+            [
+              178,
+              198,
+              162
+            ],
+            [
+              219,
+              47,
+              203
+            ]
+          ]
+        },
+        {
+          "file": "073.png",
+          "age": 14.685864318002132,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.363802,
+          "pixel_error": 0,
+          "frame_mod192": 182,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              128,
+              172,
+              208
+            ],
+            [
+              169,
+              213,
+              57
+            ],
+            [
+              46,
+              90,
+              126
+            ],
+            [
+              87,
+              131,
+              167
+            ]
+          ]
+        },
+        {
+          "file": "074.png",
+          "age": 14.886670775998937,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.380939,
+          "pixel_error": 0,
+          "frame_mod192": 1,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              151,
+              185,
+              143
+            ],
+            [
+              192,
+              34,
+              184
+            ],
+            [
+              69,
+              103,
+              61
+            ],
+            [
+              110,
+              144,
+              102
+            ]
+          ]
+        }
+      ],
+      "unclassified": [
+        {
+          "file": "040.png",
+          "age": 8.061779685001966,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.330678,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              48,
+              208,
+              112
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "041.png",
+          "age": 8.262378591000015,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.854011,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              112,
+              70,
+              88
+            ],
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "042.png",
+          "age": 8.463069060002454,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.377605,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              139,
+              53,
+              35
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "043.png",
+          "age": 8.664458695002395,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.856875,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              162,
+              66,
+              162
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "044.png",
+          "age": 8.865174997001304,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.009636,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              148,
+              200,
+              68
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "045.png",
+          "age": 9.065765570001531,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.536459,
+          "pixel_error": 167,
+          "frame_mod192": 73,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              208,
+              92,
+              32
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "046.png",
+          "age": 9.266348537999875,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.430313,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              157,
+              155,
+              101
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "047.png",
+          "age": 9.467018016999646,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.669167,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              217,
+              47,
+              65
+            ],
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "048.png",
+          "age": 9.668028069001593,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.843906,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              203,
+              181,
+              163
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "049.png",
+          "age": 9.868788330000825,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.840417,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              222,
+              32,
+              86
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "050.png",
+          "age": 10.069432235999557,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.690781,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              94,
+              86,
+              62
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "051.png",
+          "age": 10.27006202800112,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 10.731251,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              198,
+              78,
+              102
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "052.png",
+          "age": 10.470680985999934,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.635209,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              221,
+              91,
+              37
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "053.png",
+          "age": 10.671373277000384,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.754376,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              207,
+              33,
+              135
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "054.png",
+          "age": 10.871996141999261,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.617187,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              193,
+              167,
+              41
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "055.png",
+          "age": 11.072735934001685,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.411042,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              98,
+              130,
+              34
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "056.png",
+          "age": 11.273607183000422,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.446823,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              202,
+              122,
+              74
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "057.png",
+          "age": 11.474317547999817,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.746459,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              33,
+              135,
+              201
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "058.png",
+          "age": 11.674985621000815,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.694219,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              93,
+              219,
+              165
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "file": "059.png",
+          "age": 11.87564114199995,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.935417,
+          "pixel_error": 155,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              116,
+              40,
+              100
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      ],
+      "pattern_passed": 55,
+      "unclassified_count": 20,
+      "stable_geometry": 74,
+      "metadata_sha256": "3134dffbd0d96cf3432d42bf300515d2678565f27897afe4e0bbd0642791617e"
+    },
+    "result_sha256": "73cb46c94bd804828076f56c9b987259ab1459f7c2ac84469a520b035ebdfd37",
+    "note": "RAF is content-side callback cadence, not physical displayed FPS. Unclassified frames during abrupt size jumps show clipped old geometry; no seamless-resize claim."
+  },
+  "firefox-fixed-clean-direct": {
+    "request_batches": 299,
+    "raf_frames": 811,
+    "raf_interval_ms": {
+      "mean": 18.5601234567901,
+      "p95": 33.94000000000233,
+      "max": 51.5
+    },
+    "capture_summary": {
+      "case": "firefox-fixed-clean-direct",
+      "captures": 75,
+      "physical_optical_capture": false,
+      "pattern_frames": [
+        {
+          "file": "000.png",
+          "age": 7.0829992182552814e-06,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.773386,
+          "pixel_error": 0,
+          "frame_mod192": 107,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              41,
+              223,
+              145
+            ],
+            [
+              82,
+              72,
+              186
+            ],
+            [
+              151,
+              141,
+              63
+            ],
+            [
+              192,
+              182,
+              104
+            ]
+          ]
+        },
+        {
+          "file": "001.png",
+          "age": 0.20103291599662043,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.134792,
+          "pixel_error": 0,
+          "frame_mod192": 118,
+          "client_bounds": [
+            1275,
+            597,
+            672,
+            504
+          ],
+          "pixels": [
+            [
+              64,
+              44,
+              80
+            ],
+            [
+              105,
+              85,
+              121
+            ],
+            [
+              174,
+              154,
+              190
+            ],
+            [
+              215,
+              195,
+              39
+            ]
+          ]
+        },
+        {
+          "file": "002.png",
+          "age": 0.4017209889971127,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.392657,
+          "pixel_error": 0,
+          "frame_mod192": 128,
+          "client_bounds": [
+            1275,
+            597,
+            704,
+            528
+          ],
+          "pixels": [
+            [
+              50,
+              178,
+              178
+            ],
+            [
+              91,
+              219,
+              219
+            ],
+            [
+              160,
+              96,
+              96
+            ],
+            [
+              201,
+              137,
+              137
+            ]
+          ]
+        },
+        {
+          "file": "003.png",
+          "age": 0.6026283329993021,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.642761,
+          "pixel_error": 0,
+          "frame_mod192": 137,
+          "client_bounds": [
+            1275,
+            597,
+            736,
+            552
+          ],
+          "pixels": [
+            [
+              191,
+              49,
+              55
+            ],
+            [
+              40,
+              90,
+              96
+            ],
+            [
+              109,
+              159,
+              165
+            ],
+            [
+              150,
+              200,
+              206
+            ]
+          ]
+        },
+        {
+          "file": "004.png",
+          "age": 0.8037401559995487,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.854011,
+          "pixel_error": 0,
+          "frame_mod192": 149,
+          "client_bounds": [
+            1275,
+            597,
+            768,
+            576
+          ],
+          "pixels": [
+            [
+              59,
+              133,
+              211
+            ],
+            [
+              100,
+              174,
+              60
+            ],
+            [
+              169,
+              51,
+              129
+            ],
+            [
+              210,
+              92,
+              170
+            ]
+          ]
+        },
+        {
+          "file": "005.png",
+          "age": 1.0051185409975005,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.090678,
+          "pixel_error": 0,
+          "frame_mod192": 159,
+          "client_bounds": [
+            1275,
+            597,
+            800,
+            600
+          ],
+          "pixels": [
+            [
+              45,
+              75,
+              117
+            ],
+            [
+              86,
+              116,
+              158
+            ],
+            [
+              155,
+              185,
+              35
+            ],
+            [
+              196,
+              34,
+              76
+            ]
+          ]
+        },
+        {
+          "file": "006.png",
+          "age": 1.206032291000156,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.611198,
+          "pixel_error": 0,
+          "frame_mod192": 169,
+          "client_bounds": [
+            1275,
+            597,
+            832,
+            624
+          ],
+          "pixels": [
+            [
+              223,
+              209,
+              215
+            ],
+            [
+              72,
+              58,
+              64
+            ],
+            [
+              141,
+              127,
+              133
+            ],
+            [
+              182,
+              168,
+              174
+            ]
+          ]
+        },
+        {
+          "file": "007.png",
+          "age": 1.4066640099990764,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.346355,
+          "pixel_error": 0,
+          "frame_mod192": 179,
+          "client_bounds": [
+            1275,
+            597,
+            865,
+            648
+          ],
+          "pixels": [
+            [
+              209,
+              151,
+              121
+            ],
+            [
+              58,
+              192,
+              162
+            ],
+            [
+              127,
+              69,
+              39
+            ],
+            [
+              168,
+              110,
+              80
+            ]
+          ]
+        },
+        {
+          "file": "008.png",
+          "age": 1.607424894998985,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.207396,
+          "pixel_error": 0,
+          "frame_mod192": 190,
+          "client_bounds": [
+            1275,
+            597,
+            897,
+            672
+          ],
+          "pixels": [
+            [
+              40,
+              164,
+              56
+            ],
+            [
+              81,
+              205,
+              97
+            ],
+            [
+              150,
+              82,
+              166
+            ],
+            [
+              191,
+              123,
+              207
+            ]
+          ]
+        },
+        {
+          "file": "009.png",
+          "age": 1.8080170829998679,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.204688,
+          "pixel_error": 0,
+          "frame_mod192": 7,
+          "client_bounds": [
+            1275,
+            597,
+            929,
+            696
+          ],
+          "pixels": [
+            [
+              181,
+              35,
+              125
+            ],
+            [
+              222,
+              76,
+              166
+            ],
+            [
+              99,
+              145,
+              43
+            ],
+            [
+              140,
+              186,
+              84
+            ]
+          ]
+        },
+        {
+          "file": "010.png",
+          "age": 2.0087054159994295,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.715469,
+          "pixel_error": 0,
+          "frame_mod192": 20,
+          "client_bounds": [
+            1275,
+            597,
+            961,
+            721
+          ],
+          "pixels": [
+            [
+              86,
+              190,
+              118
+            ],
+            [
+              127,
+              39,
+              159
+            ],
+            [
+              196,
+              108,
+              36
+            ],
+            [
+              45,
+              149,
+              77
+            ]
+          ]
+        },
+        {
+          "file": "011.png",
+          "age": 2.2093790089966205,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.242917,
+          "pixel_error": 0,
+          "frame_mod192": 30,
+          "client_bounds": [
+            1275,
+            597,
+            993,
+            745
+          ],
+          "pixels": [
+            [
+              72,
+              132,
+              216
+            ],
+            [
+              113,
+              173,
+              65
+            ],
+            [
+              182,
+              50,
+              134
+            ],
+            [
+              223,
+              91,
+              175
+            ]
+          ]
+        },
+        {
+          "file": "012.png",
+          "age": 2.410228748998634,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.376876,
+          "pixel_error": 0,
+          "frame_mod192": 42,
+          "client_bounds": [
+            1275,
+            597,
+            1025,
+            769
+          ],
+          "pixels": [
+            [
+              132,
+              216,
+              180
+            ],
+            [
+              173,
+              65,
+              221
+            ],
+            [
+              50,
+              134,
+              98
+            ],
+            [
+              91,
+              175,
+              139
+            ]
+          ]
+        },
+        {
+          "file": "013.png",
+          "age": 2.6115812489988457,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.191875,
+          "pixel_error": 0,
+          "frame_mod192": 54,
+          "client_bounds": [
+            1275,
+            597,
+            1057,
+            793
+          ],
+          "pixels": [
+            [
+              192,
+              108,
+              144
+            ],
+            [
+              41,
+              149,
+              185
+            ],
+            [
+              110,
+              218,
+              62
+            ],
+            [
+              151,
+              67,
+              103
+            ]
+          ]
+        },
+        {
+          "file": "014.png",
+          "age": 2.8122406759976,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.546719,
+          "pixel_error": 0,
+          "frame_mod192": 65,
+          "client_bounds": [
+            1275,
+            597,
+            1089,
+            817
+          ],
+          "pixels": [
+            [
+              215,
+              121,
+              79
+            ],
+            [
+              64,
+              162,
+              120
+            ],
+            [
+              133,
+              39,
+              189
+            ],
+            [
+              174,
+              80,
+              38
+            ]
+          ]
+        },
+        {
+          "file": "015.png",
+          "age": 3.013041352998698,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.302657,
+          "pixel_error": 0,
+          "frame_mod192": 77,
+          "client_bounds": [
+            1275,
+            597,
+            1122,
+            841
+          ],
+          "pixels": [
+            [
+              83,
+              205,
+              43
+            ],
+            [
+              124,
+              54,
+              84
+            ],
+            [
+              193,
+              123,
+              153
+            ],
+            [
+              42,
+              164,
+              194
+            ]
+          ]
+        },
+        {
+          "file": "016.png",
+          "age": 3.2138372379995417,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 9.280521,
+          "pixel_error": 0,
+          "frame_mod192": 89,
+          "client_bounds": [
+            1275,
+            597,
+            1154,
+            865
+          ],
+          "pixels": [
+            [
+              143,
+              97,
+              199
+            ],
+            [
+              184,
+              138,
+              48
+            ],
+            [
+              61,
+              207,
+              117
+            ],
+            [
+              102,
+              56,
+              158
+            ]
+          ]
+        },
+        {
+          "file": "017.png",
+          "age": 3.414603070999874,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.403438,
+          "pixel_error": 0,
+          "frame_mod192": 99,
+          "client_bounds": [
+            1275,
+            597,
+            1186,
+            889
+          ],
+          "pixels": [
+            [
+              129,
+              39,
+              105
+            ],
+            [
+              170,
+              80,
+              146
+            ],
+            [
+              47,
+              149,
+              215
+            ],
+            [
+              88,
+              190,
+              64
+            ]
+          ]
+        },
+        {
+          "file": "018.png",
+          "age": 3.615697237997665,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 11.07073,
+          "pixel_error": 0,
+          "frame_mod192": 111,
+          "client_bounds": [
+            1275,
+            597,
+            1218,
+            913
+          ],
+          "pixels": [
+            [
+              189,
+              123,
+              69
+            ],
+            [
+              38,
+              164,
+              110
+            ],
+            [
+              107,
+              41,
+              179
+            ],
+            [
+              148,
+              82,
+              220
+            ]
+          ]
+        },
+        {
+          "file": "019.png",
+          "age": 3.816554997996718,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.182344,
+          "pixel_error": 0,
+          "frame_mod192": 124,
+          "client_bounds": [
+            1275,
+            597,
+            1250,
+            937
+          ],
+          "pixels": [
+            [
+              94,
+              86,
+              62
+            ],
+            [
+              135,
+              127,
+              103
+            ],
+            [
+              204,
+              196,
+              172
+            ],
+            [
+              53,
+              45,
+              213
+            ]
+          ]
+        },
+        {
+          "file": "020.png",
+          "age": 4.017123435998656,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 12.16474,
+          "pixel_error": 0,
+          "frame_mod192": 136,
+          "client_bounds": [
+            1275,
+            597,
+            1278,
+            958
+          ],
+          "pixels": [
+            [
+              154,
+              170,
+              218
+            ],
+            [
+              195,
+              211,
+              67
+            ],
+            [
+              72,
+              88,
+              136
+            ],
+            [
+              113,
+              129,
+              177
+            ]
+          ]
+        },
+        {
+          "file": "021.png",
+          "age": 4.2179505709973455,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 9.347657,
+          "pixel_error": 0,
+          "frame_mod192": 148,
+          "client_bounds": [
+            1275,
+            597,
+            1246,
+            934
+          ],
+          "pixels": [
+            [
+              214,
+              62,
+              182
+            ],
+            [
+              63,
+              103,
+              223
+            ],
+            [
+              132,
+              172,
+              100
+            ],
+            [
+              173,
+              213,
+              141
+            ]
+          ]
+        },
+        {
+          "file": "022.png",
+          "age": 4.418621924996842,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.148803,
+          "pixel_error": 0,
+          "frame_mod192": 159,
+          "client_bounds": [
+            1275,
+            597,
+            1214,
+            910
+          ],
+          "pixels": [
+            [
+              45,
+              75,
+              117
+            ],
+            [
+              86,
+              116,
+              158
+            ],
+            [
+              155,
+              185,
+              35
+            ],
+            [
+              196,
+              34,
+              76
+            ]
+          ]
+        },
+        {
+          "file": "023.png",
+          "age": 4.619219528998656,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 9.681927,
+          "pixel_error": 0,
+          "frame_mod192": 171,
+          "client_bounds": [
+            1275,
+            597,
+            1181,
+            886
+          ],
+          "pixels": [
+            [
+              105,
+              159,
+              81
+            ],
+            [
+              146,
+              200,
+              122
+            ],
+            [
+              215,
+              77,
+              191
+            ],
+            [
+              64,
+              118,
+              40
+            ]
+          ]
+        },
+        {
+          "file": "024.png",
+          "age": 4.820178799996938,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.447032,
+          "pixel_error": 0,
+          "frame_mod192": 180,
+          "client_bounds": [
+            1275,
+            597,
+            1149,
+            862
+          ],
+          "pixels": [
+            [
+              54,
+              222,
+              150
+            ],
+            [
+              95,
+              71,
+              191
+            ],
+            [
+              164,
+              140,
+              68
+            ],
+            [
+              205,
+              181,
+              109
+            ]
+          ]
+        },
+        {
+          "file": "025.png",
+          "age": 5.0212874459975865,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 7.664272,
+          "pixel_error": 0,
+          "frame_mod192": 1,
+          "client_bounds": [
+            1275,
+            597,
+            1117,
+            838
+          ],
+          "pixels": [
+            [
+              151,
+              185,
+              143
+            ],
+            [
+              192,
+              34,
+              184
+            ],
+            [
+              69,
+              103,
+              61
+            ],
+            [
+              110,
+              144,
+              102
+            ]
+          ]
+        },
+        {
+          "file": "026.png",
+          "age": 5.222642184999131,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.789219,
+          "pixel_error": 0,
+          "frame_mod192": 14,
+          "client_bounds": [
+            1275,
+            597,
+            1085,
+            814
+          ],
+          "pixels": [
+            [
+              56,
+              148,
+              136
+            ],
+            [
+              97,
+              189,
+              177
+            ],
+            [
+              166,
+              66,
+              54
+            ],
+            [
+              207,
+              107,
+              95
+            ]
+          ]
+        },
+        {
+          "file": "027.png",
+          "age": 5.424724163996871,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.182032,
+          "pixel_error": 0,
+          "frame_mod192": 26,
+          "client_bounds": [
+            1275,
+            597,
+            1053,
+            790
+          ],
+          "pixels": [
+            [
+              116,
+              40,
+              100
+            ],
+            [
+              157,
+              81,
+              141
+            ],
+            [
+              34,
+              150,
+              210
+            ],
+            [
+              75,
+              191,
+              59
+            ]
+          ]
+        },
+        {
+          "file": "028.png",
+          "age": 5.625354163999873,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.876042,
+          "pixel_error": 0,
+          "frame_mod192": 38,
+          "client_bounds": [
+            1275,
+            597,
+            1020,
+            765
+          ],
+          "pixels": [
+            [
+              176,
+              124,
+              64
+            ],
+            [
+              217,
+              165,
+              105
+            ],
+            [
+              94,
+              42,
+              174
+            ],
+            [
+              135,
+              83,
+              215
+            ]
+          ]
+        },
+        {
+          "file": "029.png",
+          "age": 5.825922549996903,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.338387,
+          "pixel_error": 0,
+          "frame_mod192": 49,
+          "client_bounds": [
+            1275,
+            597,
+            988,
+            741
+          ],
+          "pixels": [
+            [
+              199,
+              137,
+              191
+            ],
+            [
+              48,
+              178,
+              40
+            ],
+            [
+              117,
+              55,
+              109
+            ],
+            [
+              158,
+              96,
+              150
+            ]
+          ]
+        },
+        {
+          "file": "030.png",
+          "age": 6.026590934998239,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.415573,
+          "pixel_error": 0,
+          "frame_mod192": 60,
+          "client_bounds": [
+            1275,
+            597,
+            956,
+            717
+          ],
+          "pixels": [
+            [
+              222,
+              150,
+              126
+            ],
+            [
+              71,
+              191,
+              167
+            ],
+            [
+              140,
+              68,
+              44
+            ],
+            [
+              181,
+              109,
+              85
+            ]
+          ]
+        },
+        {
+          "file": "031.png",
+          "age": 6.227296871998988,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.86172,
+          "pixel_error": 0,
+          "frame_mod192": 72,
+          "client_bounds": [
+            1275,
+            597,
+            924,
+            693
+          ],
+          "pixels": [
+            [
+              90,
+              42,
+              90
+            ],
+            [
+              131,
+              83,
+              131
+            ],
+            [
+              200,
+              152,
+              200
+            ],
+            [
+              49,
+              193,
+              49
+            ]
+          ]
+        },
+        {
+          "file": "032.png",
+          "age": 6.427882757998304,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.708595,
+          "pixel_error": 0,
+          "frame_mod192": 81,
+          "client_bounds": [
+            1275,
+            597,
+            892,
+            669
+          ],
+          "pixels": [
+            [
+              39,
+              105,
+              159
+            ],
+            [
+              80,
+              146,
+              200
+            ],
+            [
+              149,
+              215,
+              77
+            ],
+            [
+              190,
+              64,
+              118
+            ]
+          ]
+        },
+        {
+          "file": "033.png",
+          "age": 6.628585882997868,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.894063,
+          "pixel_error": 0,
+          "frame_mod192": 93,
+          "client_bounds": [
+            1275,
+            597,
+            860,
+            645
+          ],
+          "pixels": [
+            [
+              99,
+              189,
+              123
+            ],
+            [
+              140,
+              38,
+              164
+            ],
+            [
+              209,
+              107,
+              41
+            ],
+            [
+              58,
+              148,
+              82
+            ]
+          ]
+        },
+        {
+          "file": "034.png",
+          "age": 6.829218225997465,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.49349,
+          "pixel_error": 0,
+          "frame_mod192": 103,
+          "client_bounds": [
+            1275,
+            597,
+            828,
+            621
+          ],
+          "pixels": [
+            [
+              85,
+              131,
+              221
+            ],
+            [
+              126,
+              172,
+              70
+            ],
+            [
+              195,
+              49,
+              139
+            ],
+            [
+              44,
+              90,
+              180
+            ]
+          ]
+        },
+        {
+          "file": "035.png",
+          "age": 7.030094267996901,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.342813,
+          "pixel_error": 0,
+          "frame_mod192": 113,
+          "client_bounds": [
+            1275,
+            597,
+            796,
+            597
+          ],
+          "pixels": [
+            [
+              71,
+              73,
+              127
+            ],
+            [
+              112,
+              114,
+              168
+            ],
+            [
+              181,
+              183,
+              45
+            ],
+            [
+              222,
+              32,
+              86
+            ]
+          ]
+        },
+        {
+          "file": "036.png",
+          "age": 7.230782027996611,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.851458,
+          "pixel_error": 0,
+          "frame_mod192": 122,
+          "client_bounds": [
+            1275,
+            597,
+            764,
+            573
+          ],
+          "pixels": [
+            [
+              212,
+              136,
+              196
+            ],
+            [
+              61,
+              177,
+              45
+            ],
+            [
+              130,
+              54,
+              114
+            ],
+            [
+              171,
+              95,
+              155
+            ]
+          ]
+        },
+        {
+          "file": "037.png",
+          "age": 7.431660673999431,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.820469,
+          "pixel_error": 0,
+          "frame_mod192": 132,
+          "client_bounds": [
+            1275,
+            597,
+            731,
+            549
+          ],
+          "pixels": [
+            [
+              198,
+              78,
+              102
+            ],
+            [
+              47,
+              119,
+              143
+            ],
+            [
+              116,
+              188,
+              212
+            ],
+            [
+              157,
+              37,
+              61
+            ]
+          ]
+        },
+        {
+          "file": "038.png",
+          "age": 7.63236556999982,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.05724,
+          "pixel_error": 0,
+          "frame_mod192": 142,
+          "client_bounds": [
+            1275,
+            597,
+            699,
+            525
+          ],
+          "pixels": [
+            [
+              184,
+              212,
+              200
+            ],
+            [
+              33,
+              61,
+              49
+            ],
+            [
+              102,
+              130,
+              118
+            ],
+            [
+              143,
+              171,
+              159
+            ]
+          ]
+        },
+        {
+          "file": "039.png",
+          "age": 7.833442496998032,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.010938,
+          "pixel_error": 0,
+          "frame_mod192": 155,
+          "client_bounds": [
+            1275,
+            597,
+            667,
+            500
+          ],
+          "pixels": [
+            [
+              89,
+              175,
+              193
+            ],
+            [
+              130,
+              216,
+              42
+            ],
+            [
+              199,
+              93,
+              111
+            ],
+            [
+              48,
+              134,
+              152
+            ]
+          ]
+        },
+        {
+          "file": "040.png",
+          "age": 8.03581067399864,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.131771,
+          "pixel_error": 0,
+          "frame_mod192": 165,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              75,
+              117,
+              99
+            ],
+            [
+              116,
+              158,
+              140
+            ],
+            [
+              185,
+              35,
+              209
+            ],
+            [
+              34,
+              76,
+              58
+            ]
+          ]
+        },
+        {
+          "file": "042.png",
+          "age": 8.437050100998022,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.332709,
+          "pixel_error": 0,
+          "frame_mod192": 187,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              121,
+              143,
+              161
+            ],
+            [
+              162,
+              184,
+              202
+            ],
+            [
+              39,
+              61,
+              79
+            ],
+            [
+              80,
+              102,
+              120
+            ]
+          ]
+        },
+        {
+          "file": "043.png",
+          "age": 8.637742391998472,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.097501,
+          "pixel_error": 0,
+          "frame_mod192": 6,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              144,
+              156,
+              96
+            ],
+            [
+              185,
+              197,
+              137
+            ],
+            [
+              62,
+              74,
+              206
+            ],
+            [
+              103,
+              115,
+              55
+            ]
+          ]
+        },
+        {
+          "file": "044.png",
+          "age": 8.8384315589974,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.342345,
+          "pixel_error": 0,
+          "frame_mod192": 17,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              167,
+              169,
+              223
+            ],
+            [
+              208,
+              210,
+              72
+            ],
+            [
+              85,
+              87,
+              141
+            ],
+            [
+              126,
+              128,
+              182
+            ]
+          ]
+        },
+        {
+          "file": "045.png",
+          "age": 9.039264995997655,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.737135,
+          "pixel_error": 0,
+          "frame_mod192": 27,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              153,
+              111,
+              129
+            ],
+            [
+              194,
+              152,
+              170
+            ],
+            [
+              71,
+              221,
+              47
+            ],
+            [
+              112,
+              70,
+              88
+            ]
+          ]
+        },
+        {
+          "file": "046.png",
+          "age": 9.239901297998586,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.509479,
+          "pixel_error": 0,
+          "frame_mod192": 37,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              139,
+              53,
+              35
+            ],
+            [
+              180,
+              94,
+              76
+            ],
+            [
+              57,
+              163,
+              145
+            ],
+            [
+              98,
+              204,
+              186
+            ]
+          ]
+        },
+        {
+          "file": "047.png",
+          "age": 9.441760412999429,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.143437,
+          "pixel_error": 0,
+          "frame_mod192": 46,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              88,
+              116,
+              104
+            ],
+            [
+              129,
+              157,
+              145
+            ],
+            [
+              198,
+              34,
+              214
+            ],
+            [
+              47,
+              75,
+              63
+            ]
+          ]
+        },
+        {
+          "file": "048.png",
+          "age": 9.642376662999595,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.149376,
+          "pixel_error": 0,
+          "frame_mod192": 56,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              74,
+              58,
+              202
+            ],
+            [
+              115,
+              99,
+              51
+            ],
+            [
+              184,
+              168,
+              120
+            ],
+            [
+              33,
+              209,
+              161
+            ]
+          ]
+        },
+        {
+          "file": "049.png",
+          "age": 9.842974787999992,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.105626,
+          "pixel_error": 0,
+          "frame_mod192": 67,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              97,
+              71,
+              137
+            ],
+            [
+              138,
+              112,
+              178
+            ],
+            [
+              207,
+              181,
+              55
+            ],
+            [
+              56,
+              222,
+              96
+            ]
+          ]
+        },
+        {
+          "file": "051.png",
+          "age": 10.244368276999012,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.836563,
+          "pixel_error": 0,
+          "frame_mod192": 87,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              69,
+              147,
+              141
+            ],
+            [
+              110,
+              188,
+              182
+            ],
+            [
+              179,
+              65,
+              59
+            ],
+            [
+              220,
+              106,
+              100
+            ]
+          ]
+        },
+        {
+          "file": "052.png",
+          "age": 10.445082755999465,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.613959,
+          "pixel_error": 0,
+          "frame_mod192": 99,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              129,
+              39,
+              105
+            ],
+            [
+              170,
+              80,
+              146
+            ],
+            [
+              47,
+              149,
+              215
+            ],
+            [
+              88,
+              190,
+              64
+            ]
+          ]
+        },
+        {
+          "file": "053.png",
+          "age": 10.646059422997496,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 5.306094,
+          "pixel_error": 0,
+          "frame_mod192": 110,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              152,
+              52,
+              40
+            ],
+            [
+              193,
+              93,
+              81
+            ],
+            [
+              70,
+              162,
+              150
+            ],
+            [
+              111,
+              203,
+              191
+            ]
+          ]
+        },
+        {
+          "file": "054.png",
+          "age": 10.846707859996968,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.916615,
+          "pixel_error": 0,
+          "frame_mod192": 122,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              212,
+              136,
+              196
+            ],
+            [
+              61,
+              177,
+              45
+            ],
+            [
+              130,
+              54,
+              114
+            ],
+            [
+              171,
+              95,
+              155
+            ]
+          ]
+        },
+        {
+          "file": "055.png",
+          "age": 11.047467599997617,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.755209,
+          "pixel_error": 0,
+          "frame_mod192": 132,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              198,
+              78,
+              102
+            ],
+            [
+              47,
+              119,
+              143
+            ],
+            [
+              116,
+              188,
+              212
+            ],
+            [
+              157,
+              37,
+              61
+            ]
+          ]
+        },
+        {
+          "file": "056.png",
+          "age": 11.248078953998629,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.812917,
+          "pixel_error": 0,
+          "frame_mod192": 143,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              221,
+              91,
+              37
+            ],
+            [
+              70,
+              132,
+              78
+            ],
+            [
+              139,
+              201,
+              147
+            ],
+            [
+              180,
+              50,
+              188
+            ]
+          ]
+        },
+        {
+          "file": "061.png",
+          "age": 12.2526843179985,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.188802,
+          "pixel_error": 0,
+          "frame_mod192": 3,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              33,
+              135,
+              201
+            ],
+            [
+              74,
+              176,
+              50
+            ],
+            [
+              143,
+              53,
+              119
+            ],
+            [
+              184,
+              94,
+              160
+            ]
+          ]
+        },
+        {
+          "file": "062.png",
+          "age": 12.453398640998785,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 1.986199,
+          "pixel_error": 0,
+          "frame_mod192": 11,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              137,
+              127,
+              49
+            ],
+            [
+              178,
+              168,
+              90
+            ],
+            [
+              55,
+              45,
+              159
+            ],
+            [
+              96,
+              86,
+              200
+            ]
+          ]
+        },
+        {
+          "file": "063.png",
+          "age": 12.654084525998769,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.182708,
+          "pixel_error": 0,
+          "frame_mod192": 22,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              160,
+              140,
+              176
+            ],
+            [
+              201,
+              181,
+              217
+            ],
+            [
+              78,
+              58,
+              94
+            ],
+            [
+              119,
+              99,
+              135
+            ]
+          ]
+        },
+        {
+          "file": "064.png",
+          "age": 12.854781817997718,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 2.974375,
+          "pixel_error": 0,
+          "frame_mod192": 34,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              220,
+              32,
+              140
+            ],
+            [
+              69,
+              73,
+              181
+            ],
+            [
+              138,
+              142,
+              58
+            ],
+            [
+              179,
+              183,
+              99
+            ]
+          ]
+        },
+        {
+          "file": "065.png",
+          "age": 13.055711192999297,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.283126,
+          "pixel_error": 0,
+          "frame_mod192": 43,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              169,
+              95,
+              209
+            ],
+            [
+              210,
+              136,
+              58
+            ],
+            [
+              87,
+              205,
+              127
+            ],
+            [
+              128,
+              54,
+              168
+            ]
+          ]
+        },
+        {
+          "file": "066.png",
+          "age": 13.256452858997363,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 4.451824,
+          "pixel_error": 0,
+          "frame_mod192": 53,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              155,
+              37,
+              115
+            ],
+            [
+              196,
+              78,
+              156
+            ],
+            [
+              73,
+              147,
+              33
+            ],
+            [
+              114,
+              188,
+              74
+            ]
+          ]
+        },
+        {
+          "file": "067.png",
+          "age": 13.458658744999411,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.42198,
+          "pixel_error": 0,
+          "frame_mod192": 66,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              60,
+              192,
+              108
+            ],
+            [
+              101,
+              41,
+              149
+            ],
+            [
+              170,
+              110,
+              218
+            ],
+            [
+              211,
+              151,
+              67
+            ]
+          ]
+        },
+        {
+          "file": "068.png",
+          "age": 13.659373952999886,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.616459,
+          "pixel_error": 0,
+          "frame_mod192": 76,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              46,
+              134,
+              206
+            ],
+            [
+              87,
+              175,
+              55
+            ],
+            [
+              156,
+              52,
+              124
+            ],
+            [
+              197,
+              93,
+              165
+            ]
+          ]
+        },
+        {
+          "file": "069.png",
+          "age": 13.859977910997259,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.759375,
+          "pixel_error": 0,
+          "frame_mod192": 86,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              32,
+              76,
+              112
+            ],
+            [
+              73,
+              117,
+              153
+            ],
+            [
+              142,
+              186,
+              222
+            ],
+            [
+              183,
+              35,
+              71
+            ]
+          ]
+        },
+        {
+          "file": "070.png",
+          "age": 14.06067634899955,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.814584,
+          "pixel_error": 0,
+          "frame_mod192": 98,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              92,
+              160,
+              76
+            ],
+            [
+              133,
+              201,
+              117
+            ],
+            [
+              202,
+              78,
+              186
+            ],
+            [
+              51,
+              119,
+              35
+            ]
+          ]
+        },
+        {
+          "file": "071.png",
+          "age": 14.261370150998118,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.779793,
+          "pixel_error": 0,
+          "frame_mod192": 110,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              152,
+              52,
+              40
+            ],
+            [
+              193,
+              93,
+              81
+            ],
+            [
+              70,
+              162,
+              150
+            ],
+            [
+              111,
+              203,
+              191
+            ]
+          ]
+        },
+        {
+          "file": "072.png",
+          "age": 14.462428639999416,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.436927,
+          "pixel_error": 0,
+          "frame_mod192": 119,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              101,
+              115,
+              109
+            ],
+            [
+              142,
+              156,
+              150
+            ],
+            [
+              211,
+              33,
+              219
+            ],
+            [
+              60,
+              74,
+              68
+            ]
+          ]
+        },
+        {
+          "file": "073.png",
+          "age": 14.663061035997089,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.782605,
+          "pixel_error": 0,
+          "frame_mod192": 130,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              124,
+              128,
+              44
+            ],
+            [
+              165,
+              169,
+              85
+            ],
+            [
+              42,
+              46,
+              154
+            ],
+            [
+              83,
+              87,
+              195
+            ]
+          ]
+        },
+        {
+          "file": "074.png",
+          "age": 14.863687597997341,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 6.85672,
+          "pixel_error": 0,
+          "frame_mod192": 141,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              147,
+              141,
+              171
+            ],
+            [
+              188,
+              182,
+              212
+            ],
+            [
+              65,
+              59,
+              89
+            ],
+            [
+              106,
+              100,
+              130
+            ]
+          ]
+        }
+      ],
+      "unclassified": [
+        {
+          "file": "041.png",
+          "age": 8.236419267999736,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.319115,
+          "pixel_error": 102,
+          "frame_mod192": 57,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              172,
+              80,
+              92
+            ],
+            [
+              172,
+              80,
+              92
+            ],
+            [
+              172,
+              80,
+              92
+            ],
+            [
+              172,
+              80,
+              92
+            ]
+          ]
+        },
+        {
+          "file": "050.png",
+          "age": 10.043603589998384,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.248646,
+          "pixel_error": 88,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              120,
+              84,
+              72
+            ],
+            [
+              120,
+              84,
+              72
+            ],
+            [
+              120,
+              84,
+              72
+            ],
+            [
+              120,
+              84,
+              72
+            ]
+          ]
+        },
+        {
+          "file": "057.png",
+          "age": 11.448721662000025,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.237344,
+          "pixel_error": 100,
+          "frame_mod192": 113,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              133,
+              83,
+              77
+            ],
+            [
+              133,
+              83,
+              77
+            ],
+            [
+              133,
+              83,
+              77
+            ],
+            [
+              133,
+              83,
+              77
+            ]
+          ]
+        },
+        {
+          "file": "058.png",
+          "age": 11.649996921998536,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 8.491199,
+          "pixel_error": 105,
+          "frame_mod192": 95,
+          "client_bounds": [
+            1275,
+            597,
+            640,
+            480
+          ],
+          "pixels": [
+            [
+              156,
+              96,
+              204
+            ],
+            [
+              156,
+              96,
+              204
+            ],
+            [
+              156,
+              96,
+              204
+            ],
+            [
+              156,
+              96,
+              204
+            ]
+          ]
+        },
+        {
+          "file": "059.png",
+          "age": 11.850899526998546,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 10.874845,
+          "pixel_error": 143,
+          "frame_mod192": 142,
+          "client_bounds": [
+            1275,
+            597,
+            1280,
+            960
+          ],
+          "pixels": [
+            [
+              101,
+              189,
+              69
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              85,
+              155
+            ],
+            [
+              0,
+              52,
+              127
+            ]
+          ]
+        },
+        {
+          "file": "060.png",
+          "age": 12.051678380998055,
+          "stable": 1,
+          "geometry_stable": true,
+          "phase_ms": 3.185626,
+          "pixel_error": 113,
+          "frame_mod192": 0,
+          "client_bounds": [
+            1275,
+            597,
+            960,
+            720
+          ],
+          "pixels": [
+            [
+              165,
+              51,
+              45
+            ],
+            [
+              43,
+              42,
+              51
+            ],
+            [
+              43,
+              42,
+              51
+            ],
+            [
+              43,
+              42,
+              51
+            ]
+          ]
+        }
+      ],
+      "pattern_passed": 69,
+      "unclassified_count": 6,
+      "stable_geometry": 75,
+      "metadata_sha256": "8a51df5a804eb2cd24b9f8261425f2a7daf40f1afccb82b127f52732670543f0"
+    },
+    "result_sha256": "40204aacf6422fae0a0e01918609daf4b477c5b46a2433fe706f40c972b06033",
+    "note": "RAF is content-side callback cadence, not physical displayed FPS. Unclassified frames during abrupt size jumps show clipped old geometry; no seamless-resize claim."
+  },
+  "firefox_graphics": {
+    "windowLayerManagerType": "WebRender",
+    "adapterDescription": "FD740",
+    "driverVendor": "mesa/software-unknown",
+    "webgl2Renderer": "freedreno -- FD740",
+    "webgl2Version": "OpenGL ES 3.2 Mesa 26.2.0-devel (git-a426a48452)",
+    "failures": [
+      "CP+[GFX1-]: Couldn't sanitize GL_RENDERER \"FD740\""
+    ],
+    "features": [
+      {
+        "name": "HW_COMPOSITING",
+        "description": "Compositing",
+        "status": "force_enabled",
+        "log": [
+          {
+            "type": "default",
+            "status": "available"
+          },
+          {
+            "type": "user",
+            "status": "force_enabled",
+            "message": "Force-enabled by pref"
+          }
+        ]
+      },
+      {
+        "name": "OPENGL_COMPOSITING",
+        "description": "OpenGL Compositing",
+        "status": "force_enabled",
+        "log": [
+          {
+            "type": "default",
+            "status": "available"
+          },
+          {
+            "type": "user",
+            "status": "force_enabled",
+            "message": "Force-enabled by pref"
+          }
+        ]
+      },
+      {
+        "name": "WEBRENDER",
+        "description": "WebRender",
+        "status": "force_enabled",
+        "log": [
+          {
+            "type": "default",
+            "status": "available"
+          },
+          {
+            "type": "user",
+            "status": "force_enabled",
+            "message": "Force enabled by pref"
+          },
+          {
+            "type": "env",
+            "status": "blocklisted",
+            "failureId": "FEATURE_FAILURE_SOFTWARE_GL",
+            "message": "Blocklisted by gfxInfo"
+          }
+        ]
+      }
+    ]
+  },
+  "firefox_pipeline_teardown": [
+    "HDMI pipeline submitted=0 completed=0 worker_copies=0 integrated_resolves=0",
+    "HDMI pipeline submitted=14050 completed=14050 worker_copies=0 integrated_resolves=14050"
+  ],
+  "discarded_browser_cases": [
+    "firefox-wm-1 and firefox-wm-corrected: EGL Present rejected; nonzero-offset committed sampler invalid. Do not use those RAF results for presentation.",
+    "firefox-fixed with original interposer: process exited 126 because RTLD_NEXT could not resolve local-loaded XCB. This is a diagnostic loader error, not a Mesa crash."
+  ],
+  "gears_wm": {
+    "case": "gears-wm-frontend",
+    "captures": 75,
+    "stable": 75,
+    "stable_geometry": 74,
+    "framebuffers": {
+      "360": 49,
+      "299": 26
+    },
+    "max_copy_ms": 7.36776,
+    "physical_optical_capture": false,
+    "blank": [
+      {
+        "file": "001.png",
+        "age": 0.20063098900209297,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 10.190209,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "002.png",
+        "age": 0.40115833299933,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 4.055469,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "003.png",
+        "age": 0.6017552080011228,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 4.962553,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "004.png",
+        "age": 0.8022471350013802,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.538802,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "005.png",
+        "age": 1.0027731240006688,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.021771,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "009.png",
+        "age": 1.81945109300068,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 6.274584,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "010.png",
+        "age": 2.0200766650013975,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 6.555052,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "011.png",
+        "age": 2.2205901550005365,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 6.537552,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "012.png",
+        "age": 2.4210319260018878,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 6.659167,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "013.png",
+        "age": 2.621529061001638,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.910209,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "014.png",
+        "age": 2.82208854000055,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.674949,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "015.png",
+        "age": 3.022613592002017,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.22974,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "016.png",
+        "age": 3.22314734199972,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.268542,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "017.png",
+        "age": 3.4238146860006964,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.269844,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "018.png",
+        "age": 3.624339529000281,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 7.229271,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "019.png",
+        "age": 3.8248516650019155,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 8.291927,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "021.png",
+        "age": 4.2260013519990025,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 6.503594,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "022.png",
+        "age": 4.426465362001181,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 3.74349,
+        "black_fraction": 1.0
+      },
+      {
+        "file": "025.png",
+        "age": 5.0281493209986365,
+        "stable": 1,
+        "geometry_stable": true,
+        "phase_ms": 4.389115,
+        "black_fraction": 1.0
+      }
+    ],
+    "blank_early_stable": 18,
+    "early_stable_samples": 53,
+    "captures_sha256": "12d1fb3940835a9bfcb9cc91c92c959d287d7f2ee8ccfcec59535b4f8a69c0f4"
+  },
+  "quake": {
+    "probe_records": 8942,
+    "requested_records": 8942,
+    "dropped": 0,
+    "seconds": 50.996385554,
+    "warmup_excluded_seconds": 5,
+    "events": {
+      "2": 1491,
+      "7": 1491,
+      "9": 2980,
+      "8": 2980
+    },
+    "physical_scanout_tested": false,
+    "swaps": {
+      "1": {
+        "call": {},
+        "end_interval": {},
+        "longest_intervals": []
+      },
+      "2": {
+        "call": {
+          "count": 1379,
+          "mean_ms": 23.41836054822335,
+          "p50_ms": 23.48375,
+          "p95_ms": 27.007136,
+          "p99_ms": 28.422448,
+          "max_ms": 29.4825
+        },
+        "end_interval": {
+          "count": 1378,
+          "mean_ms": 33.332439852685056,
+          "p50_ms": 33.359427,
+          "p95_ms": 34.73375,
+          "p99_ms": 35.684896,
+          "max_ms": 36.843542
+        },
+        "longest_intervals": [
+          {
+            "relative_seconds": 23.99920171,
+            "ms": 36.843542
+          },
+          {
+            "relative_seconds": 44.798650556,
+            "ms": 36.406198
+          },
+          {
+            "relative_seconds": 29.398635041,
+            "ms": 36.212969
+          },
+          {
+            "relative_seconds": 24.63138973,
+            "ms": 36.151927
+          },
+          {
+            "relative_seconds": 47.197914045,
+            "ms": 35.929948
+          },
+          {
+            "relative_seconds": 44.897966493,
+            "ms": 35.895781
+          },
+          {
+            "relative_seconds": 30.598016811,
+            "ms": 35.88
+          },
+          {
+            "relative_seconds": 29.998334103,
+            "ms": 35.865677
+          },
+          {
+            "relative_seconds": 31.197729676,
+            "ms": 35.795938
+          },
+          {
+            "relative_seconds": 16.131169681,
+            "ms": 35.772187
+          },
+          {
+            "relative_seconds": 50.897654147,
+            "ms": 35.738281
+          },
+          {
+            "relative_seconds": 5.631321717,
+            "ms": 35.722136
+          }
+        ]
+      }
+    },
+    "present": {
+      "completed": 1380,
+      "request_thread_ids": [
+        4665
+      ],
+      "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+      "modes": {
+        "0": 1380
+      },
+      "msc_delta": {
+        "1": 1379
+      },
+      "ust_delta": {
+        "count": 1379,
+        "mean_ms": 33.33333357505439,
+        "p50_ms": 33.333,
+        "p95_ms": 33.334,
+        "p99_ms": 33.334,
+        "max_ms": 33.334
+      },
+      "request_to_event": {
+        "count": 1380,
+        "mean_ms": 27.4344913884058,
+        "p50_ms": 28.180938,
+        "p95_ms": 28.785417,
+        "p99_ms": 28.989427,
+        "max_ms": 29.229219
+      },
+      "request_options": {
+        "0": 1379
+      }
+    }
+  }
+}
