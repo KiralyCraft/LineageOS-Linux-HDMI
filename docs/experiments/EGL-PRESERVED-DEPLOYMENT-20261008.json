@@ -1,0 +1,44 @@
+{
+  "previous_xorg_pid": 16405,
+  "agent_pid": 8827,
+  "agent_path": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-resolve-order-20261007",
+  "runtime_source": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-preserved-20261008",
+  "rollback_runtime": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-egl-20261008",
+  "magisk_changed": false,
+  "commands": [
+    {
+      "action": "pause",
+      "code": 0,
+      "output": "state=10 status=0 remaining=0 flags=0x1300 requested=3840x2160@30.000 active=3840x2160@30.000 detail=Linux paused; HDMI stays connected; use resume within five minutes\n"
+    },
+    {
+      "action": "resume",
+      "code": 0,
+      "output": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode\n"
+    }
+  ],
+  "new_xorg_pid": 22454,
+  "running": true,
+  "status": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode",
+  "xorg_sha256": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12",
+  "modesetting_sha256": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+  "post_restart_egl": {
+    "swaps": 240,
+    "images_checked": 8,
+    "passed": 8,
+    "no_age_query": true,
+    "mesa_commit": "08a3ec46412f3a2dbb708cecd07bb82ca85384d9",
+    "result_sha256": "f01e67d4e5cf8e470673bda94de76a857ea1cb1bb64f43a614b3db40f54fd180"
+  },
+  "bundle_checksum_sha256": "07a11493a311fca4e4fd60a169ef961efcadcbea5eb99ef54dea30f4a5ad8594",
+  "loaded_stack_verified": {
+    "lib/mesa/libgallium-26.2.0-devel.so": "5d29933a8bb0f7dada322b53b12b98d67fd30e27afcd13269ff635a59de51085",
+    "lib/mesa/libEGL_mesa.so.0": "c11ac86fcb8dfd89d08d56a425593accd6126e9ae64f4540479858d6cd730459",
+    "lib/mesa/libGLX_mesa.so.0": "a525c302c9a92e5c263077aa82563ff38c94bcd8fb670a796849b07f6edef56f",
+    "lib/mesa/libgbm.so.1": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+    "libexec/Xorg": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12",
+    "lib/xorg/modules/drivers/modesetting_drv.so": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+    "lib/xorg/modules/libglamoregl.so": "3d7a0cbc25544b164100bdcaa3d2caeee50ee22386bf440fb67e45e49df86e9e"
+  },
+  "raw_data_location": "RAM-backed /tmp"
+}
