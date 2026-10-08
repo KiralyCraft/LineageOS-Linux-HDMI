@@ -60,6 +60,8 @@ def main():
     ap.add_argument('--samples', type=int, choices=[0,4], default=0)
     ap.add_argument('--large-resize', action='store_true',
                     help='Unmanaged full-screen and near-full-screen allocation boundaries')
+    ap.add_argument('--interval-transitions', action='store_true',
+                    help='Exercise synchronized/unsynchronized swaps across resize generations')
     ap.add_argument('--flush-control', action='store_true', help='Diagnostic glFlush before swap; never glFinish')
     args = ap.parse_args()
     assert not args.large_resize or args.workload == 'resize-pattern'
@@ -130,10 +132,20 @@ def main():
     end = bind(G, 'glEnd', None, [])
     flush = bind(G, 'glFlush', None, [])
     swap = bind(G, 'glXSwapBuffers', None, [V, L])
+    swap_interval = bind(G, 'glXSwapIntervalEXT', None, [V, L, I])
     get_error = bind(G, 'glGetError', U, [])
     event = pattern.Event()
     capture = RootCapture(d, X, root, sw, sh) if args.workload != 'unique-resize' else None
     records = []
+    hidden_cursor = args.large_resize and args.interval_transitions
+    if hidden_cursor:
+        fixes = C.CDLL('libXfixes.so.3')
+        major, minor = I(5), I(0)
+        fixes.XFixesQueryVersion.argtypes = [V, C.POINTER(I), C.POINTER(I)]
+        assert fixes.XFixesQueryVersion(d, C.byref(major), C.byref(minor))
+        fixes.XFixesHideCursor.argtypes = fixes.XFixesShowCursor.argtypes = [V, L]
+        fixes.XFixesHideCursor(d, root)
+        sync(d, 0)
     samples = I()
     bind(G, 'glGetIntegerv', None, [U, C.POINTER(I)])(0x80a9, C.byref(samples))
     assert samples.value == args.samples, samples.value
@@ -141,6 +153,8 @@ def main():
                   pipeline_config={name:os.environ.get(name) for name in ['MESA_KGSL_X11_PIPELINE','MESA_KGSL_X11_INTEGRATED_RESOLVE','MESA_KGSL_HDMI_QUEUE','MESA_KGSL_HDMI_RESIZE_CAPACITY']},
                   flush_control=args.flush_control, records=records, physical_scanout_tested=False,
                   large_resize=args.large_resize,
+                  interval_transitions=args.interval_transitions,
+                  hidden_cursor=hidden_cursor,
                   note='Ordering screenshots synchronize server readback; unique-resize timings do not measure displayed FPS.')
 
     def drain_and_size():
@@ -188,6 +202,8 @@ def main():
                          (sw,sh),(sw-128,sh-128),(sw,sh)]*2
             quadrants = args.workload == 'resize-pattern'
             for serial in range(1, len(sizes)+1 if quadrants else 9):
+                if args.interval_transitions:
+                    swap_interval(d, window, 0 if (serial-1)//4 % 2 else 1)
                 if quadrants:
                     resize(d,window,*sizes[serial-1]); sync(d,0)
                 width, height, events = drain_and_size()
@@ -247,6 +263,9 @@ def main():
                  if (rows := [x for x in records if x['phase']==phase])}
         result['completed'] = True
     finally:
+        if hidden_cursor:
+            fixes.XFixesShowCursor(d, root)
+            sync(d, 0)
         bind(G, 'glFinish', None, [])()  # Final lifecycle only.
         make(d, 0, None)
         bind(G, 'glXDestroyContext', None, [V, V])(d, context)

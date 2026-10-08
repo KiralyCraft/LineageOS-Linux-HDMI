@@ -143,6 +143,8 @@ def main():
          str(src / 'present/present_execute.c')], env=sanitizer_env)
     run(['python3', str(repo / 'tests/graphics-contract/xorg-export-reply-fixture.py'),
          str(src)], env=sanitizer_env)
+    run(['python3', str(repo / 'tests/graphics-contract/xorg-repaint-deadline-unit.py'),
+         str(src / 'hw/xfree86/drivers/modesetting/pageflip.c')], env=sanitizer_env)
     for file, symbols in [
         (stage / 'usr/bin/Xorg', ['present_set_copy_release', 'present_drain_copy_releases',
                                  'dri3_set_fd_export_fence', 'dri3_has_fd_export_fence']),
@@ -154,7 +156,7 @@ def main():
                 raise RuntimeError(f'missing exported symbol: {symbol}')
     for relative, markers in {
         'usr/lib/xorg/modules/drivers/modesetting_drv.so':
-            ['HDMI_LOS_XORG_ASYNC_ABI=1', 'HDMI_LOS_XORG_RELEASE_ABI=1', 'HDMI_LOS_XORG_PRESENTER_ABI=1'],
+            ['HDMI_LOS_XORG_ASYNC_ABI=1', 'HDMI_LOS_XORG_RELEASE_ABI=1', 'HDMI_LOS_XORG_PRESENTER_ABI=1', 'HDMI_LOS_XORG_REPAINT_ABI=1'],
         'usr/lib/xorg/modules/libglamoregl.so': ['HDMI_LOS_XORG_COPY_ABI=1',
                                                'HDMI_LOS_XORG_EXPORT_ABI=1'],
     }.items():

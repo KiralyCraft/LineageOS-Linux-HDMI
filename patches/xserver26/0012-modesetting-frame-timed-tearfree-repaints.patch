@@ -1,0 +1,158 @@
+diff --git a/hw/xfree86/drivers/modesetting/driver.c b/hw/xfree86/drivers/modesetting/driver.c
+index 9277a29..bcfebed 100644
+--- a/hw/xfree86/drivers/modesetting/driver.c
++++ b/hw/xfree86/drivers/modesetting/driver.c
+@@ -733,6 +733,12 @@ ms_tearfree_do_flips(ScreenPtr pScreen)
+             RegionNil(&trf->buf[trf->back_idx ^ 1].dmg))
+             continue;
+ 
++        /* A frame-timed repaint collects independent clients' damage before
++         * taking the immutable GPU-copy snapshot. Waiting uses a server timer,
++         * never a sleep or a pending DRM flip entry. */
++        if (ms_tearfree_wait_repaint(crtc))
++            continue;
++
+         /* Flip. If it fails, notify the kernel of the front buffer damages */
+         if (ms_do_tearfree_flip(pScreen, crtc)) {
+             dispatch_damages(scrn, crtc, &trf->buf[trf->back_idx ^ 1].dmg,
+@@ -1516,6 +1522,18 @@ PreInit(ScrnInfoPtr pScrn, int flags)
+                 xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Asynchronous completion requires TearFree\n");
+                 return FALSE;
+             }
++            const char *window = getenv("HDMI_LOS_TEARFREE_REPAINT_US");
++            char *end = NULL;
++            long reserve = window ? strtol(window, &end, 10) : 8000;
++            if (reserve < 0 || reserve > 20000 ||
++                (window && (!*window || *end))) {
++                xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
++                           "Invalid HDMI_LOS_TEARFREE_REPAINT_US\n");
++                return FALSE;
++            }
++            ms->drmmode.tearfree_repaint_us = reserve;
++            xf86DrvMsg(pScrn->scrnIndex, X_INFO,
++                       "HDMI_LOS_XORG_REPAINT_ABI=1 reserve_us=%ld\n", reserve);
+             ms->drmmode.tearfree_async = TRUE;
+             xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                        "HDMI_LOS_XORG_ASYNC_ABI=1: fence-driven TearFree required\n");
+diff --git a/hw/xfree86/drivers/modesetting/driver.h b/hw/xfree86/drivers/modesetting/driver.h
+index d229088..70fb459 100644
+--- a/hw/xfree86/drivers/modesetting/driver.h
++++ b/hw/xfree86/drivers/modesetting/driver.h
+@@ -258,6 +258,7 @@ void
+ ms_tearfree_dri_abort_all(xf86CrtcPtr crtc);
+ 
+ Bool ms_do_tearfree_flip(ScreenPtr screen, xf86CrtcPtr crtc);
++Bool ms_tearfree_wait_repaint(xf86CrtcPtr crtc);
+ void ms_tearfree_cancel_copy(xf86CrtcPtr crtc);
+ void ms_tearfree_cancel_copies(ScreenPtr screen);
+ 
+diff --git a/hw/xfree86/drivers/modesetting/drmmode_display.h b/hw/xfree86/drivers/modesetting/drmmode_display.h
+index 95bd73e..4e4dc78 100644
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.h
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.h
+@@ -138,6 +138,7 @@ typedef struct {
+     Bool present_enable;
+     Bool tearfree_enable;
+     Bool tearfree_async;
++    unsigned tearfree_repaint_us;
+ 
+     uint32_t vrr_prop_id;
+     Bool use_ctm;
+@@ -192,6 +193,9 @@ typedef struct {
+     uint32_t copy_idx;
+     RegionRec copy_damage;
+     OsTimerPtr copy_timer;
++    OsTimerPtr repaint_timer;
++    Bool repaint_ready, repaint_pending;
++    uint64_t last_flip_ust;
+     uint64_t copy_started_us, copy_exported_us;
+     uint64_t copies, pixels, export_us, ready_us, max_export_us, max_ready_us;
+     uint32_t stats_last_ms;
+diff --git a/hw/xfree86/drivers/modesetting/pageflip.c b/hw/xfree86/drivers/modesetting/pageflip.c
+index f690e84..cab155a 100644
+--- a/hw/xfree86/drivers/modesetting/pageflip.c
++++ b/hw/xfree86/drivers/modesetting/pageflip.c
+@@ -647,6 +647,62 @@ ms_tearfree_dri_notify(drmmode_tearfree_ptr trf, uint64_t msc, uint64_t usec)
+     }
+ }
+ 
++/* Use the real last flip timestamp and mode period to choose the next copy
++ * deadline. A stale/future timestamp cannot seed a repaint timeline. Quantize
++ * down to milliseconds so the timer never deliberately consumes the reserve. */
++static unsigned
++ms_tearfree_repaint_delay(uint64_t last_ust, uint64_t now,
++                          uint64_t period, unsigned reserve)
++{
++    uint64_t remaining;
++    if (!reserve || !period || reserve >= period || !last_ust ||
++        now < last_ust || now - last_ust > 1000000)
++        return 0;
++    remaining = period - (now - last_ust) % period;
++    return remaining > reserve ? (remaining - reserve) / 1000 : 0;
++}
++
++static CARD32
++ms_tearfree_repaint_ready(OsTimerPtr timer, CARD32 now, void *data)
++{
++    xf86CrtcPtr crtc = data;
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    dc->tearfree.repaint_pending = FALSE;
++    dc->tearfree.repaint_ready = TRUE;
++    return 0;
++}
++
++Bool
++ms_tearfree_wait_repaint(xf86CrtcPtr crtc)
++{
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    unsigned reserve = dc->drmmode->tearfree_repaint_us;
++    double refresh = xf86ModeVRefresh(&crtc->mode);
++    unsigned delay;
++
++    if (!dc->drmmode->tearfree_async || !reserve)
++        return FALSE;
++    if (trf->repaint_ready) {
++        trf->repaint_ready = FALSE;
++        return FALSE;
++    }
++    if (trf->repaint_pending)
++        return TRUE;
++    if (refresh <= 0)
++        return FALSE;
++    delay = ms_tearfree_repaint_delay(trf->last_flip_ust, GetTimeInMicros(),
++                                     (uint64_t)(1000000.0 / refresh), reserve);
++    if (!delay)
++        return FALSE;
++    trf->repaint_timer = TimerSet(trf->repaint_timer, 0, delay,
++                                 ms_tearfree_repaint_ready, crtc);
++    if (!trf->repaint_timer)
++        FatalError("HDMI TearFree could not schedule its repaint deadline\n");
++    trf->repaint_pending = TRUE;
++    return TRUE;
++}
++
+ static void ms_tearfree_copy_clear(xf86CrtcPtr crtc, Bool restore);
+ static void
+ ms_tearfree_kernel_event(xf86CrtcPtr crtc)
+@@ -681,6 +737,7 @@ ms_tearfree_flip_handler(uint64_t msc, uint64_t usec, void *data)
+     /* Swap the buffers and complete the flip */
+     trf->back_idx ^= 1;
+     trf->flip_seq = 0;
++    trf->last_flip_ust = usec;
+ 
+     /* Notify DRI clients that their pixmaps are now visible on the display */
+     ms_tearfree_dri_notify(trf, msc, usec);
+@@ -780,6 +837,12 @@ ms_tearfree_cancel_copy(xf86CrtcPtr crtc)
+ {
+     drmmode_crtc_private_ptr dc = crtc->driver_private;
+     drmmode_tearfree_ptr trf = &dc->tearfree;
++    if (trf->repaint_timer) {
++        TimerFree(trf->repaint_timer);
++        trf->repaint_timer = NULL;
++    }
++    trf->repaint_ready = trf->repaint_pending = FALSE;
++    trf->last_flip_ust = 0;
+     if (!trf->copy_pending)
+         return;
+     /* Disable/modeset/teardown may destroy the destination. Drain only here;
