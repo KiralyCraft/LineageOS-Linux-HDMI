@@ -41,42 +41,74 @@ for name in ['result.json','host-repaint-test.log','final-validation.log']:
 (out/'source/xorg-built-series').write_text(''.join('patches/xserver26/'+p['name']+'\n' for p in xr['patches']))
 shutil.copy2(gears,out/'bin/glxgears')
 launcher=(out/'run-agent.sh').read_text()
-default='RESIZE_CAPACITY=${MESA_KGSL_HDMI_RESIZE_CAPACITY:-1}'
-assert launcher.count(default)==1
-launcher=launcher.replace(default,default+'\nPACED_QUEUE=${MESA_KGSL_HDMI_PACED_QUEUE:-1}\nPACED_LEAD=${MESA_KGSL_HDMI_PACED_LEAD:-1}\nREPAINT_US=${HDMI_LOS_TEARFREE_REPAINT_US:-8000}')
-launcher=launcher.replace('[--resize-capacity 0|1]','[--resize-capacity 0|1] [--paced-queue 0|1|2|3] [--paced-lead 1|2] [--repaint-us 0..20000]')
-anchor='        --resize-capacity)'
-assert launcher.count(anchor)==1
-launcher=launcher.replace(anchor,'''        --paced-queue|--paced-lead|--repaint-us)
+paced = 'PACED_QUEUE=${MESA_KGSL_HDMI_PACED_QUEUE:-1}'
+if paced in launcher:
+    for required in [paced, 'PACED_LEAD=${MESA_KGSL_HDMI_PACED_LEAD:-1}',
+                     'REPAINT_US=${HDMI_LOS_TEARFREE_REPAINT_US:-8000}',
+                     '--paced-queue "$PACED_QUEUE"', '--repaint-us "$REPAINT_US"']:
+        assert launcher.count(required) == 1, required
+else:
+    default='RESIZE_CAPACITY=${MESA_KGSL_HDMI_RESIZE_CAPACITY:-1}'
+    assert launcher.count(default)==1
+    launcher=launcher.replace(default,default+'\nPACED_QUEUE=${MESA_KGSL_HDMI_PACED_QUEUE:-1}\nPACED_LEAD=${MESA_KGSL_HDMI_PACED_LEAD:-1}\nREPAINT_US=${HDMI_LOS_TEARFREE_REPAINT_US:-8000}')
+    launcher=launcher.replace('[--resize-capacity 0|1]','[--resize-capacity 0|1] [--paced-queue 0|1|2|3] [--paced-lead 1|2] [--repaint-us 0..20000]')
+    anchor='        --resize-capacity)'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,'''        --paced-queue|--paced-lead|--repaint-us)
+                (($# >= 2)) || { usage; exit 2; }
+                if [[ $1 == --paced-queue ]]; then PACED_QUEUE=$2
+                elif [[ $1 == --paced-lead ]]; then PACED_LEAD=$2
+                else REPAINT_US=$2; fi
+                shift 2
+                ;;
+    '''+anchor)
+    anchor='if ((EUID != 0)); then'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,'[[ $PACED_QUEUE =~ ^[0-3]$ && $PACED_LEAD =~ ^[1-2]$ && $REPAINT_US =~ ^(0|[1-9][0-9]{0,4})$ && $REPAINT_US -le 20000 ]] || { usage; exit 2; }\n'+anchor)
+    anchor='args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE" --resize-capacity "$RESIZE_CAPACITY")'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,anchor+'\n    args+=(--paced-queue "$PACED_QUEUE" --paced-lead "$PACED_LEAD" --repaint-us "$REPAINT_US")')
+    anchor='export MESA_KGSL_HDMI_RESIZE_CAPACITY="$RESIZE_CAPACITY"'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,anchor+'\nexport MESA_KGSL_HDMI_PACED_QUEUE="$PACED_QUEUE" MESA_KGSL_HDMI_PACED_LEAD="$PACED_LEAD" HDMI_LOS_TEARFREE_REPAINT_US="$REPAINT_US"')
+lazy_default = 'LAZY_SLOTS=${MESA_KGSL_HDMI_LAZY_SLOTS:-1}'
+if lazy_default not in launcher:
+    anchor='REPAINT_US=${HDMI_LOS_TEARFREE_REPAINT_US:-8000}'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,anchor+'\n'+lazy_default)
+    launcher=launcher.replace('[--resize-capacity 0|1]', '[--resize-capacity 0|1] [--lazy-slots 0|1]')
+    anchor='        --resize-capacity)'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,"""        --lazy-slots)
             (($# >= 2)) || { usage; exit 2; }
-            if [[ $1 == --paced-queue ]]; then PACED_QUEUE=$2
-            elif [[ $1 == --paced-lead ]]; then PACED_LEAD=$2
-            else REPAINT_US=$2; fi
+            LAZY_SLOTS=$2
             shift 2
             ;;
-'''+anchor)
-anchor='if ((EUID != 0)); then'
-assert launcher.count(anchor)==1
-launcher=launcher.replace(anchor,'[[ $PACED_QUEUE =~ ^[0-3]$ && $PACED_LEAD =~ ^[1-2]$ && $REPAINT_US =~ ^(0|[1-9][0-9]{0,4})$ && $REPAINT_US -le 20000 ]] || { usage; exit 2; }\n'+anchor)
-anchor='args+=(--present-release "$PRESENT_RELEASE" --mesa-queue "$MESA_QUEUE" --resize-capacity "$RESIZE_CAPACITY")'
-assert launcher.count(anchor)==1
-launcher=launcher.replace(anchor,anchor+'\n    args+=(--paced-queue "$PACED_QUEUE" --paced-lead "$PACED_LEAD" --repaint-us "$REPAINT_US")')
-anchor='export MESA_KGSL_HDMI_RESIZE_CAPACITY="$RESIZE_CAPACITY"'
-assert launcher.count(anchor)==1
-launcher=launcher.replace(anchor,anchor+'\nexport MESA_KGSL_HDMI_PACED_QUEUE="$PACED_QUEUE" MESA_KGSL_HDMI_PACED_LEAD="$PACED_LEAD" HDMI_LOS_TEARFREE_REPAINT_US="$REPAINT_US"')
+"""+anchor)
+    anchor='if ((EUID != 0)); then'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,'[[ $LAZY_SLOTS == 0 || $LAZY_SLOTS == 1 ]] || { usage; exit 2; }\n'+anchor)
+    anchor='args+=(--paced-queue "$PACED_QUEUE" --paced-lead "$PACED_LEAD" --repaint-us "$REPAINT_US")'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,anchor+'\n    args+=(--lazy-slots "$LAZY_SLOTS")')
+    anchor='export MESA_KGSL_HDMI_RESIZE_CAPACITY="$RESIZE_CAPACITY"'
+    assert launcher.count(anchor)==1
+    launcher=launcher.replace(anchor,anchor+'\nexport MESA_KGSL_HDMI_LAZY_SLOTS="$LAZY_SLOTS"')
+assert b'HDMI_LOS_MESA_SLOT_ABI=1' in (out/'lib/mesa/libgallium-26.2.0-devel.so').read_bytes()
 (out/'run-agent.sh').write_text(launcher)
 for name in ['result.json','source-verification.json','cache-test.log']:
     shutil.copy2(build/name,out/'validation'/('pacing-mesa-'+name))
-for name,parent in [('pacing-on-065604e4b.patch','065604e4b'),('experiment-on-daa6e56de.patch','daa6e56de'),('stack-on-cc190637b.patch','cc190637b')]:
+for name,parent in [('demand-on-85c8dfd02.patch','85c8dfd02'),('pacing-on-065604e4b.patch','065604e4b'),('experiment-on-daa6e56de.patch','daa6e56de'),('stack-on-cc190637b.patch','cc190637b')]:
     with (out/'source/mesa'/name).open('wb') as f:subprocess.run(['git','-C',str(source),'diff',parent,commit],stdout=f,check=True)
 head=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD'],text=True).strip()
 shutil.rmtree(out/'source/hdmi');(out/'source/hdmi').mkdir()
 with subprocess.Popen(['git','-C',str(repo),'archive',head],stdout=subprocess.PIPE) as p:
     subprocess.run(['tar','xf','-','-C',str(out/'source/hdmi')],stdin=p.stdout,check=True);assert p.wait()==0
 info=json.loads((out/'build-info.json').read_text())
-info.update(source_commit=head,candidate='BCDEF-Xorg26-queued-event-fix-shallow-pacing')
+info.update(source_commit=head,candidate='BCDEF-Xorg26-shallow-pacing-demand-shared-images')
 info['components']['mesa']=dict(commit=commit,base=manifest['base'],build='validation/pacing-mesa-result.json')
 info['components']['xorg']=dict(version=xr['sources']['xserver']['version'],source_commit=head,build='validation/pacing-xorg-result.json',compiled_units=xr['compiled_units'],evdev=xr['sources']['evdev']['version'])
+info['demand_allocation']=dict(default=True,control='--lazy-slots 0',initial_images=1,maximum_images_per_generation=3,maximum_generations=3,actual_backing_limit_bytes=512*1024*1024,retirement='native completion plus Present COMPLETE and IDLE')
 info['pacing']=dict(repaint_reserve_us=8000,synchronized_pending_default=1,reprime_msc_lead=1,storage_retirement='complete plus idle',legacy_control='--paced-queue 0 --paced-lead 2',special_events='queued-only general drain; single socket reader',physical_4k60_tested=False)
 for name,entry in info['artifacts'].items():
     p=out/name
@@ -93,7 +125,7 @@ collects desktop damage until a frame-timed repaint deadline with an 8 ms reserv
 It uses real flip timestamps and the current mode period; native GPU fences and
 DRM completion still control image readiness and ownership. --repaint-us 0 disables
 that scheduling policy for comparison; --repaint-us accepts 0 through 20000.
-The complete Mesa and private Xorg stacks were rebuilt together on root@192.168.104.201.
+Shared destinations now begin with one image. Additional images are initialized only\nwhen every existing image is still owned. Existing complete-plus-idle retirement\nand the 512 MiB actual backing limit remain enforced. --lazy-slots 0 selects\nthe three-image eager control. This value survives sudo escalation. This change\nreduces allocation cost; it does not claim seamless active resizing.\n\nThe complete Mesa and private Xorg stacks were rebuilt together on root@192.168.104.201.
 
 The low-latency profile now permits one pending synchronized frame. Displayed
 scanout remains pinned until IDLE but does not block producing its replacement.

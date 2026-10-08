@@ -1,7 +1,6 @@
 import argparse,ctypes as C,json,pathlib,subprocess,time,os,sys
-sys.path.insert(0,'/home/kiraly/Downloads/hdmi-los-xorg26-20261007/tests/graphics-contract')
 from xroot_capture import RootCapture
-ap=argparse.ArgumentParser();ap.add_argument('output',type=pathlib.Path);ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--seconds',type=float,default=30);a=ap.parse_args();a.output.mkdir();
+ap=argparse.ArgumentParser();ap.add_argument('output',type=pathlib.Path);ap.add_argument('--binary',default='/usr/bin/glxgears');ap.add_argument('--maximize',action='store_true');ap.add_argument('--fullscreen',action='store_true');ap.add_argument('--hide-cursor',action='store_true');ap.add_argument('--pause-check',action='store_true');ap.add_argument('--static',action='store_true');ap.add_argument('--captures',action='store_true');ap.add_argument('--drm-captures',action='store_true');ap.add_argument('--background-pixel',type=lambda s:int(s,0));ap.add_argument('--seconds',type=float,default=30);a=ap.parse_args();a.output.mkdir();
 V,I,U,L=C.c_void_p,C.c_int,C.c_uint,C.c_ulong;X=C.CDLL('libX11.so.6')
 def bind(n,r,types):
  f=getattr(X,n);f.restype=r;f.argtypes=types;return f
@@ -20,8 +19,13 @@ def windows():
    if kids:free(C.cast(kids,V))
  return found
 before=windows();env=os.environ.copy();env['HDMI_FRAME_TRACE']=str(a.output/'trace.bin')
-log=(a.output/'stdout.log').open('w');child=subprocess.Popen([a.binary,'-geometry','640x480']+(['-fullscreen'] if a.fullscreen else []),env=env,stdout=log,stderr=subprocess.STDOUT)
-cap=RootCapture(d,X,root,sw,sh);record=[];keys=[];hidden=False
+if a.drm_captures:os.chown(a.output,4000,4000)
+log=(a.output/'stdout.log').open('w');child=subprocess.Popen([a.binary,'-geometry','640x480']+(['-fullscreen'] if a.fullscreen else []),env=env,stdout=log,stderr=subprocess.STDOUT,**({'user':4000,'group':4000,'extra_groups':[]} if a.drm_captures else {}))
+cap=RootCapture(d,X,root,sw,sh);record=[];keys=[];hidden=False;scanout=None
+if a.drm_captures:
+ assert os.geteuid()==0
+ from committed_framebuffer import Scanout
+ scanout=Scanout()
 class MessageData(C.Union):_fields_=[('l',L*5),('b',C.c_char*20)]
 class Message(C.Structure):_fields_=[('type',I),('serial',L),('send_event',I),('display',V),('window',L),('message_type',L),('format',I),('data',MessageData)]
 class Key(C.Structure):_fields_=[('type',I),('serial',L),('send_event',I),('display',V),('window',L),('root',L),('subwindow',L),('time',L),('x',I),('y',I),('x_root',I),('y_root',I),('state',U),('keycode',U),('same_screen',I)]
@@ -39,7 +43,10 @@ try:
   if len(new)==1:window=new[0];break
   assert child.poll() is None;time.sleep(.05)
  assert window
- name(d,window,b'HDMI stock gears pacing / resize test');sync(d,0)
+ name(d,window,b'HDMI gears pacing / resize test');sync(d,0)
+ if a.background_pixel is not None:
+  assert 0<=a.background_pixel<=0xffffff
+  bind('XSetWindowBackground',I,[V,L,L])(d,window,a.background_pixel);sync(d,0)
  if a.maximize:
   atom=bind('XInternAtom',L,[V,C.c_char_p,I]);e=Event();e.message=Message(type=33,display=d,window=window,message_type=atom(d,b'_NET_WM_STATE',0),format=32)
   e.message.data.l[:]=(1,atom(d,b'_NET_WM_STATE_MAXIMIZED_VERT',0),atom(d,b'_NET_WM_STATE_MAXIMIZED_HORZ',0),1,0)
@@ -64,8 +71,14 @@ try:
    resize(d,window,*size);sync(d,0);last=size
    if age>=12 and stop_time is None:stop_time=t
   row={'relative_seconds':age,'ns':time.monotonic_ns(),'requested':size}
-  if a.captures and t>=next_capture:
-   row['capture']=cap.capture(window,str(len(record)),{'age':age,'requested':size});next_capture=t+.2
+  if (a.captures or a.drm_captures) and t>=next_capture:
+   if a.drm_captures:
+    scanout.align();frame=cap.frame(window);bounds=cap.bounds(frame);client=cap.bounds(window);x,y,w,h=bounds
+    x1,y1=max(x,0),max(y,0);x2,y2=min(x+w,sw),min(y+h,sh)
+    row['capture']=scanout.read(x1,y1,x2-x1,y2-y1,{'age':age,'requested':size,'frame_bounds':bounds,'client_bounds':client})
+    row['capture']['geometry_stable']=bounds==cap.bounds(frame) and client==cap.bounds(window)
+   else:row['capture']=cap.capture(window,str(len(record)),{'age':age,'requested':size})
+   next_capture=t+.2
   record.append(row);time.sleep(max(0,.05-(time.monotonic()-t)))
 finally:
  if hidden:F.XFixesShowCursor(d,root);sync(d,0)
@@ -74,6 +87,8 @@ finally:
  except subprocess.TimeoutExpired:child.kill();code=child.wait(timeout=5)
  log.close()
  if cap.images:cap.save(a.output/'frames')
- (a.output/'result.json').write_text(json.dumps({'code':code,'binary':a.binary,'screen':[sw,sh],'static':a.static,'maximize':a.maximize,'fullscreen':a.fullscreen,'cursor_hidden':a.hide_cursor,'pause_key_ns':keys,'resize_stopped_ns':int(stop_time*1e9) if stop_time else None,'records':record,'physical_scanout_tested':False},indent=2)+'\n')
+ if scanout:
+  scanout.close();scanout.save(a.output/'scanout')
+ (a.output/'result.json').write_text(json.dumps({'code':code,'binary':a.binary,'background_pixel':a.background_pixel,'screen':[sw,sh],'static':a.static,'maximize':a.maximize,'fullscreen':a.fullscreen,'cursor_hidden':a.hide_cursor,'pause_key_ns':keys,'resize_stopped_ns':int(stop_time*1e9) if stop_time else None,'records':record,'physical_scanout_tested':False},indent=2)+'\n')
  bind('XCloseDisplay',I,[V])(d)
-print(json.dumps({'records':len(record),'captured':len(cap.records),'code':code}),flush=True)
+print(json.dumps({'records':len(record),'captured':len(scanout.records) if scanout else len(cap.records),'code':code}),flush=True)
