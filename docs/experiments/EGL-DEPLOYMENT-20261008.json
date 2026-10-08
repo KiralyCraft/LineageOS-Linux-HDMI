@@ -1,0 +1,36 @@
+{
+  "previous_xorg_pid": 23258,
+  "agent_pid": 8827,
+  "agent_path": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-resolve-order-20261007",
+  "runtime_source": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-egl-20261008",
+  "rollback_runtime": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-demand-20261008",
+  "magisk_changed": false,
+  "commands": [
+    {
+      "action": "pause",
+      "code": 0,
+      "output": "state=10 status=0 remaining=0 flags=0x1300 requested=3840x2160@30.000 active=3840x2160@30.000 detail=Linux paused; HDMI stays connected; use resume within five minutes\n"
+    },
+    {
+      "action": "resume",
+      "code": 0,
+      "output": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode\n"
+    }
+  ],
+  "new_xorg_pid": 20911,
+  "running": true,
+  "status": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode",
+  "xorg_sha256": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12",
+  "modesetting_sha256": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+  "post_restart_egl": {
+    "frames": 24,
+    "passed": 24,
+    "with_damage": true,
+    "renderer": "FD740",
+    "visual_depth": 24,
+    "result_sha256": "f3379063b92238ec3903a2f6a1432ca3675450c20397f44bfe9117f73c1a6d7a"
+  },
+  "bundle_checksum_sha256": "e72b67337ef66b55a07009a232b9aac1f91310c47a496e3e41dd0c87624174ec",
+  "mesa_commit": "a426a484523b6d8440adb3bbd1de8a4bd0e27502",
+  "raw_data_location": "RAM-backed /tmp"
+}
