@@ -1,0 +1,21 @@
+{
+  "runtime_source": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-pacing-20261008",
+  "agent_path": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-resolve-order-20261007",
+  "agent_pid": 8827,
+  "new_xorg_pid": 26221,
+  "xorg_sha256": "c8fdea22a128875846528cda27905a9f73ba71f092b831756512fb473f826f12",
+  "modesetting_sha256": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+  "magisk_changed": false,
+  "status": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode",
+  "rollback_runtime": "/home/kiraly/Downloads/hdmi-termux-vblank-min-coexist-usb-bt-bcdef-xorg26-interop-capacity-20261008",
+  "mesa_commit": "85c8dfd02a0d86d8203872149784a6b798864ad2",
+  "hdmi_code_commit": "05e6224e88659c3a9ea452f72d043b1e16101770",
+  "checksum_manifest_sha256": "21004fd56c717a11b66bedd8c6594c9b0ad6a62c9d615a4a0bd3a79abf83c1e6",
+  "post_persistent_restart_image_checks": "24/24 PASS",
+  "phone_magisk_broker": "0.4.3-restart-6d19c959b8c4",
+  "phone_magisk_power": "0.1.4-98f97e06dee7",
+  "physical_panel_tested": false,
+  "continuous_desktop_running": true,
+  "trace_instances_cleaned": true,
+  "cpu7_online": true
+}
