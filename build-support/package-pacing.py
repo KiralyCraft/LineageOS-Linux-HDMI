@@ -10,7 +10,7 @@ ap=argparse.ArgumentParser(description=__doc__)
 for name in ['base','build','source','repository','gears','xorg_build','output']:
     ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
 a=ap.parse_args()
-base,build,source,repo,gears,out=(getattr(a,n).resolve() for n in ['base','build','source','repository','gears','xorg_build','output'])
+base,build,source,repo,gears,xorg,out=(getattr(a,n).resolve() for n in ['base','build','source','repository','gears','xorg_build','output'])
 assert not out.exists()
 subprocess.run(['sha256sum','--strict','-c','SHA256SUMS'],cwd=base,check=True,stdout=subprocess.DEVNULL)
 manifest=json.loads((build/'result.json').read_text())
