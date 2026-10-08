@@ -1,0 +1,201 @@
+{
+  "mesa_commit": "eff5c22036c93e9b0c5fc9a7525c46f636e61937",
+  "control_commit": "08a3ec46412f3a2dbb708cecd07bb82ca85384d9",
+  "mode": [
+    3840,
+    2160,
+    30
+  ],
+  "physical_optical_capture": false,
+  "post_swap_readback": "correctness only",
+  "magisk_changed": false,
+  "cases": [
+    {
+      "case": "r13-next-back-fixed",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 240,
+      "passed": 223,
+      "resize_primes": 0,
+      "ages": {
+        "0": 3,
+        "1": 237
+      },
+      "result_sha256": "743df36e3cd36611016798700bd1c403eb97355dc8587ee8a9c2ab3e372afbbc",
+      "log_sha256": "af499f9d57fce3c5b24fa39e2a96abe444b23a0da3edc981013d43b271d10afb"
+    },
+    {
+      "case": "r13-defined-resize",
+      "swaps": 31,
+      "frames": 24,
+      "checked": 24,
+      "passed": 16,
+      "resize_primes": 7,
+      "ages": {
+        "0": 3,
+        "1": 21
+      },
+      "result_sha256": "ab9bc1e4799625e686c28b7068f9a1bca2eeb97dcf4420e81fbf26dfbe9c4593",
+      "log_sha256": "e48bb58e4a554b7f0f732fecb862df9c3452eb146872861c392deadabac19547"
+    },
+    {
+      "case": "r14-next-back-fixed",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 240,
+      "passed": 240,
+      "resize_primes": 0,
+      "ages": {
+        "0": 1,
+        "1": 239
+      },
+      "result_sha256": "f76e0cd08d38db5b3f7d8e35c12bf74e57a6f4ea2dcc214a7b5cb9ac7489cc2d",
+      "log_sha256": "944b1f686c36ec8277cc7b23453c18223b8dba008316437e91873473aea825ed"
+    },
+    {
+      "case": "r14-contract-fixed-noage",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 240,
+      "passed": 240,
+      "resize_primes": 0,
+      "ages": {
+        "1": 240
+      },
+      "result_sha256": "15995443e3c4e2fd502081e972176105ec012fee8722a039315bafadfc1e1670",
+      "log_sha256": "6f1fc09e5139b67c77b082371d0ea5fc4b19fda9f8a1c48f93c5004f4105d672"
+    },
+    {
+      "case": "r14-defined-resize",
+      "swaps": 31,
+      "frames": 24,
+      "checked": 24,
+      "passed": 24,
+      "resize_primes": 7,
+      "ages": {
+        "0": 1,
+        "1": 23
+      },
+      "result_sha256": "f7f38ae4c0516219d3ce81e7a2dd66be36742b9c2744fa149ec1a34196e5a62e",
+      "log_sha256": "54b1b24be09bfad8b9698e708fa28a4c6363e267bb2abc3cc80dafe26d34c042"
+    },
+    {
+      "case": "r14-defined-noage",
+      "swaps": 31,
+      "frames": 24,
+      "checked": 24,
+      "passed": 24,
+      "resize_primes": 7,
+      "ages": {
+        "1": 24
+      },
+      "result_sha256": "b68dfc402430af5f3c8e33c31490c3fd36b1e3105ad8388f28504619e0be5325",
+      "log_sha256": "e51d0f6ef9b3ad5cd65c814430daf6443395e432eb616e9802d6e909fd5ed85f"
+    },
+    {
+      "case": "r14-preserved-burst",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 8,
+      "passed": 8,
+      "resize_primes": 0,
+      "ages": {
+        "0": 1,
+        "1": 239
+      },
+      "result_sha256": "dc472542a4cdb5f9a5bc2cc5a870083b863476c4044fb994f67d3787aba7e0bc",
+      "log_sha256": "6758e846dbe532aa4bfd7b21a2d1dfaa42d2e938f055ba99b69a9fc1dcf239ae"
+    },
+    {
+      "case": "r14-ordinary-burst",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 8,
+      "passed": 8,
+      "resize_primes": 0,
+      "ages": {
+        "0": 2,
+        "2": 170,
+        "1": 40,
+        "3": 19,
+        "4": 7,
+        "6": 1,
+        "5": 1
+      },
+      "result_sha256": "a131e8cf7595d0b99594aa91fa05c8a77ce48e754ce7e575d264e9e7c8663579",
+      "log_sha256": "c42c1093eee0b5392b5e82a14149febac7dbfc938e1d052bd11ab608216223c9"
+    },
+    {
+      "case": "r14-preserved-noage-burst",
+      "swaps": 240,
+      "frames": 240,
+      "checked": 8,
+      "passed": 8,
+      "resize_primes": 0,
+      "ages": {
+        "1": 240
+      },
+      "result_sha256": "b981fc9a0ad30a1a6949c9dbb3eac57b00c3c802c547a98b12a12d1c877f4a5f",
+      "log_sha256": "78633202946c891cf1acab097e614173a21f94a50b5382eb0429cb025f171a1e"
+    },
+    {
+      "case": "r14-egl-full",
+      "swaps": 24,
+      "frames": 24,
+      "checked": 24,
+      "passed": 24,
+      "resize_primes": 0,
+      "ages": {
+        "null": 24
+      },
+      "result_sha256": "3d37e4729aa35e6b20df7f2374cff963ea73ee9ff0e05744fd397925440e3297",
+      "log_sha256": "15e21399b25463c8ff1052837759530e1e6403c2af6889217e31e430dbc66874"
+    },
+    {
+      "case": "r14-egl-damage",
+      "swaps": 24,
+      "frames": 24,
+      "checked": 24,
+      "passed": 24,
+      "resize_primes": 0,
+      "ages": {
+        "null": 24
+      },
+      "result_sha256": "50d2ba971fb12c290bf838d160c827d94d2bb2f012178e38883f656a71013677",
+      "log_sha256": "ce0cab494744a624f3409ff77aead0c4e84d176205e0102c345ade6585b50feb"
+    },
+    {
+      "case": "r14-glx-msaa",
+      "swaps": 24,
+      "frames": 24,
+      "checked": 24,
+      "passed": 24,
+      "resize_primes": 0,
+      "ages": {
+        "null": 24
+      },
+      "result_sha256": "65af6427d976734bfe48e2ee88426da66edfee4db59e23fffc27065d55f6247a",
+      "log_sha256": "77651385f717af3b39bd1d3b7afad25e2577500cff3251ea9a3bcdd2b9ee9d77"
+    }
+  ],
+  "build": {
+    "commit": "eff5c22036c93e9b0c5fc9a7525c46f636e61937",
+    "base": "cc190637b670f522f60a294caeb4412cee1ea477",
+    "seconds_this_run": 15.249380111694336,
+    "tests": {
+      "src/freedreno/drm/kgsl_bo_handle_test": "skipped: device unavailable",
+      "src/x11/kgsl_device_selection_test": "skipped: device unavailable"
+    },
+    "files": {
+      "usr/lib/libgbm.so.1.0.0": "653474a86d39b498f49336499dd8d21c08da83dec87129646e336f2275787f8f",
+      "usr/lib/libgallium-26.2.0-devel.so": "296b411e488e689fcf0dd593b13b25dca2c980c6ff22ccdd5585fc832c102c99",
+      "usr/lib/libGLX_mesa.so.0.0.0": "a525c302c9a92e5c263077aa82563ff38c94bcd8fb670a796849b07f6edef56f",
+      "usr/lib/libEGL_mesa.so.0.0.0": "c11ac86fcb8dfd89d08d56a425593accd6126e9ae64f4540479858d6cd730459",
+      "usr/lib/pkgconfig/dri.pc": "0ef0ad154b083686235bc2148b64f84e3cad3c02ab807179ea66c014c60e5b33",
+      "usr/lib/pkgconfig/gbm.pc": "dc758a99eedc7aae15ba56488d1aeec45beadfdc83421afaca17d852cc6927e6",
+      "usr/lib/dri/libdril_dri.so": "db3b5424b8bec640db4414ac9c620f02418489207476f869c658aae0b1def561",
+      "usr/lib/gbm/dri_gbm.so": "868e7656a0baff277ef4d2b31307dc0078f6de812e8f0ffc0244e700eb818fc7"
+    },
+    "note": "Not installed. Hardware allocation regression and live presentation still require validation."
+  }
+}

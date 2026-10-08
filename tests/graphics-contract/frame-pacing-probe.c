@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <xcb/present.h>
+#include <xcb/xfixes.h>
 
 #define LIMIT 262144u
 struct record { uint64_t begin,end; int64_t data[5]; uint32_t event,tid; };
@@ -44,8 +45,10 @@ static void note(unsigned event,uint64_t begin,uint64_t end,int64_t a,int64_t b,
 }
 static void write_all(int fd,const void *data,size_t size){const char *p=data;while(size){ssize_t n=write(fd,p,size);if(n<0&&errno==EINTR)continue;if(n<=0)break;p+=n;size-=n;}}
 static void dump(void){
+ /* A vfork/posix_spawn child can share our address space. Never clear the
+  * parent's recording state from that child; CLOEXEC/exit closes its FD. */
+ if(getpid()!=owner)return;
  int fd=atomic_exchange_explicit(&output,-1,memory_order_relaxed);if(fd<0)return;
- if(getpid()!=owner){close(fd);return;}
  unsigned count=atomic_load_explicit(&used,memory_order_relaxed),limit=count>LIMIT?LIMIT:count;
  uint64_t header[4]={UINT64_C(0x31305046494d4448),64,count,stamp()};
  write_all(fd,header,sizeof(header));
@@ -74,6 +77,7 @@ static void *resolve_symbol(const char *name){
  void *symbol=dlsym(RTLD_NEXT,name);if(symbol)return symbol;
  const char *library=NULL;
  if(!strncmp(name,"xcb_present_",12))library="libxcb-present.so.0";
+ else if(!strncmp(name,"xcb_xfixes_",11))library="libxcb-xfixes.so.0";
  else if(!strncmp(name,"xcb_sync_",9))library="libxcb-sync.so.1";
  else if(!strncmp(name,"xcb_",4))library="libxcb.so.1";
  else if(!strncmp(name,"egl",3))library="libEGL.so.1";
@@ -104,6 +108,13 @@ int XPending(Display*d){RESOLVE(XPending);int r=real_XPending(d);uint64_t t=stam
 DECLARE(xcb_present_pixmap,xcb_void_cookie_t,(xcb_connection_t*,xcb_window_t,xcb_pixmap_t,uint32_t,xcb_xfixes_region_t,xcb_xfixes_region_t,int16_t,int16_t,xcb_randr_crtc_t,xcb_sync_fence_t,xcb_sync_fence_t,uint32_t,uint64_t,uint64_t,uint64_t,uint32_t,const xcb_present_notify_t*))
 xcb_void_cookie_t xcb_present_pixmap(xcb_connection_t*c,xcb_window_t w,xcb_pixmap_t p,uint32_t s,xcb_xfixes_region_t v,xcb_xfixes_region_t u,int16_t x,int16_t y,xcb_randr_crtc_t crtc,xcb_sync_fence_t wait,xcb_sync_fence_t idle,uint32_t options,uint64_t target,uint64_t div,uint64_t rem,uint32_t n,const xcb_present_notify_t*notify){
  RESOLVE(xcb_present_pixmap);uint64_t b=stamp();xcb_void_cookie_t r=real_xcb_present_pixmap(c,w,p,s,v,u,x,y,crtc,wait,idle,options,target,div,rem,n,notify);note(7,b,stamp(),s,options,target,w,p);return r;
+}
+/* The HDMI worker sets the logical valid region immediately before Present.
+ * Trace its dimensions to distinguish a late old-sized image from damage or
+ * rendering inside a correctly sized image. No X round trip or readback. */
+DECLARE(xcb_xfixes_set_region,xcb_void_cookie_t,(xcb_connection_t*,xcb_xfixes_region_t,uint32_t,const xcb_rectangle_t*))
+xcb_void_cookie_t xcb_xfixes_set_region(xcb_connection_t*c,xcb_xfixes_region_t region,uint32_t n,const xcb_rectangle_t*rects){
+ RESOLVE(xcb_xfixes_set_region);uint64_t b=stamp();xcb_void_cookie_t r=real_xcb_xfixes_set_region(c,region,n,rects);note(13,b,stamp(),region,n,n?rects[0].width:0,n?rects[0].height:0,(intptr_t)c);return r;
 }
 static void event(xcb_generic_event_t*e,uint64_t t){
  if(!e||(e->response_type&127)!=XCB_GE_GENERIC)return;

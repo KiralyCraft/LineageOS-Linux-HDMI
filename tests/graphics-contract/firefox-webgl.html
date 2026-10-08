@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><title>HDMI WM resize WebGL diagnostic</title>
+<style>html,body{margin:0;overflow:hidden;background:#e511ad}canvas{position:absolute;inset:0;width:100%;height:100%}#info{position:absolute;top:8px;left:8px;background:white;color:black;font:16px monospace;z-index:1}</style><canvas id="canvas"></canvas><div id="info"></div>
+<script>
+const canvas=document.querySelector('canvas'),info=document.querySelector('#info');
+const gl=canvas.getContext('webgl2',{antialias:false,preserveDrawingBuffer:false});
+window.framesLog=[];window.frameNumber=0;window.diagnostic={webgl:!!gl};
+if(gl){const ext=gl.getExtension('WEBGL_debug_renderer_info');window.diagnostic.renderer=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);window.diagnostic.vendor=ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):gl.getParameter(gl.VENDOR);window.diagnostic.contextAttributes=gl.getContextAttributes();}
+function draw(t){const start=performance.now();if(gl){let w=innerWidth*devicePixelRatio|0,h=innerHeight*devicePixelRatio|0;if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);const id=++window.frameNumber;gl.enable(gl.SCISSOR_TEST);for(let q=0;q<4;q++){const x=q%2,y=q>>1;gl.scissor(x*(w>>1),y*(h>>1),x?w-(w>>1):w>>1,y?h-(h>>1):h>>1);gl.clearColor((32+((id*37+q*41)%192))/255,(32+((id*71+q*41)%192))/255,(32+((id*29+q*41)%192))/255,1);gl.clear(gl.COLOR_BUFFER_BIT);}gl.disable(gl.SCISSOR_TEST);window.framesLog.push({t,w,h,id,drawMs:performance.now()-start});if(window.framesLog.length>10000)window.framesLog.shift();info.textContent=id+' '+w+'x'+h+' '+window.diagnostic.renderer;}else{info.textContent='WebGL unavailable';}requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script>

@@ -11,8 +11,9 @@ screenshot_samples=checks.screenshot_samples
 
 from ctypes import c_void_p as V,c_int as I,c_uint as U,c_ulong as L
 spec=importlib.util.spec_from_file_location('p',pathlib.Path(__file__).with_name('leased-pattern.py'));p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
-ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('output',type=pathlib.Path);ap.add_argument('--preserved',action='store_true');ap.add_argument('--burst',action='store_true');ap.add_argument('--no-age-query',action='store_true');a=ap.parse_args()
+ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('output',type=pathlib.Path);ap.add_argument('--preserved',action='store_true');ap.add_argument('--burst',action='store_true');ap.add_argument('--no-age-query',action='store_true');ap.add_argument('--check-next-back',action='store_true');a=ap.parse_args()
 if a.no_age_query and not a.preserved:ap.error('--no-age-query requires --preserved')
+if a.check_next_back and not a.preserved:ap.error('--check-next-back requires --preserved')
 a.output.mkdir()
 X,E,G=C.CDLL('libX11.so.6'),C.CDLL('libEGL.so.1'),C.CDLL('libGLESv2.so.2')
 def bind(lib,n,r,t):
@@ -40,11 +41,12 @@ surface=bind(E,'eglCreateWindowSurface',V,[V,V,L,C.POINTER(I)])(ed,config,win,no
 make=bind(E,'eglMakeCurrent',U,[V,V,V,V]);assert surface and ctx and make(ed,surface,surface,ctx)
 renderer=bind(G,'glGetString',C.c_char_p,[U])(0x1f01).decode();assert 'FD740' in renderer,renderer
 viewport=bind(G,'glViewport',None,[I]*4);clear_color=bind(G,'glClearColor',None,[C.c_float]*4);clear=bind(G,'glClear',None,[U]);scissor=bind(G,'glScissor',None,[I]*4);enable=bind(G,'glEnable',None,[U]);disable=bind(G,'glDisable',None,[U]);geterr=bind(G,'glGetError',U,[])
+read_pixel=bind(G,'glReadPixels',None,[I,I,I,I,U,U,V]);pixel=(C.c_ubyte*4)()
 geteglerr=bind(E,'eglGetError',U,[])
 getproc=bind(E,'eglGetProcAddress',V,[C.c_char_p]);f=getproc(b'eglSwapBuffersWithDamageKHR');assert f;damageswap=C.CFUNCTYPE(U,V,V,C.POINTER(I),I)(f)
 query_surface=bind(E,'eglQuerySurface',U,[V,V,I,C.POINTER(I)]);surface_attrib=bind(E,'eglSurfaceAttrib',U,[V,V,I,I]);
 if a.preserved:assert surface_attrib(ed,surface,0x3093,0x3094),hex(geteglerr())
-cap=RootCapture(d,X,root,sw,sh);rows=[];result={'renderer':renderer,'egl':[major.value,minor.value],'depth':vi.contents.depth,'with_damage':True,'physical_scanout_tested':False,'records':rows,'preserved':a.preserved,'partial_damage':True,'no_age_query':a.no_age_query}
+cap=RootCapture(d,X,root,sw,sh);rows=[];resize_primes=[];result={'renderer':renderer,'egl':[major.value,minor.value],'depth':vi.contents.depth,'with_damage':True,'physical_scanout_tested':False,'records':rows,'preserved':a.preserved,'partial_damage':True,'no_age_query':a.no_age_query,'check_next_back':a.check_next_back,'post_swap_readback_for_contract_validation':a.check_next_back,'resize_primes':resize_primes}
 
 scene=[[32+(i*f+19)%192 for f in [37,71,29]] for i in range(16)];history=[];last_size=None
 try:
@@ -56,6 +58,21 @@ try:
    while cap.bounds(win)[2:]!=[width,height] and time.monotonic()<deadline:time.sleep(.005)
    assert cap.bounds(win)[2:]==[width,height]
   while pending(d):next_event(d,C.byref(event))
+  if (width,height)!=last_size:
+   # Resolve the EGL surface's new size before drawing. A native X resize
+   # alone does not update the current EGL framebuffer; otherwise a full
+   # repaint can be clipped to the preceding allocation before Swap.
+   ew,eh=I(),I()
+   assert query_surface(ed,surface,0x3057,C.byref(ew)),hex(geteglerr())
+   assert query_surface(ed,surface,0x3056,C.byref(eh)),hex(geteglerr())
+   assert (ew.value,eh.value)==(width,height),(ew.value,eh.value,width,height)
+   if a.check_next_back and (width,height)!=(last_size or (640,480)):
+    # EGL makes buffer contents undefined when the native window changes
+    # size, even with PRESERVED. Let that resize swap adopt the new storage,
+    # then establish a fresh full scene before checking preservation.
+    prime_ok=damageswap(ed,surface,None,0);prime_error=geteglerr()
+    resize_primes.append(dict(before_serial=serial,geometry=[width,height],swap_ok=int(prime_ok),egl_error=hex(prime_error)))
+    assert prime_ok and prime_error==0x3000
   age=I(1 if a.preserved else 0)
   if not a.no_age_query:assert query_surface(ed,surface,0x313d,C.byref(age)),hex(geteglerr())
   changed=(serial*7)%16;scene[changed]=[32+(serial*f+11)%192 for f in [37,71,29]];history.append(changed)
@@ -65,6 +82,17 @@ try:
   for index in sorted(repair):
    x=index%4;y=index//4;x0=x*width//4;x1=(x+1)*width//4;y0=y*height//4;y1=(y+1)*height//4;scissor(x0,y0,x1-x0,y1-y0);clear_color(*(c/255 for c in scene[index]),1);clear(0x4000);rectangles.extend([x0,y0,x1-x0,y1-y0])
   disable(0xc11);start=time.monotonic_ns();ok=damageswap(ed,surface,(I*len(rectangles))(*rectangles),len(rectangles)//4);swapms=(time.monotonic_ns()-start)/1e6;eglerr=geteglerr();glerr=geterr()
+  if a.check_next_back:
+   # EGL_BUFFER_PRESERVED promises the next back contains this scene. This
+   # explicit contract check reads after Swap, never before presentation.
+   # It is not a performance or cross-process visibility measurement.
+   bad=[];pixels=[]
+   for index in range(16):
+    x=int(width*((index%4)+.5)/4);y=int(height*((index//4)+.5)/4)
+    read_pixel(x,y,1,1,0x1908,0x1401,C.cast(pixel,V));color=list(pixel)[:3];pixels.append(color)
+    if any(abs(c-e)>1 for c,e in zip(color,scene[index])):bad.append(index)
+   read_error=geterr();passed=bool(ok and eglerr==0x3000 and glerr==0 and read_error==0 and not bad)
+   rows.append(dict(serial=serial,geometry=[width,height],buffer_age=age.value,swap_ok=int(ok),egl_error=hex(eglerr),gl_error=glerr,read_error=read_error,swap_ms=swapms,expected=[c[:] for c in scene],pixels=pixels,bad_tiles=bad,passed=passed));last_size=(width,height);continue
   if a.burst and serial%30!=0:
    rows.append(dict(serial=serial,geometry=[width,height],buffer_age=age.value,swap_ok=int(ok),egl_error=hex(eglerr),gl_error=glerr,full_repaint=full,passed=None,swap_ms=swapms));last_size=(width,height);continue
   time.sleep(.2)

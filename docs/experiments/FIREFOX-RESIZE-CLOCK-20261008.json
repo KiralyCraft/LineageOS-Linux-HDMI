@@ -1,0 +1,478 @@
+{
+  "mesa_commit": "08a3ec46412f3a2dbb708cecd07bb82ca85384d9",
+  "mode": [
+    3840,
+    2160,
+    30
+  ],
+  "hardware": {
+    "compositing": "WebRender",
+    "adapter": "FD740",
+    "webgl": "freedreno -- FD740"
+  },
+  "cases": [
+    {
+      "case": "firefox-preserved-bare-after-wm",
+      "raf_frames": 842,
+      "captures": 75,
+      "classified": 58,
+      "unclassified": 17,
+      "unclassified_ages": [
+        8.446951975995034,
+        8.848324735998176,
+        9.048941662993457,
+        9.24968817399349,
+        9.450560360994132,
+        9.651192808996711,
+        9.852325464999012,
+        10.053073277995281,
+        10.253724579997652,
+        10.454354631998285,
+        10.654969422997965,
+        10.855675464998058,
+        11.056399891996989,
+        11.257076141999278,
+        11.45784905799519,
+        11.658444161999796,
+        11.859063640993554
+      ],
+      "raf_intervals_ms": {
+        "mean": 17.997384066587383,
+        "p95": 33.34000000002561,
+        "max": 34.740000000048894
+      },
+      "result_sha256": "a7b346deda1c3993c4f1f532ac6b54b2c43e9332b10261a4ed4d0c200740a3c8",
+      "pattern_sha256": "885bfa2f88f647f14da3529c23554037d107e5a4b63e555509796f4e59db5aab"
+    },
+    {
+      "case": "firefox-preserved-bare-wm",
+      "raf_frames": 840,
+      "captures": 75,
+      "classified": 62,
+      "unclassified": 13,
+      "unclassified_ages": [
+        8.843026715003361,
+        9.244215465005254,
+        9.645833642003709,
+        9.846532756004308,
+        10.04729692300316,
+        10.247937235006248,
+        10.448542444006307,
+        10.84999098499975,
+        11.050630880999961,
+        11.255920777002757,
+        11.456445360003272,
+        11.65706327600492,
+        11.85783884900593
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.040238379022643,
+        "p95": 33.39999999999782,
+        "max": 51.52000000000044
+      },
+      "result_sha256": "6d8a205b0310dd4ffc9753328c53c62ca05b2f499152ed78f0e592d8201b7ca3",
+      "pattern_sha256": "6f1537c07283760c5e9bce164b8b73aded76db44760b03b3ae8290c666c45b46"
+    },
+    {
+      "case": "firefox-preserved-circle-wm",
+      "raf_frames": 837,
+      "captures": 75,
+      "classified": 74,
+      "unclassified": 1,
+      "unclassified_ages": [
+        2.328100526938215e-05
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.125622009569373,
+        "p95": 33.400000000001455,
+        "max": 51.4800000000032
+      },
+      "result_sha256": "ca58d787195928580fa4726e7e0263d641354406a547f76541da6bd25f226ff6",
+      "pattern_sha256": "0e0163ee57bd464fdbcdf7d6ed233f431a0060a55781343189b9279bfc64245f"
+    },
+    {
+      "case": "firefox-preserved-full-wm",
+      "raf_frames": 834,
+      "captures": 75,
+      "classified": 56,
+      "unclassified": 19,
+      "unclassified_ages": [
+        8.250861872002133,
+        8.452361194998957,
+        8.657255412996165,
+        8.857837028001086,
+        9.058477965001657,
+        9.259706402997836,
+        9.460667236002337,
+        9.661323068998172,
+        9.862148277003143,
+        10.063275672997406,
+        10.263980933996208,
+        10.464749892002146,
+        10.665885517002607,
+        10.866627600000356,
+        11.069892496001557,
+        11.270444683003007,
+        11.471011975001602,
+        11.671739422999963,
+        11.872457131001283
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.211524609843938,
+        "p95": 33.400000000000546,
+        "max": 51.47999999999956
+      },
+      "result_sha256": "1e3ef6478a5ec26dd8c328380134dde2ae7f95e5cb9b4d1dd6412d61ed6ebbc4",
+      "pattern_sha256": "b8646f52aa6e01d384151d73d333dfe3a2c033c4797ebddbb9724f491e7db1af"
+    },
+    {
+      "case": "firefox-preserved-legacy-wm",
+      "raf_frames": 718,
+      "captures": 75,
+      "classified": 58,
+      "unclassified": 17,
+      "unclassified_ages": [
+        8.447729633000563,
+        8.648390414004098,
+        9.050281976000406,
+        9.251462705004087,
+        9.452932288004376,
+        9.653639528005442,
+        9.855017809000856,
+        10.055554007005412,
+        10.256124424005975,
+        10.457062028006476,
+        10.657816663006088,
+        10.85863155900006,
+        11.059340725005313,
+        11.259937809001713,
+        11.46061791300599,
+        11.661620829007006,
+        11.862741349999851
+      ],
+      "raf_intervals_ms": {
+        "mean": 21.132803347280337,
+        "p95": 34.400000000001455,
+        "max": 84.22000000000116
+      },
+      "result_sha256": "998c5535db5e3542ed3cb0ac481844f48986d97d9d12b73cf8892f38e7d9c7a5",
+      "pattern_sha256": "c883495e475f8933b8b00fb784a1d38a373daa9cbb6e05b67a4b9a87aeafac39"
+    },
+    {
+      "case": "firefox-preserved-noage-wm",
+      "raf_frames": 820,
+      "captures": 75,
+      "classified": 56,
+      "unclassified": 19,
+      "unclassified_ages": [
+        8.248252600998967,
+        8.448911143001169,
+        8.649669892001839,
+        8.850282653002068,
+        9.05086468400259,
+        9.25170077799703,
+        9.452605047998077,
+        9.653241767002328,
+        9.85439322500315,
+        10.05502780900133,
+        10.255620828997053,
+        10.456182704001549,
+        10.6571632769992,
+        10.857941453999956,
+        11.058674995998445,
+        11.25966181900003,
+        11.460298589001468,
+        11.660906140998122,
+        11.861531454000215
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.480537240537238,
+        "p95": 33.5,
+        "max": 50.57999999999811
+      },
+      "result_sha256": "ce406c2dd6d7a8873e8c7a91866585d637092cb15102a1d4023b032c6333ce18",
+      "pattern_sha256": "7449f3efa00398b6344b1717c53eb47cbbd7ee5e6a09994cf94b7e195b195a9a"
+    },
+    {
+      "case": "firefox-preserved-region-wm",
+      "raf_frames": 831,
+      "captures": 75,
+      "classified": 64,
+      "unclassified": 11,
+      "unclassified_ages": [
+        9.04442119399755,
+        9.245308433994069,
+        10.249533224996412,
+        10.45019785999466,
+        10.663144370999362,
+        10.863835880998522,
+        11.064509682997596,
+        11.26520989099663,
+        11.46596577699529,
+        11.666546140993887,
+        11.86709905799944
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.255783132530123,
+        "p95": 33.5,
+        "max": 50.57999999999993
+      },
+      "result_sha256": "f08beced05881297062c96a72332e54534daa24aa91aaeb855ec28bc027855ea",
+      "pattern_sha256": "282925243d6704fa34cd9abb0807667608d01be658844c260c5d139d621a1ac0"
+    },
+    {
+      "case": "firefox-preserved-shadow-wm",
+      "raf_frames": 786,
+      "captures": 75,
+      "classified": 55,
+      "unclassified": 20,
+      "unclassified_ages": [
+        8.051070413996058,
+        8.257597080999403,
+        8.458247132999531,
+        8.658869632999995,
+        8.859772913994675,
+        9.060702236994985,
+        9.261324267994496,
+        9.46188926800096,
+        9.663951090995397,
+        9.865194319994771,
+        10.06593994499417,
+        10.269618016995082,
+        10.470210725994548,
+        10.671738381999603,
+        10.872604215001047,
+        11.07427999599895,
+        11.276220568994177,
+        11.479178068999317,
+        11.688077443999646,
+        11.890948745996866
+      ],
+      "raf_intervals_ms": {
+        "mean": 19.280636942675162,
+        "p95": 34.279999999998836,
+        "max": 51.5
+      },
+      "result_sha256": "3ed239285ddf71d11f703c078143f9f4010deccc39c7ea664f2111e99d789f87",
+      "pattern_sha256": "c6cc999de5546cb22e998581dd5c5b0e5a2c6217d9b12cb902eb745eab2dcdbb"
+    },
+    {
+      "case": "firefox-preserved-vsync-fixed-wm",
+      "raf_frames": 454,
+      "captures": 75,
+      "classified": 59,
+      "unclassified": 16,
+      "unclassified_ages": [
+        8.650217444999726,
+        8.851115516998107,
+        9.051826818998961,
+        9.25279457999568,
+        9.656142704996455,
+        9.85688499599928,
+        10.057625620996987,
+        10.258287026998005,
+        10.458877599994594,
+        10.659479579000617,
+        10.860098953999113,
+        11.060799891994975,
+        11.261518172999786,
+        11.46218082899577,
+        11.662796869997692,
+        11.863799109996762
+      ],
+      "raf_intervals_ms": {
+        "mean": 33.33359823399559,
+        "p95": 34.5199999999968,
+        "max": 37.919999999998254
+      },
+      "result_sha256": "a36de3952b6673e9e5fca8c7a92c375a8a3fc126e11890312ad8cf836aa190e3",
+      "pattern_sha256": "f9a7152432c6b3a8cb2253b82c04c6a6812cdcca83cda0d5fe5b812ce32388b4"
+    },
+    {
+      "case": "firefox-preserved-vsync-wm",
+      "raf_frames": 455,
+      "captures": 75,
+      "classified": 65,
+      "unclassified": 10,
+      "unclassified_ages": [
+        8.235039735998726,
+        8.636213798999961,
+        8.836862340001971,
+        9.03765989200474,
+        9.238373434003734,
+        9.440944943999057,
+        10.043047809005657,
+        11.24712806900061,
+        11.447765568998875,
+        12.049669890999212
+      ],
+      "raf_intervals_ms": {
+        "mean": 33.33330396475771,
+        "p95": 34.61999999999534,
+        "max": 38.5
+      },
+      "result_sha256": "cc800148479529a2d8f8cab6c5e9b713ebdaa90d64a1f8a2c4a5155791442bef",
+      "pattern_sha256": "a0d3b9f5552bc0b4086fee6b272f4f4a456dcfefbb4e7102f84f456b2d33c198"
+    },
+    {
+      "case": "firefox-preserved-xrender-wm",
+      "raf_frames": 829,
+      "captures": 75,
+      "classified": 61,
+      "unclassified": 14,
+      "unclassified_ages": [
+        8.241372913995292,
+        8.441976559995965,
+        8.643664267998247,
+        9.446638018001977,
+        9.647310257001664,
+        9.848180725995917,
+        10.450404475996038,
+        10.651454214996193,
+        10.852804736001417,
+        11.053421090000484,
+        11.254481454001507,
+        11.455382235995785,
+        11.65649817299709,
+        11.857339422997029
+      ],
+      "raf_intervals_ms": {
+        "mean": 18.280169082125582,
+        "p95": 33.40000000002328,
+        "max": 67.14000000001397
+      },
+      "result_sha256": "b5142ad41894981504a8378a30915bea2c14b0f30ed2a32afbd83d071f7b3c35",
+      "pattern_sha256": "bf97716e79525e313a680aa4ff25d3bc89f42fabda2cbe99b50a636b21f6e3c6"
+    }
+  ],
+  "physical_optical_capture": false,
+  "compositor": {
+    "firefox-preserved-bare-wm": {
+      "pattern_passed": 62,
+      "unclassified": 13,
+      "raf_frames": 840,
+      "phases": {
+        "grow": {
+          "batches": 80,
+          "request_p95_ms": 11.477343,
+          "pattern_samples": 20,
+          "unclassified": 0
+        },
+        "shrink": {
+          "batches": 80,
+          "request_p95_ms": 11.712292,
+          "pattern_samples": 20,
+          "unclassified": 0
+        },
+        "abrupt": {
+          "batches": 79,
+          "request_p95_ms": 9.866719,
+          "pattern_samples": 20,
+          "unclassified": 13
+        },
+        "settled": {
+          "batches": 60,
+          "request_p95_ms": 6.406771,
+          "pattern_samples": 15,
+          "unclassified": 0
+        }
+      }
+    },
+    "firefox-preserved-xrender-wm": {
+      "pattern_passed": 61,
+      "unclassified": 14,
+      "raf_frames": 829,
+      "phases": {
+        "grow": {
+          "batches": 80,
+          "request_p95_ms": 15.540781,
+          "pattern_samples": 20,
+          "unclassified": 0
+        },
+        "shrink": {
+          "batches": 80,
+          "request_p95_ms": 13.243438,
+          "pattern_samples": 20,
+          "unclassified": 0
+        },
+        "abrupt": {
+          "batches": 79,
+          "request_p95_ms": 13.812969,
+          "pattern_samples": 20,
+          "unclassified": 14
+        },
+        "settled": {
+          "batches": 60,
+          "request_p95_ms": 0.903437,
+          "pattern_samples": 15,
+          "unclassified": 0
+        }
+      }
+    }
+  },
+  "default_clock": {
+    "gdk_refresh_millihz": 30000,
+    "xorg_refresh_hz": 30,
+    "firefox_target_frame_rate": 59
+  },
+  "valid_bare_trace": {
+    "record_count": 88968,
+    "wm_event_counts": {
+      "8": 2027,
+      "9": 2027,
+      "7": 1013,
+      "6": 18273,
+      "4": 476,
+      "5": 714,
+      "11": 714
+    },
+    "presents": 1013,
+    "present_options_target": {
+      "(1, 0)": 1013
+    },
+    "resize_acknowledgements_by_counter": {
+      "20971545": 476,
+      "20971544": 238
+    },
+    "request_gaps_ms": {
+      "mean": 14.757926954545455,
+      "p95": 26.770677,
+      "max": 51.431718
+    },
+    "trace_overlap_valid": true,
+    "trace_sha256": "e5b4d7f377d28b3a9b695cf4fc417a125f56e20d647307d6eb5f8a2993758a55",
+    "physical_optical_capture": false
+  },
+  "native_clock_trace_scope": "Only about two seconds of resize activity overlapped the 45-second checkpoint; not a complete workload trace",
+  "capture_archive": {
+    "archive": "root@192.168.104.201:/bigdata/mesa-sync-build/package-combined/hdmi-picom-20261008/browser-captures-20261008.tar.gz",
+    "archive_sha256": "f79deea99fe9690e83b9dd0b2a08a3094d3f92e613ccf4335db466c5072490d9",
+    "manifest_sha256": "e7ee6721268c3bc1b6b2ddf10ba751149421735268a77aa18dabfdb073299f1e",
+    "files": 608,
+    "cases": [
+      "firefox-preserved-bare-wm",
+      "firefox-preserved-xrender-wm",
+      "firefox-preserved-bare-after-wm",
+      "firefox-preserved-legacy-wm",
+      "firefox-preserved-shadow-wm",
+      "firefox-preserved-region-wm",
+      "firefox-preserved-noage-wm",
+      "firefox-preserved-full-wm"
+    ],
+    "retained_ram_samples": [
+      "000.png",
+      "044.png"
+    ],
+    "freed_bytes": 26856973
+  },
+  "probe_vfork_fixture": {
+    "native_aarch64": true,
+    "before_bytes": 0,
+    "after_bytes": 160,
+    "records": 2,
+    "passed": true,
+    "builder": "root@192.168.104.201",
+    "gpu_access": false
+  },
+  "user_followup": "User saw transient pink/black native diagnostic background during resize and purple duck.ai page background on vertical Firefox resize; not proven resolved by quadrant center checks"
+}

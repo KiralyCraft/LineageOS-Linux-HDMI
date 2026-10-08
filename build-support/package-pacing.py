@@ -113,7 +113,7 @@ info['frontend_flush']=dict(api=1,egl='normalized drawable and ancillary flags',
 preserved = 'bool preserve_back' in (source/'src/gallium/frontends/dri/loader_dri3_hdmi_pipeline.h').read_text()
 if preserved:
     info['candidate'] += '-preserved-backbuffers'
-    info['egl_preservation']=dict(implementation='ordinary loader GPU copy-back before ring advance',scope='EGL_BUFFER_PRESERVED',producer_consumer_fences='unchanged',regression='source/hdmi/docs/experiments/EGL-PRESERVATION-20261008.json')
+    info['egl_preservation']=dict(implementation='ordinary loader retains selected render buffer until its producer read completes',scope='EGL_BUFFER_PRESERVED',producer_consumer_fences='unchanged',regression='source/hdmi/docs/experiments/EGL-PRESERVATION-IMMEDIATE-20261008.json')
 info['demand_allocation']=dict(default=True,control='--lazy-slots 0',initial_images=1,maximum_images_per_generation=3,maximum_generations=3,actual_backing_limit_bytes=512*1024*1024,retirement='native completion plus Present COMPLETE and IDLE')
 info['pacing']=dict(repaint_reserve_us=8000,synchronized_pending_default=1,reprime_msc_lead=1,storage_retirement='complete plus idle',legacy_control='--paced-queue 0 --paced-lead 2',special_events='queued-only general drain; single socket reader',physical_4k60_tested=False)
 for name,entry in info['artifacts'].items():
@@ -157,8 +157,8 @@ No Magisk install is needed for this graphics update. Do not run two agents at o
 ''')
 (out/'README.md').write_text((out/'PACING-20261008.md').read_text())
 if preserved:
-    (out/'README.md').write_text((out/'README.md').read_text()+'''\nEGL_BUFFER_PRESERVED now retains the just-rendered image across private back-buffer
-rotation through the existing loader GPU copy-back path. Ordinary EGL buffer-age
+    (out/'README.md').write_text((out/'README.md').read_text()+'''\nEGL_BUFFER_PRESERVED now keeps the just-rendered private image selected, following
+the ordinary loader's reuse and completion rules. Ordinary EGL buffer-age
 clients retain their damage history policy. See EGL-PRESERVATION-20261008 in the
 source reports for the rapid partial repaint regression and its limits.
 \nRollback runtime: '''+str(base)+'\n')

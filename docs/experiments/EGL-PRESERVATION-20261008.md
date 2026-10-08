@@ -1,5 +1,10 @@
 # EGL preserved back buffers, 2026-10-08
 
+Follow-up: the R13 results below establish settled-image correctness only.
+Immediate checks subsequently exposed lost contents in the first render-buffer
+allocations. R14 retains the same render buffer, following the ordinary loader.
+See [the immediate validation report](EGL-PRESERVATION-IMMEDIATE-20261008.md).
+
 The HDMI pipeline skipped the ordinary DRI3 loader's copy-back bookkeeping when
 an EGL surface requested `EGL_BUFFER_PRESERVED`. Once rapid presentation rotated
 the private render buffers, drawing only the changed rectangle left stale tiles
