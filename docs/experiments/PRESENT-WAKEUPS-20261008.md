@@ -73,5 +73,69 @@ It is newly integrated here into the leased modesetting/KGSL backend; it is not
 an assertion that an upstream Xorg release already includes this implementation.
 The initial 8 ms reserve must be assessed at each claimed output/workload; 4K60
 has not been tested. Native production-function tests cover timeline rejection,
-quantization, a single timer and readiness consumption. Hardware results follow
-once this matched private Xorg has been started.
+quantization, a single timer and readiness consumption. Live software results are recorded below.
+
+
+The matched Xorg was built on root@192.168.104.201. Upstream tests: five PASS,
+one optional XTS SKIP. Symbol/SDK validation, copy-release lifetime/error fixtures,
+export-reply lifetime/error fixtures and the production repaint timing/state tests
+passed. The native host fixture also passed with ASan/UBSan/LSan. An initial
+source-reconstruction attempt found a missing 0011 patch in the older builder
+checkout; that attempt did not reach compilation. The exact patch was supplied
+and the successful build reconstructed and compared the complete patched tree.
+
+The enabled 50-second maximized run produced 1367 copy completions after warmup,
+all 1366 adjacent MSC changes +1. Request-to-event mean was 26.96 ms, p99 27.38 ms,
+maximum 27.58 ms. Swap-end intervals were 33.33 ms mean and 35.30 ms maximum.
+LXPanel stayed active. Both the new Xorg code and normal client Mesa were used.
+
+A same-Mesa, same-Xorg-binary control temporarily mounted the previous complete
+modesetting module over the new module, with Xorg stopped on either side of the
+switch. Both are built against the same Xorg SDK and existing glamor/native
+interfaces. The control restores the prior immediate-copy implementation; no
+other runtime component changed. Its 25-second run reproduced 20 +2 MSC gaps
+among 595 adjacent intervals, all at the periodic-update phase. Request-to-event
+p99 returned to 57.28 ms and swap intervals reached 67.25 ms. The new module was
+then restored and the desktop resumed successfully. The following 180-second enabled run produced 5266 completions: 5264 adjacent
+MSC changes +1 and one isolated +2. Request-to-event mean stayed 26.95 ms, p99
+27.41 ms. The periodic once-per-second defect did not return, but the isolated
+miss is retained as an unresolved tail, rather than a zero-skip claim.
+
+A separate owned two-window 2D movement test uses two 1100x700 colored windows,
+50 request batches/s and XSync turnaround, with no client GL rendering. Before
+and after each produced 1000 batches in 20 seconds. Mean turnaround was 1.91 ->
+1.73 ms, p95 3.16 -> 2.99 ms and p99 4.77 -> 3.56 ms. This is a request-processing
+check, not a measured display latency improvement or physical FPS claim.
+
+
+The recorded ioQuake3 demo completed normally with the same 1920x1080 windowed
+profile, interval one and no software frame cap. All 1361 adjacent completion
+MSC changes after warmup were +1; mean request-to-event was 27.48 ms, p99 29.00 ms.
+The earlier original-depth comparison was 93.04 ms. No original configuration
+or game asset changed. These are server/DRM timings rather than physical panel
+latency. The new default path was used, without queue or MSC environment overrides.
+
+Image validation on the matched runtime passed 24/24 changing patterned resize
+frames with interval 1/0 transitions and 12/12 near/full-screen hidden-cursor
+transitions. Sources and destinations use distinct changing patterns; geometry
+and multiple image positions are checked. These readback/capture checks are
+separate from performance runs. Lazy allocation of the three generation slots,
+4K60 validation and broad Firefox/Maps/Teams usability remain outstanding.
+
+
+The corrected normal glxgears command was also resized with the same 20 Hz
+waveform and 0.2-second X-root capture schedule. It left at most eight X events
+pending; one already-issued old-geometry swap finished 22.07 ms after the final
+resize, then viewport swaps matched 960x720. The earlier stock loop continued
+obsolete viewport swaps for 3.13 seconds. Final settled images show the correctly
+scaled animated gears, and 96 captures remain in RAM.
+
+There are black intermediate root snapshots during rapid resizing: a sampled
+color grid found 19 candidates in the new 96-capture run and 26 in the older
+112-capture corrected-loop control. None occurred after resizing stopped. These
+are snapshots of the root drawable, which can be cleared by Configure before
+client repaint and before the TearFree scanout snapshot. Capture requests are
+also intrusive GPU readbacks. Consequently these images neither prove physical
+black flashes nor establish perfectly seamless physical resizing. The viewport
+backlog is fixed, while front-scanout image verification and resource-allocation
+tails remain separate work.

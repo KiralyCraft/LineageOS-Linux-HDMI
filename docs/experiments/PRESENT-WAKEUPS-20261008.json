@@ -901,6 +901,516 @@
           }
         }
       }
+    },
+    "gears-maximized-repaint": {
+      "trace_sha256": "ac4b73751ecca1e5de2223e4ff77f049c1358426bd279c90e2dd493c22b86a52",
+      "summary": {
+        "probe_records": 10612,
+        "requested_records": 10612,
+        "dropped": 0,
+        "seconds": 50.556289148,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 1524,
+          "4": 4,
+          "5": 4,
+          "1": 1513,
+          "7": 1513,
+          "9": 3025,
+          "8": 3024
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 1366,
+              "mean_ms": 33.14143598096632,
+              "p50_ms": 33.127344,
+              "p95_ms": 33.60125,
+              "p99_ms": 33.7775,
+              "max_ms": 35.111198
+            },
+            "end_interval": {
+              "count": 1365,
+              "mean_ms": 33.33321698241758,
+              "p50_ms": 33.328073,
+              "p95_ms": 33.755469,
+              "p99_ms": 33.926979,
+              "max_ms": 35.299062
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 27.148810198,
+                "ms": 35.299062
+              },
+              {
+                "relative_seconds": 18.980591712,
+                "ms": 34.358177
+              },
+              {
+                "relative_seconds": 22.080645409,
+                "ms": 34.328698
+              },
+              {
+                "relative_seconds": 32.480550196,
+                "ms": 34.327552
+              },
+              {
+                "relative_seconds": 32.54707728,
+                "ms": 34.041355
+              },
+              {
+                "relative_seconds": 13.014074683,
+                "ms": 34.023385
+              },
+              {
+                "relative_seconds": 27.513609313,
+                "ms": 34.008646
+              },
+              {
+                "relative_seconds": 41.480505766,
+                "ms": 33.997761
+              },
+              {
+                "relative_seconds": 18.846923743,
+                "ms": 33.982864
+              },
+              {
+                "relative_seconds": 33.4467553,
+                "ms": 33.956927
+              },
+              {
+                "relative_seconds": 15.913521401,
+                "ms": 33.938021
+              },
+              {
+                "relative_seconds": 5.513851144,
+                "ms": 33.931458
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 1367,
+          "request_thread_ids": [
+            11386
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 1367
+          },
+          "msc_delta": {
+            "1": 1366
+          },
+          "ust_delta": {
+            "count": 1366,
+            "mean_ms": 33.33333308931186,
+            "p50_ms": 33.333,
+            "p95_ms": 33.334,
+            "p99_ms": 33.334,
+            "max_ms": 33.341
+          },
+          "request_to_event": {
+            "count": 1367,
+            "mean_ms": 26.95729920555962,
+            "p50_ms": 26.954948,
+            "p95_ms": 27.247917,
+            "p99_ms": 27.383437,
+            "max_ms": 27.576094
+          },
+          "request_options": {
+            "0": 1367
+          }
+        }
+      }
+    },
+    "gears-maximized-repaint-control": {
+      "trace_sha256": "f15c6db20ad6c0c0b80f3a69249eda7ad5c992be23c631f5ba15f464b3d334d3",
+      "summary": {
+        "probe_records": 5194,
+        "requested_records": 5194,
+        "dropped": 0,
+        "seconds": 25.543129157,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 750,
+          "4": 4,
+          "5": 4,
+          "1": 739,
+          "7": 739,
+          "9": 1477,
+          "8": 1476
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 596,
+              "mean_ms": 34.28009639597315,
+              "p50_ms": 33.187708,
+              "p95_ms": 33.790521,
+              "p99_ms": 66.803854,
+              "max_ms": 67.118594
+            },
+            "end_interval": {
+              "count": 595,
+              "mean_ms": 34.4533301697479,
+              "p50_ms": 33.350833,
+              "p95_ms": 33.949844,
+              "p99_ms": 66.975,
+              "max_ms": 67.245052
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 6.733546195,
+                "ms": 67.245052
+              },
+              {
+                "relative_seconds": 21.733601971,
+                "ms": 67.244896
+              },
+              {
+                "relative_seconds": 14.733438067,
+                "ms": 67.005937
+              },
+              {
+                "relative_seconds": 22.733290616,
+                "ms": 66.985625
+              },
+              {
+                "relative_seconds": 15.733538796,
+                "ms": 66.979271
+              },
+              {
+                "relative_seconds": 24.733423532,
+                "ms": 66.975
+              },
+              {
+                "relative_seconds": 13.733621661,
+                "ms": 66.949896
+              },
+              {
+                "relative_seconds": 11.733367079,
+                "ms": 66.910053
+              },
+              {
+                "relative_seconds": 19.733656919,
+                "ms": 66.902916
+              },
+              {
+                "relative_seconds": 9.733457704,
+                "ms": 66.898021
+              },
+              {
+                "relative_seconds": 17.73367343,
+                "ms": 66.885781
+              },
+              {
+                "relative_seconds": 7.73350057,
+                "ms": 66.865104
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 596,
+          "request_thread_ids": [
+            13388
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 596
+          },
+          "msc_delta": {
+            "1": 575,
+            "2": 20
+          },
+          "ust_delta": {
+            "count": 595,
+            "mean_ms": 34.45378151260504,
+            "p50_ms": 33.333,
+            "p95_ms": 33.334,
+            "p99_ms": 66.667,
+            "max_ms": 66.667
+          },
+          "request_to_event": {
+            "count": 596,
+            "mean_ms": 27.8965558590604,
+            "p50_ms": 26.984739,
+            "p95_ms": 27.326718,
+            "p99_ms": 57.283645,
+            "max_ms": 59.991146
+          },
+          "request_options": {
+            "0": 597
+          }
+        }
+      }
+    },
+    "gears-maximized-repaint-long": {
+      "trace_sha256": "12cb460b03253919a84dbf28a4025da737d10948e13c01893760c7806448aea6",
+      "summary": {
+        "probe_records": 37905,
+        "requested_records": 37905,
+        "dropped": 0,
+        "seconds": 180.563325504,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "3": 5,
+          "6": 5423,
+          "4": 4,
+          "5": 4,
+          "1": 5412,
+          "7": 5412,
+          "9": 10823,
+          "8": 10822
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {
+              "count": 5265,
+              "mean_ms": 33.16691312193733,
+              "p50_ms": 33.162552,
+              "p95_ms": 33.676927,
+              "p99_ms": 33.994323,
+              "max_ms": 66.676614
+            },
+            "end_interval": {
+              "count": 5264,
+              "mean_ms": 33.33971508244681,
+              "p50_ms": 33.33625,
+              "p95_ms": 33.819479,
+              "p99_ms": 34.128385,
+              "max_ms": 66.957239
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 14.886798536,
+                "ms": 66.957239
+              },
+              {
+                "relative_seconds": 147.555501038,
+                "ms": 36.073438
+              },
+              {
+                "relative_seconds": 50.821844616,
+                "ms": 35.477083
+              },
+              {
+                "relative_seconds": 154.121535775,
+                "ms": 35.251563
+              },
+              {
+                "relative_seconds": 124.087803443,
+                "ms": 35.137761
+              },
+              {
+                "relative_seconds": 153.88778041,
+                "ms": 34.790625
+              },
+              {
+                "relative_seconds": 142.454300415,
+                "ms": 34.785157
+              },
+              {
+                "relative_seconds": 50.354315137,
+                "ms": 34.761666
+              },
+              {
+                "relative_seconds": 144.287474737,
+                "ms": 34.741042
+              },
+              {
+                "relative_seconds": 45.554286233,
+                "ms": 34.71375
+              },
+              {
+                "relative_seconds": 179.154015713,
+                "ms": 34.650729
+              },
+              {
+                "relative_seconds": 38.554345715,
+                "ms": 34.646354
+              }
+            ]
+          },
+          "2": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          }
+        },
+        "present": {
+          "completed": 5266,
+          "request_thread_ids": [
+            14160
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 5266
+          },
+          "msc_delta": {
+            "1": 5264,
+            "2": 1
+          },
+          "ust_delta": {
+            "count": 5265,
+            "mean_ms": 33.33966438746439,
+            "p50_ms": 33.333,
+            "p95_ms": 33.334,
+            "p99_ms": 33.334,
+            "max_ms": 66.666
+          },
+          "request_to_event": {
+            "count": 5266,
+            "mean_ms": 26.954777490505126,
+            "p50_ms": 26.954427,
+            "p95_ms": 27.2675,
+            "p99_ms": 27.409688,
+            "max_ms": 60.315989
+          },
+          "request_options": {
+            "0": 5266
+          }
+        }
+      }
+    },
+    "quake-vsync-repaint": {
+      "trace_sha256": "08ea33c5894803aac4a75982b45a8950592a4ddefbb17ff88c43bca4f5e8c5f9",
+      "summary": {
+        "probe_records": 8942,
+        "requested_records": 8942,
+        "dropped": 0,
+        "seconds": 50.400046751,
+        "warmup_excluded_seconds": 5,
+        "events": {
+          "2": 1491,
+          "7": 1491,
+          "9": 2980,
+          "8": 2980
+        },
+        "physical_scanout_tested": false,
+        "swaps": {
+          "1": {
+            "call": {},
+            "end_interval": {},
+            "longest_intervals": []
+          },
+          "2": {
+            "call": {
+              "count": 1361,
+              "mean_ms": 23.258023535635562,
+              "p50_ms": 23.417187,
+              "p95_ms": 26.718021,
+              "p99_ms": 28.207031,
+              "max_ms": 30.066458
+            },
+            "end_interval": {
+              "count": 1360,
+              "mean_ms": 33.33299546838235,
+              "p50_ms": 33.353282,
+              "p95_ms": 34.653125,
+              "p99_ms": 35.505261,
+              "max_ms": 36.626354
+            },
+            "longest_intervals": [
+              {
+                "relative_seconds": 20.933933377,
+                "ms": 36.626354
+              },
+              {
+                "relative_seconds": 24.833622021,
+                "ms": 35.86151
+              },
+              {
+                "relative_seconds": 30.59992228,
+                "ms": 35.800053
+              },
+              {
+                "relative_seconds": 18.533247388,
+                "ms": 35.762135
+              },
+              {
+                "relative_seconds": 9.266591819,
+                "ms": 35.759219
+              },
+              {
+                "relative_seconds": 29.599886499,
+                "ms": 35.755834
+              },
+              {
+                "relative_seconds": 43.499829618,
+                "ms": 35.749114
+              },
+              {
+                "relative_seconds": 30.400273425,
+                "ms": 35.722968
+              },
+              {
+                "relative_seconds": 30.866283321,
+                "ms": 35.692604
+              },
+              {
+                "relative_seconds": 13.166831453,
+                "ms": 35.689323
+              },
+              {
+                "relative_seconds": 5.099816821,
+                "ms": 35.615625
+              },
+              {
+                "relative_seconds": 28.399659728,
+                "ms": 35.6
+              }
+            ]
+          }
+        },
+        "present": {
+          "completed": 1362,
+          "request_thread_ids": [
+            18632
+          ],
+          "stream": "Present worker only; main XCB subscription receives duplicate notifications",
+          "modes": {
+            "0": 1362
+          },
+          "msc_delta": {
+            "1": 1361
+          },
+          "ust_delta": {
+            "count": 1361,
+            "mean_ms": 33.333333578251285,
+            "p50_ms": 33.333,
+            "p95_ms": 33.334,
+            "p99_ms": 33.334,
+            "max_ms": 33.334
+          },
+          "request_to_event": {
+            "count": 1362,
+            "mean_ms": 27.484632472099854,
+            "p50_ms": 28.17224,
+            "p95_ms": 28.787292,
+            "p99_ms": 29.0,
+            "max_ms": 30.19849
+          },
+          "request_options": {
+            "0": 1362
+          }
+        }
+      }
     }
   },
   "native_xcb_race": "general socket poll strands the special event: REPRODUCED\nqueued-only drain preserves readiness: PASS\n",
@@ -909,5 +1419,225 @@
     "action": "temporary SIGSTOP; guaranteed SIGCONT in finally",
     "closed": false,
     "resumed": true
+  },
+  "repaint_control": {
+    "one_variable": "modesetting module before/after repaint patch; identical running Mesa and Xorg binary",
+    "commands": [
+      {
+        "action": "pause",
+        "code": 0,
+        "output": "state=10 status=0 remaining=0 flags=0x1300 requested=3840x2160@30.000 active=3840x2160@30.000 detail=Linux paused; HDMI stays connected; use resume within five minutes\n"
+      },
+      {
+        "action": "resume",
+        "code": 0,
+        "output": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode\n"
+      },
+      {
+        "action": "pause",
+        "code": 0,
+        "output": "state=10 status=0 remaining=0 flags=0x1300 requested=3840x2160@30.000 active=3840x2160@30.000 detail=Linux paused; HDMI stays connected; use resume within five minutes\n"
+      },
+      {
+        "action": "resume",
+        "code": 0,
+        "output": "state=2 status=0 remaining=0 flags=0x80001500 requested=3840x2160@30.000 active=3840x2160@30.000 detail=traced legacy Xorg owns external display; continuous watchdog mode\n"
+      }
+    ],
+    "enabled_module": "12234e3fc9ab088029f9b2f8bef25542542146c205eb4837114a4e07e8e32195",
+    "control_module": "3921bb29f69bad744ff368050d6456aaf40cb81df146680bca522815b93381f5",
+    "enabled_restored": true
+  },
+  "two_window_turnaround": {
+    "two-window-immediate": {
+      "windows": 2,
+      "size_each": [
+        1100,
+        700
+      ],
+      "batches": 1000,
+      "seconds": 20.00507462799942,
+      "turnaround_ms": {
+        "mean": 1.905096973,
+        "p95": 3.155625,
+        "p99": 4.771823,
+        "max": 10.815573
+      },
+      "physical_scanout_tested": false
+    },
+    "two-window-repaint": {
+      "windows": 2,
+      "size_each": [
+        1100,
+        700
+      ],
+      "batches": 1000,
+      "seconds": 20.004537544002233,
+      "turnaround_ms": {
+        "mean": 1.731036304,
+        "p95": 2.989323,
+        "p99": 3.562604,
+        "max": 8.352292
+      },
+      "physical_scanout_tested": false
+    }
+  },
+  "resize_image_checks": {
+    "repaint-pattern": {
+      "renderer": "FD740",
+      "frames": 24,
+      "passed": 24,
+      "result_sha256": "2cc6963ff6aceaee550799c04b5c382dc3d274987330035848419862bd0475c9",
+      "physical_panel_tested": false
+    },
+    "repaint-large-transitions": {
+      "renderer": "FD740",
+      "frames": 12,
+      "passed": 12,
+      "result_sha256": "3fe72bd9d9f19b8a9bebc5b1dd8e323ee141179dee267dae59a2a0ebd48a3ecd",
+      "physical_panel_tested": false
+    }
+  },
+  "gears_resize_capture": {
+    "captured": 96,
+    "max_pending_events": 8,
+    "old_geometry_swaps_after_stop": 1,
+    "last_old_geometry_after_stop_ms": 22.069583,
+    "root_blank_capture_candidates": [
+      {
+        "file": "001-4.png",
+        "age": 0.202,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "002-8.png",
+        "age": 0.418,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "004-16.png",
+        "age": 0.837,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "007-28.png",
+        "age": 1.47,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "008-32.png",
+        "age": 1.679,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "009-36.png",
+        "age": 1.905,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "011-44.png",
+        "age": 2.34,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "014-56.png",
+        "age": 3.011,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "015-60.png",
+        "age": 3.235,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "016-64.png",
+        "age": 3.464,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "028-112.png",
+        "age": 6.095,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "038-152.png",
+        "age": 8.187,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "039-156.png",
+        "age": 8.412,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "041-164.png",
+        "age": 8.837,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "042-168.png",
+        "age": 9.037,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "045-180.png",
+        "age": 9.707,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "048-192.png",
+        "age": 10.329,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "051-204.png",
+        "age": 10.971,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      },
+      {
+        "file": "055-220.png",
+        "age": 11.882,
+        "colored_samples": 0,
+        "black_fraction": 1.0,
+        "geometry_stable": true
+      }
+    ],
+    "scanout_read": false
   }
 }
