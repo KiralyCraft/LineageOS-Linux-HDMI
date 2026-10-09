@@ -610,7 +610,10 @@ std::string xorg_mode_flags(uint32_t flags) {
 
 bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
                        uint32_t probe_mode, const drm_mode_modeinfo &mode) {
-  constexpr const char *kModeName = "hdmi-los-android-current";
+  // LXRandR expects the mode list to start with a resolution-shaped name.
+  // Keep Android's exact timing distinct from the EDID mode with that size.
+  const std::string mode_name = std::to_string(mode.hdisplay) + "x" +
+      std::to_string(mode.vdisplay) + "-android-current";
   std::string mode_flags = xorg_mode_flags(mode.flags);
   std::string path = std::string(kRuntime) + "/xorg.conf";
   FILE *file = fopen(path.c_str(), "we");
@@ -671,16 +674,16 @@ bool write_xorg_config(const std::string &mouse, const std::string &keyboard,
       "  Screen 0 \"HDMI Screen\"\n"
       "  InputDevice \"HDMI Mouse\" \"CorePointer\"\n"
       "  InputDevice \"HDMI Keyboard\" \"CoreKeyboard\"\n"
-      "EndSection\n", mouse.c_str(), keyboard.c_str(), kModeName,
+      "EndSection\n", mouse.c_str(), keyboard.c_str(), mode_name.c_str(),
       static_cast<double>(mode.clock) / 1000.0,
       mode.hdisplay, mode.hsync_start, mode.hsync_end, mode.htotal,
       mode.vdisplay, mode.vsync_start, mode.vsync_end, mode.vtotal,
-      mode_flags.c_str(), kModeName,
+      mode_flags.c_str(), mode_name.c_str(),
       g_kgsl_glamor ? "glamor" : "none",
       g_kgsl_glamor ? "true" : "false",
       g_kgsl_glamor ? "false" : "true",
       probe_mode == HDMI_LOS_PROBE_XORG_ATOMIC ? "true" : "false",
-      "true", kModeName);
+      "true", mode_name.c_str());
   bool ok = result > 0;
   if (fflush(file) != 0 || fsync(fileno(file)) != 0) ok = false;
   if (fclose(file) != 0) ok = false;
