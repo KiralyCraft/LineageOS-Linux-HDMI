@@ -127,6 +127,18 @@ static void initialize_record(struct hdmi_los_trace_record *record, uint16_t pha
   if (name) snprintf(record->name, sizeof(record->name), "%s", name);
 }
 
+/* Explicit Xorg lifecycle hook: RMFB may disable the active CRTC before
+ * SETCRTC is reached. No kernel ioctl is invented for this userspace barrier. */
+int hdmi_los_modeset_prepare(int fd, uint32_t crtc) {
+  if (g_trace_fd < 0 || crtc != g_expected_crtc) return 0;
+  struct hdmi_los_trace_record record;
+  initialize_record(&record, HDMI_LOS_TRACE_MODESET_PREPARE,
+                    atomic_fetch_add(&g_sequence, 1), fd, 0, "MODESET_PREPARE");
+  record.argument[0] = crtc;
+  snprintf(record.detail, sizeof(record.detail), "retire scanout crtc=%u", crtc);
+  return exchange_record(&record);
+}
+
 static int safe_copy(void *destination, uint64_t source, size_t size) {
   if (!source || !destination || !size) return 0;
   struct iovec local = {destination, size};

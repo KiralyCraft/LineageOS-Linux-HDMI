@@ -1,0 +1,103 @@
+--- a/hw/xfree86/drivers/modesetting/drmmode_display.c
++++ b/hw/xfree86/drivers/modesetting/drmmode_display.c
+@@ -56,6 +56,7 @@
+ #include <X11/extensions/dpmsconst.h>
+ 
+ #include "driver.h"
++#include <dlfcn.h>
+ 
+ #if X_BYTE_ORDER == X_BIG_ENDIAN
+ #define cpu_to_le32(x) bswap_32(x)
+@@ -824,6 +825,40 @@
+     drmModeDestroyPropertyBlob(drmmode->fd, blob_id);
+ }
+ 
++/* The broker retires the timing generation at the synchronous SETCRTC
++ * barrier. Retire our presenter first, including a real submitted DRM event;
++ * closing an fd or aborting a queue entry does not cancel GPU/scanout work. */
++static void
++drmmode_retire_kernel_presenter(xf86CrtcPtr crtc)
++{
++#ifdef HAVE_GBM
++    drmmode_crtc_private_ptr dc = crtc->driver_private;
++    drmmode_tearfree_ptr trf = &dc->tearfree;
++    const char *presenter = getenv("HDMI_LOS_PRESENTER");
++    if (!presenter || strcmp(presenter, "kernel"))
++        return;
++    ms_tearfree_cancel_copy(crtc);
++    while (trf->flip_seq)
++        ms_drain_drm_events(xf86ScrnToScreen(crtc->scrn));
++    if (trf->kernel_fd >= 0) {
++        RemoveNotifyFd(trf->kernel_fd);
++        close(trf->kernel_fd);
++        trf->kernel_fd = -1;
++        trf->kernel_generation = 0;
++    }
++    /* Removal of an active FB can disable the CRTC, even before SETCRTC.
++     * Begin the broker-owned transaction before releasing any scanout BO. */
++    if (trf->buf[0].px || trf->buf[1].px) {
++        typedef int (*prepare_fn)(int, uint32_t);
++        prepare_fn prepare = (prepare_fn)dlsym(RTLD_DEFAULT, "hdmi_los_modeset_prepare");
++        if (!prepare || !prepare(dc->drmmode->fd, dc->mode_crtc->crtc_id))
++            FatalError("HDMI modeset could not retire timing before scanout release\n");
++    }
++    xf86DrvMsg(crtc->scrn->scrnIndex, X_INFO,
++               "HDMI_LOS_MODESET_TIMING_ABI=1 retired presenter before scanout release\n");
++#endif
++}
++
+ static int
+ drmmode_crtc_set_mode(xf86CrtcPtr crtc, Bool test_only)
+ {
+@@ -933,6 +968,7 @@
+     }
+ 
+     drmmode_ConvertToKMode(crtc->scrn, &kmode, &crtc->mode);
++    drmmode_retire_kernel_presenter(crtc);
+     ret = drmModeSetCrtc(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id,
+                          fb_id, x, y, output_ids, output_count, &kmode);
+     if (!ret && !ms->atomic_modeset) {
+@@ -1500,6 +1536,7 @@
+         if (mode != DPMSModeOn && !ms->pending_modeset)
+             drmmode_crtc_disable(crtc);
+     } else if (crtc->enabled == FALSE) {
++        drmmode_retire_kernel_presenter(crtc);
+         drmModeSetCrtc(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id,
+                        0, 0, 0, NULL, 0, NULL);
+     }
+@@ -1651,6 +1688,7 @@
+     drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
+     int i;
+ 
++    drmmode_retire_kernel_presenter(crtc);
+ #ifdef HAVE_GBM
+     ms_tearfree_cancel_copy(crtc);
+     if (trf->copy_timer) {
+@@ -3041,6 +3079,19 @@
+ 
+     /* XXX Check if DPMS mode is already the right one */
+ 
++    /* RandR powers the connector down before it disables the CRTC. Enter
++     * the same transaction before that first hardware-visible operation. */
++    if (!ms->atomic_modeset && mode != DPMSModeOn) {
++        xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(output->scrn);
++        xf86CrtcPtr old_crtc = crtc;
++        /* A leased server exposes exactly one CRTC even after RandR detaches
++         * output->crtc while rearranging the topology. */
++        if (!old_crtc && config->num_crtc == 1)
++            old_crtc = config->crtc[0];
++        if (old_crtc)
++            drmmode_retire_kernel_presenter(old_crtc);
++    }
++
+     drmmode_output->dpms = mode;
+ 
+     if (ms->atomic_modeset) {
+@@ -4065,6 +4116,7 @@
+         /* Skip disabled CRTCs */
+         if (!crtc->enabled) {
+             if (set_hw) {
++                drmmode_retire_kernel_presenter(crtc);
+                 drmModeSetCrtc(drmmode->fd, drmmode_crtc->mode_crtc->crtc_id,
+                                0, 0, 0, NULL, 0, NULL);
+             }

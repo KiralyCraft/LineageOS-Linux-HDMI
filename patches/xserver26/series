@@ -6,3 +6,4 @@
 0010-present-fence-gated-copy-release.patch
 0011-dri3-native-fence-gated-pixmap-exports.patch
 0012-modesetting-frame-timed-tearfree-repaints.patch
+0017-modesetting-retire-presenter-before-modeset.patch

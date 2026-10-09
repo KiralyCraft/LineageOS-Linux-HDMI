@@ -7,7 +7,7 @@ mkdir -p "$BUILD"
 "$NDK/aarch64-linux-android35-clang++" -std=c++20 -O2 -fPIE -pie -pthread \
   -static-libstdc++ -Wall -Wextra -Werror -I"$SOURCE/native/common" \
   "$SOURCE/native/broker/main.cpp" -o "$BUILD/hdmi-losd"
-for fixture in restart stop lifecycle; do
+for fixture in restart stop lifecycle modeset; do
   g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
     -pthread -Wall -Wextra -Werror -I"$SOURCE/native/common" \
     "$SOURCE/native/broker/$fixture-selftest.cpp" -o "$BUILD/$fixture-selftest"
@@ -25,6 +25,8 @@ docker run --rm --platform linux/arm64 \
 set -Eeuo pipefail
 g++ -std=c++20 -O2 -fPIE -pie -pthread -Wall -Wextra -Werror \
   -I/source/native/common /source/native/agent/main.cpp -o /output/hdmi-los-agent
+gcc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror -I/source/native/common \
+  /source/native/drm-trace/drmtrace.c -ldl -o /output/libhdmi-los-drmtrace.so
 /output/hdmi-los-agent --help >/output/agent-help.txt 2>&1 || test $? = 2
 '
 readelf -h "$BUILD/hdmi-los-agent" | grep -q AArch64
@@ -37,12 +39,12 @@ paths=['native/broker/main.cpp','native/broker/restart-selftest.cpp',
        'native/broker/registration-selftest.cpp',
        'native/agent/main.cpp','native/agent/child-selftest.cpp',
        'native/common/hdmi_agent_reader.h','native/common/hdmi_child_process.h',
-       'native/common/hdmi_los_trace.h','native/common/hdmi_los_protocol.h',
-       'native/common/hdmi_connected_restart.h','native/common/hdmi_timing_session.h',
+       'native/common/hdmi_los_trace.h','native/drm-trace/drmtrace.c','native/drm-trace/property_cache.h','native/common/hdmi_los_protocol.h',
+       'native/common/hdmi_connected_restart.h','native/common/hdmi_timing_session.h','native/broker/modeset-selftest.cpp',
        'kernel/hdmi_companion/uapi.h','build-support/build-connected-restart.sh']
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 manifest=dict(target='aarch64-linux-android35',sources={p:sha(source/p) for p in paths},
-              artifacts={p:sha(build/p) for p in ['hdmi-losd','hdmi-los-agent','restart-test.log','stop-test.log','lifecycle-test.log','registration-test.log','child-test.log','agent-help.txt']},
+              artifacts={p:sha(build/p) for p in ['hdmi-losd','hdmi-los-agent','libhdmi-los-drmtrace.so','modeset-test.log','restart-test.log','stop-test.log','lifecycle-test.log','registration-test.log','child-test.log','agent-help.txt']},
               validation=dict(host_lifecycle='PASS with ASan UBSan and LSan',physical_restart='pending'))
 (build/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY

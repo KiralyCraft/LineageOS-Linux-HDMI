@@ -18,7 +18,8 @@ enum hdmi_los_trace_phase {
   HDMI_LOS_TRACE_BEFORE = 2,
   HDMI_LOS_TRACE_DETAIL = 3,
   HDMI_LOS_TRACE_AFTER = 4,
-  HDMI_LOS_TRACE_ACK = 5
+  HDMI_LOS_TRACE_ACK = 5,
+  HDMI_LOS_TRACE_MODESET_PREPARE = 6
 };
 
 struct hdmi_los_trace_record {

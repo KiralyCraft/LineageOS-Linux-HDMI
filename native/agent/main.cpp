@@ -27,6 +27,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -172,7 +174,8 @@ bool recv_message(int fd, hdmi_los_message *message, int *passed_fd) {
 
 bool valid_trace_record(const hdmi_los_trace_record &record) {
   return record.magic == HDMI_LOS_TRACE_MAGIC && record.version == HDMI_LOS_TRACE_VERSION &&
-         record.phase >= HDMI_LOS_TRACE_LOADED && record.phase <= HDMI_LOS_TRACE_AFTER;
+         ((record.phase >= HDMI_LOS_TRACE_LOADED && record.phase <= HDMI_LOS_TRACE_AFTER) ||
+          record.phase == HDMI_LOS_TRACE_MODESET_PREPARE);
 }
 
 void observe_scanout_record(const hdmi_los_trace_record &record) {
@@ -224,6 +227,22 @@ bool forward_trace_record(const hdmi_los_trace_record &record) {
                  record.phase == HDMI_LOS_TRACE_DETAIL ? 'D' : 'B';
     snprintf(progress.detail, sizeof(progress.detail),
              "drm %c #%u %.20s %.48s", phase, record.sequence, name, detail);
+  }
+  // Structured barriers, never parse diagnostic text to control ownership.
+  if (g_timing_required && record.request == DRM_IOCTL_MODE_SETCRTC &&
+      (record.phase == HDMI_LOS_TRACE_BEFORE || record.phase == HDMI_LOS_TRACE_AFTER)) {
+    progress.opcode = HDMI_LOS_OP_AGENT_MODESET;
+    progress.state = record.phase == HDMI_LOS_TRACE_BEFORE ? 1 : 2;
+    progress.crtc_id = static_cast<uint32_t>(record.argument[0]);
+    progress.active_width = static_cast<uint32_t>(record.argument[1]); // framebuffer ID
+    progress.active_height = static_cast<uint32_t>(record.argument[2]); // connector count
+    progress.active_refresh_millihz = static_cast<uint32_t>(record.argument[3]); // mode_valid
+    progress.status = record.result < 0 ? -record.error : 0;
+  }
+  if (g_timing_required && record.phase == HDMI_LOS_TRACE_MODESET_PREPARE) {
+    progress.opcode = HDMI_LOS_OP_AGENT_MODESET;
+    progress.state = 0;
+    progress.crtc_id = static_cast<uint32_t>(record.argument[0]);
   }
   if (!write_full(g_broker, &progress, sizeof(progress))) return false;
   hdmi_los_message acknowledgement = {};
@@ -390,6 +409,16 @@ bool trace_preflight() {
        access(gbm_backend.c_str(), R_OK) != 0)) {
     log_message("error", "a matched private Xorg or Mesa DRI module is missing");
     return false;
+  }
+
+  const char *presenter = getenv("HDMI_LOS_PRESENTER");
+  if (g_timing_required && presenter && !strcmp(presenter, "kernel")) {
+    std::ifstream module(modesetting_module, std::ios::binary);
+    std::string contents((std::istreambuf_iterator<char>(module)), {});
+    if (contents.find("HDMI_LOS_MODESET_TIMING_ABI=1") == std::string::npos) {
+      log_message("error", "kernel presenter requires the matching modeset-aware Xorg module");
+      return false;
+    }
   }
 
   int sockets[2] = {-1, -1};
@@ -1030,7 +1059,7 @@ int run_agent() {
   registration.opcode = HDMI_LOS_OP_AGENT_REGISTER;
   registration.request_id = static_cast<uint32_t>(getpid());
   registration.flags = g_no_timeout ? HDMI_LOS_FLAG_CONTINUOUS : 0;
-  if (g_timing_required) registration.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED;
+  if (g_timing_required) registration.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED | HDMI_LOS_FLAG_MODESET_TIMING;
   if (!write_full(g_broker, &registration, sizeof(registration))) return 1;
   int ignored_fd = -1;
   hdmi_los_message reply = {};
@@ -1042,7 +1071,8 @@ int run_agent() {
     log_message("error", "installed broker does not support continuous sessions");
     return 1;
   }
-  if (g_timing_required && !(reply.flags & HDMI_LOS_FLAG_TIMING_REQUIRED)) {
+  if (g_timing_required && (reply.flags & (HDMI_LOS_FLAG_TIMING_REQUIRED | HDMI_LOS_FLAG_MODESET_TIMING)) !=
+      (HDMI_LOS_FLAG_TIMING_REQUIRED | HDMI_LOS_FLAG_MODESET_TIMING)) {
     log_message("error", "broker did not acknowledge required kernel timing ownership");
     close(g_broker);
     g_broker = -1;

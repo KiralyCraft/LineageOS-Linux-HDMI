@@ -480,7 +480,10 @@ class Broker {
       }
       if (active_ && agent_timing_required_ && monotonic_ms() >= timing_check_ms_) {
         std::string error;
-        if (!timing_.Valid(&error)) Release(error.c_str(), true);
+        if (modeset_deadline_ms_) {
+          if (monotonic_ms() >= modeset_deadline_ms_)
+            Release("HDMI modeset did not restore validated timing within 2 seconds", true);
+        } else if (!timing_.Valid(&error)) Release(error.c_str(), true);
         timing_check_ms_ = monotonic_ms() + 500;
       }
       if (armed_ && !active_) AdvanceArmed();
@@ -556,6 +559,7 @@ class Broker {
     agent_reader_.Reset();
     agent_continuous_ = false;
     agent_timing_required_ = false;
+    agent_modeset_timing_ = false;
   }
 
   void ObserveHotplug(const hdmi_los_message &event) {
@@ -660,16 +664,72 @@ class Broker {
     return connected ? ComposerHotplug::kConnected : ComposerHotplug::kDisconnected;
   }
 
+  virtual bool RestartModeTiming(std::string *error) {
+    return timing_.Start(timing_lease_fd_, timing_connector_, timing_crtc_, timing_plane_, error);
+  }
+  virtual void SuspendModeTiming() { StopTiming(); }
+
+  bool ModeBarrier(const hdmi_los_message &event, std::string *error) {
+    if (!agent_modeset_timing_ || !agent_timing_required_ ||
+        event.crtc_id != timing_crtc_ || !event.request_id ||
+        event.state > 2) {
+      *error = "invalid modeset barrier";
+      return false;
+    }
+    // StopAgent can relay final SETCRTCs. Acknowledging teardown must never
+    // recreate timing after the owner has elected to release its lease.
+    if (stopping_agent_) return true;
+    if ((!active_ && !starting_) || timing_lease_fd_ < 0 ||
+        (modeset_deadline_ms_ && monotonic_ms() >= modeset_deadline_ms_)) {
+      *error = "modeset outside a live lease or past its deadline";
+      return false;
+    }
+    if (event.state == 0) {
+      if (modeset_sequence_) { *error = "prepare inside modeset ioctl"; return false; }
+      if (!modeset_deadline_ms_) modeset_deadline_ms_ = monotonic_ms() + 2000;
+      SuspendModeTiming();
+      return true;
+    }
+    if (event.state == 1) {
+      if (modeset_sequence_) { *error = "nested modeset ioctl"; return false; }
+      if (!modeset_deadline_ms_) modeset_deadline_ms_ = monotonic_ms() + 2000;
+      modeset_sequence_ = event.request_id;
+      // Xorg has drained/cancelled the old presenter before this barrier.
+      SuspendModeTiming();
+      return true;
+    }
+    if (modeset_sequence_ != event.request_id) {
+      *error = "unmatched modeset completion";
+      return false;
+    }
+    modeset_sequence_ = 0;
+    // A successful disable is only the first half of the bounded transition.
+    if (event.status == 0 && !event.active_refresh_millihz) return true;
+    // After either enable or ioctl failure, inspect actual kernel state. A
+    // failed ioctl may have left the old mode active; validate it for rollback.
+    if (!RestartModeTiming(error)) return false;
+    if (monotonic_ms() >= modeset_deadline_ms_) {
+      *error = "modeset validation exceeded deadline";
+      return false;
+    }
+    modeset_deadline_ms_ = 0;
+    log_line("info", ("modeset timing renewed: " + timing_.Describe()).c_str());
+    return true;
+  }
+
   bool HandleAgentEvent(const hdmi_los_message &event) {
-    if (event.opcode == HDMI_LOS_OP_AGENT_PROGRESS) {
+    if (event.opcode == HDMI_LOS_OP_AGENT_PROGRESS || event.opcode == HDMI_LOS_OP_AGENT_MODESET) {
       char text[sizeof(event.detail) + 1] = {};
       memcpy(text, event.detail, sizeof(event.detail));
       log_transition(text);
       hdmi_los_message acknowledgement = make_message(HDMI_LOS_OP_AGENT_PROGRESS_ACK);
       acknowledgement.request_id = event.request_id;
-      acknowledgement.status = HDMI_LOS_OK;
+      std::string error;
+      bool ok = event.opcode != HDMI_LOS_OP_AGENT_MODESET || ModeBarrier(event, &error);
+      acknowledgement.status = ok ? HDMI_LOS_OK : HDMI_LOS_ERR_STATE;
+      if (!ok) log_line("error", error.c_str());
       acknowledgement.flags = event.flags;
-      return write_full(agent_fd_, &acknowledgement, sizeof(acknowledgement));
+      return write_full(agent_fd_, &acknowledgement, sizeof(acknowledgement)) && ok;
     }
     return event.opcode != HDMI_LOS_OP_AGENT_FAILED;
   }
@@ -710,7 +770,7 @@ class Broker {
         if (!valid_message(*response) || monotonic_ms() >= end ||
             (!stopping && deadline_ms_ > 0 && monotonic_ms() >= deadline_ms_)) return false;
         if (stopping && response->opcode == HDMI_LOS_OP_AGENT_FAILED) continue;
-        if (response->opcode == HDMI_LOS_OP_AGENT_PROGRESS) {
+        if (response->opcode == HDMI_LOS_OP_AGENT_PROGRESS || response->opcode == HDMI_LOS_OP_AGENT_MODESET) {
           if (!HandleAgentEvent(*response)) return false;
           continue;
         }
@@ -1086,6 +1146,16 @@ class Broker {
     log_transition("takeover composer-create complete");
 
     if (agent_timing_required_) {
+      if (agent_modeset_timing_) {
+        timing_lease_fd_ = fcntl(lease_fd, F_DUPFD_CLOEXEC, 0);
+        if (timing_lease_fd_ < 0) {
+          close(lease_fd);
+          return AbortStart(HDMI_LOS_ERR_IO, "cannot retain timing lease", detail);
+        }
+        timing_connector_ = response.connector_id;
+        timing_crtc_ = response.crtc_id;
+        timing_plane_ = response.plane_id;
+      }
       if (!timing_.Start(lease_fd, response.connector_id, response.crtc_id,
                          response.plane_id, detail)) {
         close(lease_fd);
@@ -1252,6 +1322,10 @@ class Broker {
 
   void CleanupGuards() {
     StopTiming();
+    if (timing_lease_fd_ >= 0) close(timing_lease_fd_);
+    timing_lease_fd_ = -1;
+    timing_connector_ = timing_crtc_ = timing_plane_ = modeset_sequence_ = 0;
+    modeset_deadline_ms_ = 0;
     volumes_.Release();
     set_wake_lock(false);
     deadline_ms_ = 0;
@@ -1265,12 +1339,14 @@ class Broker {
     hdmi_los_message stop = make_message(HDMI_LOS_OP_AGENT_STOP);
     hdmi_los_message response = {};
     log_transition("restore agent-stop begin");
+    stopping_agent_ = true;
     bool stopped = write_full(agent_fd_, &stop, sizeof(stop)) &&
         WaitAgent(HDMI_LOS_OP_AGENT_READY, timeout_ms, &response, true, stop.request_id);
     log_transition(stopped ? "restore agent-stop complete" : "restore agent-stop timeout/failure");
     // Do not reuse a connection whose stop was not acknowledged. The agent's
     // independent disconnect cleanup is the fallback before forced revocation.
     if (!stopped) ForgetAgent();
+    stopping_agent_ = false;
     return stopped;
   }
 
@@ -1455,10 +1531,16 @@ class Broker {
 
     if (request.opcode == HDMI_LOS_OP_AGENT_REGISTER && root) {
       std::string timing_error;
-      if (request.flags & ~(HDMI_LOS_FLAG_CONTINUOUS | HDMI_LOS_FLAG_TIMING_REQUIRED)) {
+      if (request.flags & ~(HDMI_LOS_FLAG_CONTINUOUS | HDMI_LOS_FLAG_TIMING_REQUIRED | HDMI_LOS_FLAG_MODESET_TIMING)) {
         hdmi_los_message rejected = Status(request.request_id);
         rejected.status = HDMI_LOS_ERR_PROTOCOL;
         snprintf(rejected.detail, sizeof(rejected.detail), "unknown agent registration flag");
+        write_full(client, &rejected, sizeof(rejected));
+        close(client);
+      } else if ((request.flags & HDMI_LOS_FLAG_MODESET_TIMING) &&
+                 !(request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED)) {
+        hdmi_los_message rejected = Status(request.request_id);
+        rejected.status = HDMI_LOS_ERR_PROTOCOL;
         write_full(client, &rejected, sizeof(rejected));
         close(client);
       } else if ((request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED) &&
@@ -1478,6 +1560,7 @@ class Broker {
         agent_reader_.Reset();
         agent_continuous_ = request.flags & HDMI_LOS_FLAG_CONTINUOUS;
         agent_timing_required_ = request.flags & HDMI_LOS_FLAG_TIMING_REQUIRED;
+        agent_modeset_timing_ = request.flags & HDMI_LOS_FLAG_MODESET_TIMING;
         hdmi_los_message ready = Status(request.request_id);
         ready.status = HDMI_LOS_OK;
         ready.state = HDMI_LOS_STATE_AGENT_READY;
@@ -1485,6 +1568,7 @@ class Broker {
         // Status describes an armed display or a paused connected restart.
         if (agent_continuous_) ready.flags |= HDMI_LOS_FLAG_CONTINUOUS;
         if (agent_timing_required_) ready.flags |= HDMI_LOS_FLAG_TIMING_REQUIRED;
+        if (agent_modeset_timing_) ready.flags |= HDMI_LOS_FLAG_MODESET_TIMING;
         write_full(agent_fd_, &ready, sizeof(ready));
         log_line("info", "chroot agent registered");
       }
@@ -1587,6 +1671,12 @@ class Broker {
   bool session_continuous_ = false;
   bool composer_renewable_ = false;
   bool agent_timing_required_ = false;
+  bool agent_modeset_timing_ = false;
+  bool stopping_agent_ = false;
+  int timing_lease_fd_ = -1;
+  uint32_t timing_connector_ = 0, timing_crtc_ = 0, timing_plane_ = 0;
+  uint32_t modeset_sequence_ = 0;
+  int64_t modeset_deadline_ms_ = 0;
   int64_t timing_check_ms_ = 0;
   HdmiTimingSession timing_;
   bool armed_ = false;
