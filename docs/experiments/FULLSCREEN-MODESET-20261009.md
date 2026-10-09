@@ -74,7 +74,10 @@ The desktop was restored to 4K60 and a connected restart succeeded; a subsequent
 game round trip passed on the new Xorg PID 11571. All retired R3 timing sessions
 reported USER stop with balanced gets=1/puts=1, rather than CRTC_INACTIVE or
 MODE_CHANGED. The 55-second trace contained 15,767 ioctls, including 4,814
-companion operations, with no companion ioctl failures. Other driver capability
+classified presentation/modeset operations, with no observed companion ioctl failures.
+CPU3 reported 168 overwritten trace events at the beginning of the bounded capture;
+this is not a lossless trace of every ioctl. The broker/Xorg logs and normal game
+exits independently establish that the sessions survived. Other driver capability
 probe failures and interrupted waits were retained in the raw trace.
 
 The additional requested 4K60 -> 1080p30 -> 4K60 transition passed with xrandr.
